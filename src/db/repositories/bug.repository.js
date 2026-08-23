@@ -35,7 +35,6 @@ export class BugRepository extends BaseRepository {
     if (filters.kanbanColumn) {
       sql += ` AND kanban_column = $${paramIndex}`;
       params.push(filters.kanbanColumn);
-      paramIndex++;
     }
 
     sql += ' ORDER BY created_at DESC';

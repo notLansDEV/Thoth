@@ -1,10 +1,10 @@
 const API_URL = '/api'
 
 export const TASK_STAGES = [
-  { value: 'todo', label: 'To Do', color: '#5f74ff' },
-  { value: 'in_progress', label: 'In Progress', color: '#ff7918' },
-  { value: 'review', label: 'Review', color: '#a14cff' },
-  { value: 'done', label: 'Done', color: '#20d86b' },
+  { value: 'To Do', label: 'To Do', color: '#6e61ff' },
+  { value: 'In Progress', label: 'In Progress', color: '#ff7918' },
+  { value: 'Review', label: 'Review', color: '#a14cff' },
+  { value: 'Done', label: 'Done', color: '#20d96b' },
 ]
 
 export const TASK_PRIORITIES = [
@@ -66,4 +66,37 @@ export async function getWorkspaceMembers(workspaceId) {
 export async function getMilestones(projectId) {
   if (!projectId) return []
   return apiRequest(`/milestones?project_id=${encodeURIComponent(projectId)}`)
+}
+
+export async function getStages(workspaceId) {
+  if (!workspaceId) return []
+  const rows = await apiRequest(`/task-stages?workspace_id=${encodeURIComponent(workspaceId)}`)
+  return Array.isArray(rows) ? rows : []
+}
+
+export async function createStage(workspaceId, name, color) {
+  return apiRequest('/task-stages', {
+    method: 'POST',
+    body: JSON.stringify({ workspace_id: workspaceId, name, color }),
+  })
+}
+
+export async function updateStage(stageId, data) {
+  return apiRequest(`/task-stages/${encodeURIComponent(stageId)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function deleteStage(stageId) {
+  return apiRequest(`/task-stages/${encodeURIComponent(stageId)}`, {
+    method: 'DELETE',
+  })
+}
+
+export async function reorderStages(order) {
+  return apiRequest('/task-stages/reorder', {
+    method: 'PATCH',
+    body: JSON.stringify({ order }),
+  })
 }

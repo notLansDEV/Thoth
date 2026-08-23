@@ -20,23 +20,24 @@ function parsePath(){
   const parts = window.location.pathname.split('/').filter(Boolean)
   let workspace = 'default'
   let page = 'dashboard'
-  if(parts.length === 0){ return {workspace,page} }
+  if(parts.length === 0){ return {workspace,page,id:null} }
   // Support both /Thoth/workspace/page and /workspace/page
   if(parts[0].toLowerCase() === 'thoth'){
     parts.shift()
   }
-  if(parts.length === 0){ return {workspace,page} }
+  if(parts.length === 0){ return {workspace,page,id:null} }
   // /login and /signup are top-level pages, not workspaces
   if(AUTH_PAGES.includes(parts[0])){
-    return { workspace: 'default', page: parts[0] }
+    return { workspace: 'default', page: parts[0], id: null }
   }
   // A single segment is a PAGE (e.g. /workspaces, /tasks), not a workspace name
   if(parts.length === 1){
-    return { workspace: 'default', page: parts[0] }
+    return { workspace: 'default', page: parts[0], id: null }
   }
   if(parts[0]) workspace = parts[0]
   if(parts[1]) page = parts[1]
-  return {workspace,page}
+  const id = parts[2] || null
+  return {workspace,page,id}
 }
 
 export default function AppRouter(){
@@ -50,6 +51,7 @@ export default function AppRouter(){
 
   const { workspace } = route
   let { page } = route
+  const routeId = route.id
 
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
 
@@ -72,7 +74,7 @@ export default function AppRouter(){
     case 'login': return render(<Login />)
     case 'signup': return render(<Signup />)
     case 'dashboard': return render(<Dashboard workspace={workspace} />)
-    case 'projects': return render(<Projects workspace={workspace} />)
+    case 'projects': return render(<Projects workspace={workspace} projectId={routeId} />)
     case 'tasks': return render(<Tasks workspace={workspace} />)
     case 'bugs': return render(<Bugs workspace={workspace} />)
     case 'calendar': return render(<Calendar workspace={workspace} />)

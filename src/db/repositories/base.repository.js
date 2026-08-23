@@ -1,4 +1,4 @@
-import { query, getOne, getMany, transaction } from '../database.js';
+import { query, getOne, getMany } from '../database.js';
 
 /**
  * Base Repository class with common CRUD operations
@@ -87,6 +87,17 @@ export class BaseRepository {
     const sql = `DELETE FROM ${this.tableName} WHERE ${whereClause}`;
     const result = await query(sql, params);
     return result.rowCount;
+  }
+
+  /**
+   * Update by condition (returns updated rows)
+   */
+  async updateByCondition(whereClause, params = [], data = {}) {
+    const entries = Object.entries(data);
+    if (entries.length === 0) return [];
+    const setClause = entries.map(([key], i) => `${key} = $${params.length + i + 1}`).join(', ');
+    const sql = `UPDATE ${this.tableName} SET ${setClause}, updated_at = CURRENT_TIMESTAMP WHERE ${whereClause} RETURNING *`;
+    return getMany(sql, [...params, ...entries.map(([, value]) => value)]);
   }
 }
 

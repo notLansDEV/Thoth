@@ -16,6 +16,10 @@ import workspaceRepository from '../src/db/repositories/workspace.repository.js'
 import taskRepository from '../src/db/repositories/task.repository.js'
 import milestoneRepository from '../src/db/repositories/milestone.repository.js'
 import bugRepository from '../src/db/repositories/bug.repository.js'
+import { BaseRepository } from '../src/db/repositories/base.repository.js'
+
+const taskStageRepository = new BaseRepository('task_stages')
+const bugStageRepository = new BaseRepository('bug_stages')
 
 const PORT = process.env.PORT || 4000
 const JWT_SECRET = process.env.JWT_SECRET || 'devsecret'
@@ -355,10 +359,196 @@ app.delete('/api/projects/:id', auth, async (req, res) => {
 
 app.get('/api/bugs', auth, async (req, res) => {
   try {
-    const { project_id } = req.query
-    if (!project_id) return res.status(400).json({ error: 'project_id is required' })
-    const rows = await bugRepository.findByCondition('project_id = $1', [project_id])
-    res.json(rows)
+    const { project_id, workspace_id } = req.query
+    if (project_id) {
+      const rows = await bugRepository.findByCondition('project_id = $1', [project_id])
+      return res.json(rows)
+    }
+    if (workspace_id) {
+      const projects = await projectRepository.findByCondition('workspace_id = $1', [workspace_id])
+      if (projects.length === 0) return res.json([])
+      const rows = await bugRepository.findByCondition(
+        'project_id = ANY($1::uuid[])',
+        [projects.map((p) => p.id)]
+      )
+      return res.json(rows)
+    }
+    return res.status(400).json({ error: 'project_id or workspace_id is required' })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
+// ---------- Stage management (tasks + bugs) ----------
+
+const DEFAULT_TASK_STAGES = [
+  { name: 'To Do', color: '#6e61ff' },
+  { name: 'In Progress', color: '#ff7918' },
+  { name: 'Review', color: '#a14cff' },
+  { name: 'Done', color: '#20d969' },
+]
+
+const DEFAULT_BUG_STAGES = [
+  { name: 'New', color: '#5f74ff' },
+  { name: 'In Progress', color: '#ff7818' },
+  { name: 'Fixed', color: '#20d96b' },
+  { name: 'Closed', color: '#777777' },
+]
+
+async function ensureStages(repo, workspaceId, defaults) {
+  let rows = await repo.findByCondition('workspace_id = $1', [workspaceId], 'position ASC, created_at ASC')
+  if (rows.length === 0) {
+    let pos = 0
+    for (const s of defaults) {
+      await repo.create({ workspace_id: workspaceId, name: s.name, color: s.color, position: pos++ })
+    }
+    rows = await repo.findByCondition('workspace_id = $1', [workspaceId], 'position ASC, created_at ASC')
+  }
+  return rows
+}
+
+function stageRoutes(basePath, repo, defaults) {
+  app.get(basePath, auth, async (req, res) => {
+    try {
+      const { workspace_id } = req.query
+      if (!workspace_id) return res.status(400).json({ error: 'workspace_id is required' })
+      const rows = await ensureStages(repo, workspace_id, defaults)
+      res.json(rows)
+    } catch (err) {
+      console.error(err)
+      res.status(500).json({ error: 'Server error' })
+    }
+  })
+
+  app.post(basePath, auth, async (req, res) => {
+    try {
+      const { workspace_id, name, color } = req.body
+      if (!workspace_id || !name || !name.trim()) {
+        return res.status(400).json({ error: 'workspace_id and name are required' })
+      }
+      const existing = await repo.findByCondition('workspace_id = $1', [workspace_id], 'position ASC')
+      const maxPos = existing.reduce((m, r) => Math.max(m, Number(r.position) || 0), -1)
+      const created = await repo.create({
+        workspace_id,
+        name: name.trim(),
+        color: color || '#6e61ff',
+        position: maxPos + 1,
+      })
+      res.json(created)
+    } catch (err) {
+      if (err && err.code === '23505') {
+        return res.status(409).json({ error: 'A stage with this name already exists' })
+      }
+      console.error(err)
+      res.status(500).json({ error: 'Server error' })
+    }
+  })
+
+  app.patch(`${basePath}/reorder`, auth, async (req, res) => {
+    try {
+      const { order } = req.body
+      if (!Array.isArray(order)) return res.status(400).json({ error: 'order array is required' })
+      for (let i = 0; i < order.length; i++) {
+        await repo.updateById(order[i], { position: i })
+      }
+      res.json({ ok: true })
+    } catch (err) {
+      console.error(err)
+      res.status(500).json({ error: 'Server error' })
+    }
+  })
+
+  app.patch(`${basePath}/:id`, auth, async (req, res) => {
+    try {
+      const data = {}
+      if (req.body.name !== undefined) data.name = String(req.body.name).trim()
+      if (req.body.color !== undefined) data.color = req.body.color
+      if (req.body.position !== undefined) data.position = req.body.position
+      if (Object.keys(data).length === 0) {
+        return res.status(400).json({ error: 'No valid fields to update' })
+      }
+      const updated = await repo.updateById(req.params.id, data)
+      if (!updated) return res.status(404).json({ error: 'Stage not found' })
+      res.json(updated)
+    } catch (err) {
+      if (err && err.code === '23505') {
+        return res.status(409).json({ error: 'A stage with this name already exists' })
+      }
+      console.error(err)
+      res.status(500).json({ error: 'Server error' })
+    }
+  })
+}
+
+stageRoutes('/api/task-stages', taskStageRepository, DEFAULT_TASK_STAGES)
+stageRoutes('/api/bug-stages', bugStageRepository, DEFAULT_BUG_STAGES)
+
+async function ensureArchivedStage(repo, workspaceId) {
+  let archived = (await repo.findByCondition('workspace_id = $1 AND name = $2', [workspaceId, 'Archived']))[0]
+  if (!archived) {
+    const all = await repo.findByCondition('workspace_id = $1', [workspaceId], 'position ASC')
+    const maxPos = all.reduce((m, r) => Math.max(m, Number(r.position) || 0), -1)
+    archived = await repo.create({
+      workspace_id: workspaceId,
+      name: 'Archived',
+      color: '#555555',
+      position: maxPos + 1,
+    })
+  }
+  return archived
+}
+
+app.delete('/api/task-stages/:id', auth, async (req, res) => {
+  try {
+    const stage = await taskStageRepository.findById(req.params.id)
+    if (!stage) return res.status(404).json({ error: 'Stage not found' })
+    if (stage.name === 'Archived') {
+      return res.status(400).json({ error: 'The Archived stage cannot be deleted' })
+    }
+
+    await ensureArchivedStage(taskStageRepository, stage.workspace_id)
+
+    // Tasks are scoped by project, so scope through the workspace's projects
+    const projects = await projectRepository.findByCondition('workspace_id = $1', [stage.workspace_id])
+    if (projects.length > 0) {
+      await taskRepository.updateByCondition(
+        'project_id = ANY($1::uuid[]) AND status = $2',
+        [projects.map((p) => p.id), stage.name],
+        { status: 'Archived' }
+      )
+    }
+
+    await taskStageRepository.deleteById(stage.id)
+    res.json({ ok: true })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
+app.delete('/api/bug-stages/:id', auth, async (req, res) => {
+  try {
+    const stage = await bugStageRepository.findById(req.params.id)
+    if (!stage) return res.status(404).json({ error: 'Stage not found' })
+    if (stage.name === 'Archived') {
+      return res.status(400).json({ error: 'The Archived stage cannot be deleted' })
+    }
+
+    await ensureArchivedStage(bugStageRepository, stage.workspace_id)
+
+    // Bugs are scoped by project, so scope through the workspace's projects
+    const projects = await projectRepository.findByCondition('workspace_id = $1', [stage.workspace_id])
+    if (projects.length > 0) {
+      await bugRepository.updateByCondition(
+        'project_id = ANY($1::uuid[]) AND kanban_column = $2',
+        [projects.map((p) => p.id), stage.name],
+        { kanban_column: 'Archived', status: 'Archived' }
+      )
+    }
+
+    await bugStageRepository.deleteById(stage.id)
+    res.json({ ok: true })
   } catch (err) {
     console.error(err)
     res.status(500).json({ error: 'Server error' })

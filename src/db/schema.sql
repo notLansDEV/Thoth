@@ -81,6 +81,36 @@ CREATE TABLE IF NOT EXISTS tasks (
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS progress INTEGER DEFAULT 0;
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS meta JSONB DEFAULT '{}';
 
+-- Task Stages Table (workspace-level, user-manageable)
+CREATE TABLE IF NOT EXISTS task_stages (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  name VARCHAR(100) NOT NULL,
+  color VARCHAR(20) DEFAULT '#6e61ff',
+  position INTEGER DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(workspace_id, name)
+);
+
+-- Bug Stages Table (workspace-level, user-manageable)
+CREATE TABLE IF NOT EXISTS bug_stages (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  name VARCHAR(100) NOT NULL,
+  color VARCHAR(20) DEFAULT '#ff4040',
+  position INTEGER DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(workspace_id, name)
+);
+
+-- Migrate legacy hardcoded task statuses to stage names
+UPDATE tasks SET status = 'To Do' WHERE status = 'todo';
+UPDATE tasks SET status = 'In Progress' WHERE status = 'in_progress';
+UPDATE tasks SET status = 'Review' WHERE status = 'review';
+UPDATE tasks SET status = 'Done' WHERE status = 'done';
+
 -- Bugs Table
 CREATE TABLE IF NOT EXISTS bugs (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

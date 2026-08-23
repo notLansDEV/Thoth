@@ -64,7 +64,10 @@ function fileIcon(name = '') {
   return '📎'
 }
 
-export default function TaskPreviewModal({ task, workspaceId, onUpdated, onClose }) {
+export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated, onClose }) {
+  const stageOptions = (stages && stages.length > 0)
+    ? stages.map((s) => ({ value: s.name, label: s.name }))
+    : TASK_STAGES
   const [title, setTitle] = useState(task.title)
   const [description, setDescription] = useState(task.description || '')
   const [stage, setStage] = useState(task.status || 'todo')
@@ -217,7 +220,7 @@ export default function TaskPreviewModal({ task, workspaceId, onUpdated, onClose
 
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '14px', paddingLeft: '2px' }}>
             <span className="badge paused" style={{ fontSize: '9px' }}>
-              {(TASK_STAGES.find((s) => s.value === stage) || {}).label}
+              {(stageOptions.find((s) => s.value === stage) || {}).label || stage}
             </span>
             <span className="badge" style={{ ...priorityStyle(priority), background: 'transparent', fontSize: '9px' }}>
               {priority}
@@ -472,7 +475,7 @@ export default function TaskPreviewModal({ task, workspaceId, onUpdated, onClose
               onChange={(e) => { setStage(e.target.value); patch({ status: e.target.value }) }}
               style={inputStyle}
             >
-              {TASK_STAGES.map((s) => (
+              {stageOptions.map((s) => (
                 <option key={s.value} value={s.value}>{s.label}</option>
               ))}
             </select>

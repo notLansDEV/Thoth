@@ -1,2 +1,1 @@
-﻿import React from 'react'
 export default function Milestones({workspace}){ return <section className="card"><div className="card-head"><div className="name">Milestones — {workspace}</div></div><div style={{paddingTop:8}}>Milestones page placeholder</div></section> }

@@ -1,17 +1,24 @@
-﻿import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   TASK_STAGES,
   priorityStyle,
   getTasks,
   updateTask,
+  getStages,
+  createStage,
+  updateStage as updateStageApi,
+  deleteStage as deleteStageApi,
+  reorderStages,
 } from '../features/tasks/tasks.service.js'
 import { getProjects } from '../features/projects/projects.service.js'
 import { getCurrentWorkspace } from '../features/workspaces/workspaces.service.js'
 import CreateTaskModal from '../features/tasks/components/CreateTaskModal.jsx'
 import TaskPreviewModal from '../features/tasks/components/TaskPreviewModal.jsx'
+import StageBoard from '../components/StageBoard.jsx'
+import ConfirmModal from '../components/ConfirmModal.jsx'
 
 function isOverdue(task) {
-  if (!task.due_date || task.status === 'done') return false
+  if (!task.due_date || task.status === 'Done') return false
   return new Date(task.due_date) < new Date(new Date().toDateString())
 }
 
@@ -21,32 +28,20 @@ function formatDate(value) {
   return Number.isNaN(d.getTime()) ? null : d.toLocaleDateString()
 }
 
-function TaskCard({ task, compact, onOpen, onDragStart }) {
+function StatCard({ icon, label, value }) {
+  return (
+    <div className="card" style={{ padding: '12px' }}>
+      <div style={{ fontSize: '9px', fontWeight: 700, color: '#666', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '6px' }}>
+        {icon} {label}
+      </div>
+      <div style={{ fontSize: '18px', fontWeight: 700, color: '#f1f1f1' }}>{value}</div>
+    </div>
+  )
+}
+
+function TaskCard({ task, onOpen, onDragStart }) {
   const overdue = isOverdue(task)
   const due = formatDate(task.due_date)
-
-  if (compact) {
-    return (
-      <div
-        draggable
-        onDragStart={(e) => onDragStart(e, task.id)}
-        onClick={() => onOpen(task)}
-        style={{
-          background: '#101010', border: '1px solid #2a2a2a', borderRadius: '4px',
-          padding: '8px 9px', marginBottom: '7px', cursor: 'grab',
-        }}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', alignItems: 'center' }}>
-          <span style={{ fontSize: '11px', color: '#ddd', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {task.title}
-          </span>
-          <span className="badge" style={{ ...priorityStyle(task.priority), background: 'transparent', fontSize: '9px', flexShrink: 0 }}>
-            {task.priority}
-          </span>
-        </div>
-      </div>
-    )
-  }
 
   return (
     <div
@@ -55,7 +50,7 @@ function TaskCard({ task, compact, onOpen, onDragStart }) {
       onClick={() => onOpen(task)}
       style={{
         background: '#101010', border: overdue ? '1px solid rgba(255,64,64,0.4)' : '1px solid #2a2a2a',
-        borderRadius: '4px', padding: '10px', marginBottom: '8px', cursor: 'pointer',
+        borderRadius: '4px', padding: '10px', marginBottom: '8px', cursor: 'grab',
         transition: 'border-color 0.15s',
       }}
       onMouseEnter={(e) => { e.currentTarget.style.borderColor = overdue ? 'rgba(255,64,64,0.7)' : '#6e61ff' }}
@@ -79,7 +74,7 @@ function TaskCard({ task, compact, onOpen, onDragStart }) {
 
       {task.assignee_name && (
         <div style={{ fontSize: '10px', color: '#888', marginTop: '7px' }}>
-          👤 {task.assignee_name}
+          ?? {task.assignee_name}
         </div>
       )}
 
@@ -95,7 +90,7 @@ function TaskCard({ task, compact, onOpen, onDragStart }) {
                 Overdue
               </span>
             )}
-            <span style={{ color: overdue ? '#ff8080' : '#777' }}>⏰ {due}</span>
+            <span style={{ color: overdue ? '#ff8080' : '#777' }}>? {due}</span>
           </span>
         )}
       </div>
@@ -105,44 +100,53 @@ function TaskCard({ task, compact, onOpen, onDragStart }) {
 
 export default function Tasks() {
   const ws = getCurrentWorkspace()
-  const [mode, setMode] = useState('all')
-  const [menuOpen, setMenuOpen] = useState(false)
+  const [tab, setTab] = useState('all')
   const [tasks, setTasks] = useState([])
   const [projects, setProjects] = useState([])
+  const [stages, setStages] = useState([])
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
   const [preview, setPreview] = useState(null)
+  const [confirmDelete, setConfirmDelete] = useState(null)
+  const [deleting, setDeleting] = useState(false)
   const dragId = useRef(null)
-  const menuRef = useRef(null)
+
+  async function refresh() {
+    try {
+      const [t, p, s] = await Promise.all([
+        getTasks(ws?.id),
+        getProjects(ws?.id),
+        getStages(ws?.id).catch(() => []),
+      ])
+      setTasks(t)
+      setProjects(p)
+      setStages(s.length > 0 ? s : TASK_STAGES.map((x) => ({ id: x.value, name: x.value, color: x.color })))
+    } catch {
+      /* keep current state */
+    }
+  }
 
   useEffect(() => {
     let alive = true
-
-    async function load() {
+    ;(async () => {
       try {
-        const [t, p] = await Promise.all([
+        const [t, p, s] = await Promise.all([
           getTasks(ws?.id),
           getProjects(ws?.id),
+          getStages(ws?.id).catch(() => []),
         ])
-        if (alive) { setTasks(t); setProjects(p) }
+        if (!alive) return
+        setTasks(t)
+        setProjects(p)
+        setStages(s.length > 0 ? s : TASK_STAGES.map((x) => ({ id: x.value, name: x.value, color: x.color })))
       } catch {
         if (alive) setTasks([])
       } finally {
         if (alive) setLoading(false)
       }
-    }
-
-    load()
+    })()
     return () => { alive = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  useEffect(() => {
-    function onDocClick(e) {
-      if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false)
-    }
-    document.addEventListener('mousedown', onDocClick)
-    return () => document.removeEventListener('mousedown', onDocClick)
   }, [])
 
   function handleDrop(status) {
@@ -171,9 +175,57 @@ export default function Tasks() {
     setTasks((current) => current.map((t) => (t.id === updated.id ? updated : t)))
   }
 
-  const stages = mode === 'all'
-    ? [...TASK_STAGES]
-    : TASK_STAGES.filter((s) => s.value !== 'done')
+  async function handleAddStage(data) {
+    try {
+      await createStage(ws?.id, data.name, data.color)
+      await refresh()
+    } catch (err) {
+      window.alert(err.message || 'Could not create stage')
+    }
+  }
+
+  async function handleUpdateStage(id, data) {
+    try {
+      await updateStageApi(id, data)
+      await refresh()
+    } catch (err) {
+      window.alert(err.message || 'Could not update stage')
+    }
+  }
+
+  async function handleReorder(orderIds) {
+    setStages((cur) => {
+      const map = new Map(cur.map((s) => [s.id, s]))
+      return orderIds.map((id) => map.get(id)).filter(Boolean)
+    })
+    try {
+      await reorderStages(orderIds)
+    } catch {
+      await refresh()
+    }
+  }
+
+  async function handleConfirmDelete() {
+    if (!confirmDelete) return
+    setDeleting(true)
+    try {
+      await deleteStageApi(confirmDelete.id)
+      setConfirmDelete(null)
+      await refresh()
+    } catch (err) {
+      window.alert(err.message || 'Could not delete stage')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  const counts = {}
+  for (const t of tasks) {
+    const key = t.status || stages[0]?.name || 'To Do'
+    counts[key] = (counts[key] || 0) + 1
+  }
+
+  const defaultStageName = stages[0]?.name || 'To Do'
 
   return (
     <div>
@@ -183,81 +235,58 @@ export default function Tasks() {
           <p className="page-subtitle">Plan, track and move work across stages</p>
         </div>
 
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }} ref={menuRef}>
-          <div style={{ position: 'relative' }}>
-            <button className="btn" onClick={() => setMenuOpen((v) => !v)} style={{ cursor: 'pointer' }}>
-              {mode === 'all' ? 'All Tasks' : 'Task Stages'} ▾
-            </button>
-            {menuOpen && (
-              <div style={{
-                position: 'absolute', right: 0, top: '31px', zIndex: 50,
-                background: '#151515', border: '1px solid #2a2a2a', borderRadius: '4px',
-                minWidth: '150px', boxShadow: '0 8px 20px rgba(0,0,0,0.45)', overflow: 'hidden',
-              }}>
-                <div
-                  onClick={() => { setMode('all'); setMenuOpen(false) }}
-                  style={{
-                    padding: '8px 11px', fontSize: '12px', cursor: 'pointer',
-                    color: mode === 'all' ? '#fff' : '#999',
-                    background: mode === 'all' ? '#1c1c1c' : 'transparent',
-                    borderBottom: '1px solid #242424',
-                  }}
-                  onMouseEnter={(e) => { e.currentTarget.style.background = '#1c1c1c' }}
-                  onMouseLeave={(e) => { if (mode !== 'all') e.currentTarget.style.background = 'transparent' }}
-                >
-                  All Tasks
-                  <div style={{ fontSize: '9px', color: '#666', marginTop: '2px' }}>Every task in Kanban view</div>
-                </div>
-                <div
-                  onClick={() => { setMode('stages'); setMenuOpen(false) }}
-                  style={{
-                    padding: '8px 11px', fontSize: '12px', cursor: 'pointer',
-                    color: mode === 'stages' ? '#fff' : '#999',
-                    background: mode === 'stages' ? '#1c1c1c' : 'transparent',
-                  }}
-                  onMouseEnter={(e) => { e.currentTarget.style.background = '#1c1c1c' }}
-                  onMouseLeave={(e) => { if (mode !== 'stages') e.currentTarget.style.background = 'transparent' }}
-                >
-                  Task Stages
-                  <div style={{ fontSize: '9px', color: '#666', marginTop: '2px' }}>Drag tasks between stages</div>
-                </div>
-              </div>
-            )}
-          </div>
+        <button className="btn primary" onClick={() => setShowCreate(true)} style={{ cursor: 'pointer' }}>
+          + New Task
+        </button>
+      </div>
 
-          <button className="btn primary" onClick={() => setShowCreate(true)} style={{ cursor: 'pointer' }}>
-            + New Task
+      {/* Sub-module tabs */}
+      <div className="tab-row">
+        {[{ key: 'all', label: 'All Task' }, { key: 'stages', label: 'Task Stages' }].map((t) => (
+          <button
+            key={t.key}
+            className={`tab-btn${tab === t.key ? ' active' : ''}`}
+            onClick={() => setTab(t.key)}
+          >
+            {t.label}
           </button>
-        </div>
+        ))}
+      </div>
+
+      {/* 3 stat cards */}
+      <div className="stat-grid">
+        <StatCard icon="?" label="Total stage" value={stages.length} />
+        <StatCard icon="?" label="Total task" value={tasks.length} />
+        <StatCard icon="?" label={defaultStageName} value={counts[defaultStageName] || 0} />
       </div>
 
       {projects.length === 0 && !loading && (
         <div className="card">
           <div className="description" style={{ margin: 0 }}>
-            Create a project first — tasks live inside projects.
+            Create a project first � tasks live inside projects.
           </div>
         </div>
       )}
 
       {loading ? (
-        <div className="card"><div className="description" style={{ margin: 0 }}>Loading tasks…</div></div>
-      ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${stages.length}, minmax(230px, 1fr))`, gap: '10px', alignItems: 'start' }}>
+        <div className="card"><div className="description" style={{ margin: 0 }}>Loading tasks�</div></div>
+      ) : tab === 'all' ? (
+        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.max(stages.length, 1)}, minmax(230px, 1fr))`, gap: '10px', alignItems: 'start', overflowX: 'auto' }}>
           {stages.map((stage) => {
-            const columnTasks = tasks.filter((t) => (t.status || 'todo') === stage.value)
+            const columnTasks = tasks.filter((t) => (t.status || defaultStageName) === stage.name)
             return (
               <div
-                key={stage.value}
+                key={stage.id}
                 onDragOver={(e) => e.preventDefault()}
-                onDrop={() => handleDrop(stage.value)}
+                onDrop={() => handleDrop(stage.name)}
                 style={{
                   background: '#121212', border: '1px solid #292929', borderRadius: '5px',
                   padding: '9px', minHeight: '120px',
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '9px', padding: '0 2px' }}>
-                  <span style={{ fontSize: '11px', fontWeight: '700', color: stage.color, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    {stage.label}
+                  <span style={{ fontSize: '11px', fontWeight: '700', color: stage.color || '#999', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    {stage.name}
                   </span>
                   <span style={{ fontSize: '10px', color: '#555' }}>{columnTasks.length}</span>
                 </div>
@@ -266,7 +295,6 @@ export default function Tasks() {
                   <TaskCard
                     key={task.id}
                     task={task}
-                    compact={mode === 'stages'}
                     onOpen={setPreview}
                     onDragStart={(e, id) => { dragId.current = id; e.dataTransfer.effectAllowed = 'move' }}
                   />
@@ -284,12 +312,23 @@ export default function Tasks() {
             )
           })}
         </div>
+      ) : (
+        <StageBoard
+          stages={stages}
+          counts={counts}
+          itemLabel="tasks"
+          onAdd={handleAddStage}
+          onUpdate={handleUpdateStage}
+          onDelete={setConfirmDelete}
+          onReorder={handleReorder}
+        />
       )}
 
       {showCreate && (
         <CreateTaskModal
           projects={projects}
           workspaceId={ws?.id}
+          stages={stages}
           defaultProjectId={projects[0]?.id}
           onCreated={onCreated}
           onClose={() => setShowCreate(false)}
@@ -300,8 +339,21 @@ export default function Tasks() {
         <TaskPreviewModal
           task={preview}
           workspaceId={ws?.id}
+          stages={stages}
           onUpdated={onUpdated}
           onClose={() => setPreview(null)}
+        />
+      )}
+
+      {confirmDelete && (
+        <ConfirmModal
+          title={`Delete stage "${confirmDelete.name}"?`}
+          message="Are you sure you want to delete this stage?"
+          note="* All of the tasks inside will be moved to the Archived stage."
+          confirmLabel="Delete"
+          busy={deleting}
+          onConfirm={handleConfirmDelete}
+          onCancel={() => setConfirmDelete(null)}
         />
       )}
     </div>

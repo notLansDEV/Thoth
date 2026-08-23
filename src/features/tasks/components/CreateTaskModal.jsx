@@ -25,8 +25,12 @@ const labelStyle = {
   color: '#ddd',
 }
 
-export default function CreateTaskModal({ projects, workspaceId, defaultProjectId, onCreated, onClose }) {
+export default function CreateTaskModal({ projects, workspaceId, stages, defaultProjectId, onCreated, onClose }) {
+  const stageOptions = (stages && stages.length > 0)
+    ? stages.map((s) => ({ value: s.name, label: s.name }))
+    : []
   const [projectId, setProjectId] = useState(defaultProjectId || '')
+  const [stage, setStage] = useState(stageOptions[0]?.value || 'To Do')
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [priority, setPriority] = useState('medium')
@@ -58,6 +62,7 @@ export default function CreateTaskModal({ projects, workspaceId, defaultProjectI
         project_id: projectId,
         title: title.trim(),
         description: description.trim() || null,
+        status: stage,
         priority,
         assigned_to: assignee || null,
         start_date: startDate || null,
@@ -125,6 +130,16 @@ export default function CreateTaskModal({ projects, workspaceId, defaultProjectI
               placeholder="Add more details…"
               style={{ ...inputStyle, minHeight: '60px', resize: 'vertical' }}
             />
+          </div>
+
+          <div style={{ marginBottom: '14px' }}>
+            <label style={labelStyle}>Stage</label>
+            <select value={stage} onChange={(e) => setStage(e.target.value)} style={inputStyle}>
+              {stageOptions.length === 0 && <option value="To Do">To Do</option>}
+              {stageOptions.map((s) => (
+                <option key={s.value} value={s.value}>{s.label}</option>
+              ))}
+            </select>
           </div>
 
           <div style={{ marginBottom: '14px' }}>

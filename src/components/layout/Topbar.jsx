@@ -72,7 +72,9 @@ export default function Topbar({ collapsed, onToggleCollapse }) {
   }
 
   const parts = window.location.pathname.split('/').filter(Boolean)
-  const pageKey = parts[parts.length - 1] || 'dashboard'
+  if (parts[0] && parts[0].toLowerCase() === 'thoth') parts.shift()
+  // /{workspace}/{page}[/{id}] — page is always the second segment
+  const pageKey = parts[1] || parts[0] || 'dashboard'
   const pageLabel = PAGE_LABELS[pageKey] || pageKey
 
   const name = user?.full_name || user?.username || 'Guest'

@@ -6,18 +6,26 @@ import ProjectCard from '../features/projects/components/ProjectCard.jsx'
 import EditProjectModal from '../features/projects/components/EditProjectModal.jsx'
 import ProjectDetail from '../features/projects/components/ProjectDetail.jsx'
 
-export default function Projects({ workspace }) {
+function navigate(path) {
+  window.history.pushState({}, '', path)
+  window.dispatchEvent(new PopStateEvent('popstate'))
+}
+
+export default function Projects({ workspace, projectId }) {
   const [projects, setProjects] = useState([])
   const [showForm, setShowForm] = useState(false)
-  const [viewing, setViewing] = useState(null)
   const [editing, setEditing] = useState(null)
+  const [refreshKey, setRefreshKey] = useState(0)
+
+  const ws = getCurrentWorkspace()
 
   useEffect(() => {
+    if (projectId) return
     let alive = true
 
     async function loadProjects() {
-      const ws = getCurrentWorkspace()
-      const rows = await getProjects(ws?.id || undefined)
+      const current = getCurrentWorkspace()
+      const rows = await getProjects(current?.id || undefined)
       if (alive) setProjects(rows)
     }
 
@@ -26,19 +34,29 @@ export default function Projects({ workspace }) {
     return () => {
       alive = false
     }
-  }, [workspace])
+  }, [workspace, projectId])
+
+  const openProject = (project) => {
+    const slug = ws?.slug || ws?.name?.toLowerCase().replace(/[^a-z0-9]+/g, '-') || 'ws'
+    navigate(`/Thoth/${slug}/projects/${project.id}`)
+  }
+
+  const backToList = () => {
+    const slug = ws?.slug || ws?.name?.toLowerCase().replace(/[^a-z0-9]+/g, '-') || 'ws'
+    navigate(`/Thoth/${slug}/projects`)
+  }
 
   const handleAddProject = async (fields) => {
-    const ws = getCurrentWorkspace()
-    const newProject = await addProject(ws?.id || workspace?.id, fields)
-    setProjects((current) => [...current, newProject])
+    const current = getCurrentWorkspace()
+    const newProject = await addProject(current?.id || workspace?.id, fields)
+    setProjects((currentList) => [...currentList, newProject])
     setShowForm(false)
   }
 
   const handleUpdated = (updated) => {
     setProjects((current) => current.map((p) => (p.id === updated.id ? updated : p)))
     setEditing(null)
-    if (viewing && viewing.id === updated.id) setViewing(updated)
+    setRefreshKey((k) => k + 1)
   }
 
   const handleDelete = async (project) => {
@@ -49,6 +67,17 @@ export default function Projects({ workspace }) {
     } catch {
       window.alert('Could not delete project')
     }
+  }
+
+  // Full-screen project detail
+  if (projectId) {
+    return (
+      <ProjectDetail
+        key={refreshKey}
+        projectId={projectId}
+        onBack={backToList}
+      />
+    )
   }
 
   return (
@@ -65,17 +94,8 @@ export default function Projects({ workspace }) {
         </div>
         <button
           onClick={() => setShowForm(true)}
-          style={{
-            height: '32px',
-            padding: '0 14px',
-            borderRadius: '4px',
-            background: '#695df0',
-            border: '0',
-            color: '#fff',
-            fontWeight: '600',
-            cursor: 'pointer',
-            fontSize: '12px'
-          }}
+          className="btn primary"
+          style={{ cursor: 'pointer' }}
         >
           + New Project
         </button>
@@ -96,7 +116,7 @@ export default function Projects({ workspace }) {
             <ProjectCard
               key={project.id}
               project={project}
-              onView={setViewing}
+              onView={openProject}
               onEdit={setEditing}
               onDelete={handleDelete}
             />
@@ -116,13 +136,6 @@ export default function Projects({ workspace }) {
           project={editing}
           onSaved={handleUpdated}
           onClose={() => setEditing(null)}
-        />
-      )}
-
-      {viewing && (
-        <ProjectDetail
-          projectId={viewing.id}
-          onClose={() => setViewing(null)}
         />
       )}
     </div>
