@@ -120,7 +120,7 @@ export default function StageBoard({ stages, counts = {}, itemLabel = 'tasks', o
   return (
     <div>
       <div style={{
-        display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'stretch',
+        display: 'flex', flexDirection: 'column', gap: '8px',
       }}>
         {stages.map((stage) => (
           <div
@@ -132,8 +132,8 @@ export default function StageBoard({ stages, counts = {}, itemLabel = 'tasks', o
             onDrop={() => handleDrop(stage.id)}
             style={{
               background: '#121212', border: dragId === stage.id ? '1px solid #695df0' : '1px solid #292929',
-              borderRadius: '5px', padding: '11px 12px', minWidth: '190px', flex: '1 1 190px',
-              maxWidth: '260px', cursor: String(stage.name) === 'Archived' ? 'default' : 'grab',
+              borderRadius: '5px', padding: '11px 12px', width: '100%', boxSizing: 'border-box',
+              cursor: String(stage.name) === 'Archived' ? 'default' : 'grab',
               opacity: dragId === stage.id ? 0.5 : 1,
             }}
           >
@@ -174,8 +174,8 @@ export default function StageBoard({ stages, counts = {}, itemLabel = 'tasks', o
           onClick={() => setForm({})}
           style={{
             border: '1px dashed #2a2a2a', borderRadius: '5px', background: 'transparent',
-            color: '#666', cursor: 'pointer', minWidth: '150px', flex: '1 1 150px',
-            maxWidth: '220px', minHeight: '64px', fontSize: '11px',
+            color: '#666', cursor: 'pointer', width: '100%', boxSizing: 'border-box',
+            minHeight: '40px', fontSize: '11px',
           }}
         >
           + Add Stage

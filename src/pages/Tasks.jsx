@@ -57,7 +57,14 @@ function TaskCard({ task, onOpen, onDragStart }) {
       onMouseLeave={(e) => { e.currentTarget.style.borderColor = overdue ? 'rgba(255,64,64,0.4)' : '#2a2a2a' }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', alignItems: 'flex-start' }}>
-        <div style={{ fontSize: '12px', color: '#eee', fontWeight: 600 }}>{task.title}</div>
+        <div style={{ fontSize: '12px', color: '#eee', fontWeight: 600 }}>
+          {task.task_code && (
+            <span style={{ fontFamily: 'monospace', fontSize: '9.5px', color: '#6e61ff', marginRight: '6px' }}>
+              {task.task_code}
+            </span>
+          )}
+          {task.title}
+        </div>
         <span className="badge" style={{ ...priorityStyle(task.priority), background: 'transparent', fontSize: '9px', flexShrink: 0 }}>
           {task.priority}
         </span>

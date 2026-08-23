@@ -11,7 +11,6 @@ const PAGE_LABELS = {
   tasks: 'Tasks',
   bugs: 'Bugs',
   calendar: 'Calendar',
-  milestones: 'Milestones',
   reports: 'Reports',
   markdown: 'Markdown',
   workspaces: 'Workspaces',

@@ -1,11 +1,11 @@
 ﻿import { useState, useEffect } from 'react'
 import AppLayout from '../components/layout/AppLayout'
+import ErrorBoundary from '../components/ErrorBoundary.jsx'
 import Dashboard from '../features/dashboard/Dashboard'
 import Projects from '../pages/Projects'
 import Tasks from '../pages/Tasks'
 import Bugs from '../pages/Bugs'
 import Calendar from '../pages/Calendar'
-import Milestones from '../pages/Milestones'
 import Reports from '../pages/Reports'
 import Markdown from '../pages/Markdown'
 import Settings from '../pages/Settings'
@@ -76,9 +76,8 @@ export default function AppRouter(){
     case 'dashboard': return render(<Dashboard workspace={workspace} />)
     case 'projects': return render(<Projects workspace={workspace} projectId={routeId} />)
     case 'tasks': return render(<Tasks workspace={workspace} subPage={routeId} />)
-    case 'bugs': return render(<Bugs workspace={workspace} />)
+    case 'bugs': return render(<Bugs workspace={workspace} subPage={routeId} />)
     case 'calendar': return render(<Calendar workspace={workspace} />)
-    case 'milestones': return render(<Milestones workspace={workspace} />)
     case 'reports': return render(<Reports workspace={workspace} />)
     case 'markdown': return render(<Markdown workspace={workspace} />)
     case 'workspaces': return render(<Workspaces workspace={workspace} />)
@@ -93,6 +92,10 @@ export default function AppRouter(){
     }
     // Key on the selected workspace so pages remount (and refetch) when it changes
     const wsKey = getCurrentWorkspace()?.id || 'none'
-    return <AppLayout key={wsKey}>{element}</AppLayout>
+    return (
+      <ErrorBoundary>
+        <AppLayout key={wsKey}>{element}</AppLayout>
+      </ErrorBoundary>
+    )
   }
 }

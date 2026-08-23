@@ -80,6 +80,15 @@ CREATE TABLE IF NOT EXISTS tasks (
 -- Ensure new columns on existing installs
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS progress INTEGER DEFAULT 0;
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS meta JSONB DEFAULT '{}';
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS task_code VARCHAR(50);
+
+-- Backfill human-readable codes for tasks created before the column existed
+WITH numbered AS (
+  SELECT id, 'Task-' || LPAD((ROW_NUMBER() OVER (PARTITION BY project_id ORDER BY created_at))::text, 2, '0') AS code
+  FROM tasks
+  WHERE task_code IS NULL
+)
+UPDATE tasks t SET task_code = n.code FROM numbered n WHERE t.id = n.id AND t.task_code IS NULL;
 
 -- Task Stages Table (workspace-level, user-manageable)
 CREATE TABLE IF NOT EXISTS task_stages (

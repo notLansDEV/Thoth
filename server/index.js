@@ -259,10 +259,15 @@ app.post('/api/tasks', auth, async (req, res) => {
       if (req.body[field] !== undefined) data[field] = req.body[field]
     }
 
+    // Human-readable code scoped to the project: Task-01, Task-02, ...
+    const taskCount = Number(await taskRepository.countByCondition('project_id = $1', [project_id])) + 1
+    const task_code = `Task-${String(taskCount).padStart(2, '0')}`
+
     const created = await taskRepository.create({
       project_id,
       title: title.trim(),
       status: 'todo',
+      task_code,
       ...data,
     })
     res.json(created)

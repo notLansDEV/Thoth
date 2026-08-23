@@ -26,10 +26,14 @@ function StatCard({ icon, label, value }) {
   )
 }
 
-export default function Bugs() {
+function navigateTo(path) {
+  window.history.pushState({}, '', path)
+  window.dispatchEvent(new PopStateEvent('popstate'))
+}
+
+export default function Bugs({ subPage }) {
   const ws = getCurrentWorkspace()
   const tab = subPage === 'stages' ? 'stages' : 'all'
-  //const [tab, setTab] = useState('all')
   const [bugs, setBugs] = useState([])
   const [projects, setProjects] = useState([])
   const [stages, setStages] = useState([])
@@ -145,7 +149,7 @@ export default function Bugs() {
           <button
             key={t.key}
             className={`tab-btn${tab === t.key ? ' active' : ''}`}
-            onClick={() => setTab(t.key)}
+            onClick={() => navigateTo(`/Thoth/${ws?.slug || 'ws'}/bugs/${t.key}`)}
           >
             {t.label}
           </button>

@@ -163,16 +163,32 @@ export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated,
     if (!updated) setChecklist(checklist)
   }
 
-  function onFilesPicked(e) {
+  function readFileAsDataUrl(file) {
+    return new Promise((resolve) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(String(reader.result))
+      reader.onerror = () => resolve(null)
+      reader.readAsDataURL(file)
+    })
+  }
+
+  async function onFilesPicked(e) {
     const picked = Array.from(e.target.files || [])
     e.target.value = ''
     if (picked.length === 0) return
-    const additions = picked.map((f) => ({
-      name: f.name,
-      size: f.size,
-      type: f.type || null,
-      added_at: new Date().toISOString(),
-      added_by: currentUser().name,
+    // Images up to 2MB are inlined as data URLs so the Files tab can show thumbnails
+    const additions = await Promise.all(picked.map(async (f) => {
+      const entry = {
+        name: f.name,
+        size: f.size,
+        type: f.type || null,
+        added_at: new Date().toISOString(),
+        added_by: currentUser().name,
+      }
+      if ((f.type || '').startsWith('image/') && f.size <= 2 * 1024 * 1024) {
+        entry.dataUrl = await readFileAsDataUrl(f)
+      }
+      return entry
     }))
     const next = [...files, ...additions]
     setFiles(next)
@@ -219,6 +235,11 @@ export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated,
           />
 
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '14px', paddingLeft: '2px' }}>
+            {task.task_code && (
+              <span style={{ fontFamily: 'monospace', fontSize: '10px', color: '#6e61ff' }}>
+                {task.task_code}
+              </span>
+            )}
             <span className="badge paused" style={{ fontSize: '9px' }}>
               {(stageOptions.find((s) => s.value === stage) || {}).label || stage}
             </span>
@@ -419,7 +440,18 @@ export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated,
                       className="check-row"
                       style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px', borderRadius: '4px' }}
                     >
-                      <span style={{ fontSize: '13px' }}>{fileIcon(f.name)}</span>
+                      {f.dataUrl ? (
+                        <img
+                          src={f.dataUrl}
+                          alt={f.name}
+                          style={{
+                            width: '34px', height: '34px', objectFit: 'cover',
+                            borderRadius: '3px', border: '1px solid #2a2a2a', flexShrink: 0,
+                          }}
+                        />
+                      ) : (
+                        <span style={{ fontSize: '13px' }}>{fileIcon(f.name)}</span>
+                      )}
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: '11px', color: '#ccc', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {f.name}

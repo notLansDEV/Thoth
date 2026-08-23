@@ -5,7 +5,7 @@ import {
   getProject,
   getProjectBugs,
 } from '../projects.service.js'
-import { getTasks, TASK_STAGES, getMilestones, getWorkspaceMembers } from '../../tasks/tasks.service.js'
+import { getTasks, TASK_STAGES, getMilestones, getWorkspaceMembers, priorityStyle } from '../../tasks/tasks.service.js'
 
 const TABS = ['Overview', 'Team', 'Milestone', 'Task', 'Bugs', 'Attachments', 'Activity', 'Notes']
 
@@ -206,39 +206,97 @@ export default function ProjectDetail({ projectId, onBack }) {
 
       {tab === 'Milestone' && (
         milestones.length === 0 ? <Empty text="No milestones yet." /> : (
-          milestones.map((ms) => (
-            <div key={ms.id} className="card" style={{ marginBottom: '8px' }}>
-              <div className="name">{ms.name}</div>
-              {ms.description && <div className="description">{ms.description}</div>}
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', color: '#666', margin: '8px 0 5px' }}>
-                <span>{Number(ms.progress) || 0}%</span>
-              </div>
-              <div className="progress"><span style={{ width: `${Number(ms.progress) || 0}%` }} /></div>
-              <div className="meta">
-                {ms.due_date && <div className="meta-item">⏰ Due {fmtDate(ms.due_date)}</div>}
-                <div className="meta-item">◈ {ms.status || 'planned'}</div>
-              </div>
-            </div>
-          ))
+          <div className="card" style={{ padding: 0, overflowX: 'auto' }}>
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>Description</th>
+                  <th>Due Date</th>
+                  <th>Status</th>
+                  <th>Progress</th>
+                </tr>
+              </thead>
+              <tbody>
+                {milestones.map((ms) => (
+                  <tr key={ms.id}>
+                    <td style={{ color: '#ddd', fontWeight: 600 }}>{ms.name}</td>
+                    <td style={{ color: '#888', maxWidth: '320px' }}>{ms.description || '—'}</td>
+                    <td>{fmtDate(ms.due_date)}</td>
+                    <td><span className="badge paused">{ms.status || 'planned'}</span></td>
+                    <td style={{ minWidth: '110px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+                        <div className="progress" style={{ flex: 1 }}><span style={{ width: `${Number(ms.progress) || 0}%` }} /></div>
+                        <span style={{ fontSize: '10px', color: '#666' }}>{Number(ms.progress) || 0}%</span>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )
       )}
 
       {tab === 'Task' && (
-        tasks.length === 0 ? <Empty text="No tasks in this project yet." /> : (
-          <div className="card">
-            {tasks.map((t) => {
-              const stage = TASK_STAGES.find((s) => s.value === (t.status || 'To Do'))
-              return (
-                <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: '9px', padding: '7px 0', borderBottom: '1px solid #222' }}>
-                  <span className="dot" style={{ background: stage?.color || '#555' }} />
-                  <div style={{ flex: 1, fontSize: '12px', color: '#ddd' }}>{t.title}</div>
-                  <span style={{ fontSize: '10px', color: '#666' }}>{t.status || 'To Do'}</span>
-                  <span style={{ fontSize: '10px', color: '#555' }}>{t.progress || 0}%</span>
-                </div>
-              )
-            })}
+        <>
+          <div className="stat-grid">
+            <StatCard icon="☑" label="Total Current Task" value={tasks.length} />
+            <StatCard icon="◐" label="Total Current In Progress" value={tasks.filter((t) => t.status === 'In Progress').length} />
+            <StatCard icon="○" label="Total Current Pending" value={tasks.filter((t) => !t.status || t.status === 'To Do').length} />
+            <StatCard icon="✔" label="Total Current Done" value={tasks.filter((t) => t.status === 'Done').length} />
           </div>
-        )
+
+          {tasks.length === 0 ? <Empty text="No tasks in this project yet." /> : (
+            <div className="card" style={{ padding: 0, overflowX: 'auto' }}>
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Code</th>
+                    <th>Title</th>
+                    <th>Assignee</th>
+                    <th>Stage</th>
+                    <th>Priority</th>
+                    <th>Due</th>
+                    <th>Progress</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...tasks]
+                    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+                    .map((t) => {
+                      const stage = TASK_STAGES.find((s) => s.value === (t.status || 'To Do'))
+                      return (
+                        <tr key={t.id}>
+                          <td style={{ color: '#888', fontFamily: 'monospace', fontSize: '10.5px' }}>{t.task_code || '—'}</td>
+                          <td style={{ color: '#ddd', fontWeight: 600 }}>{t.title}</td>
+                          <td>{t.assignee_name || 'Unassigned'}</td>
+                          <td>
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#ccc' }}>
+                              <span className="dot" style={{ background: stage?.color || '#555' }} />
+                              {t.status || 'To Do'}
+                            </span>
+                          </td>
+                          <td>
+                            <span className="badge" style={{ ...priorityStyle(t.priority), background: 'transparent', fontSize: '9px' }}>
+                              {t.priority || 'medium'}
+                            </span>
+                          </td>
+                          <td>{fmtDate(t.due_date)}</td>
+                          <td style={{ minWidth: '90px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+                              <div className="progress" style={{ flex: 1 }}><span style={{ width: `${Number(t.progress) || 0}%` }} /></div>
+                              <span style={{ fontSize: '10px', color: '#666' }}>{Number(t.progress) || 0}%</span>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
       )}
 
       {tab === 'Bugs' && (
