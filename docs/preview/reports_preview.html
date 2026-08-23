@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Thoth Dev — Reports</title>
+<style>
+:root{
+  --bg:#0b0b0b;--panel:#111;--panel2:#191919;--panel3:#151515;
+  --border:#252525;--border2:#202020;--text:#ececec;--muted:#707070;
+  --blue:#6b5cff;--green:#35d279;--orange:#ff8517;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{
+  background:var(--bg);color:var(--text);
+  font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  font-size:12px;overflow:hidden;
+}
+.app{height:100vh;display:grid;grid-template-columns:198px 198px 1fr;grid-template-rows:40px 1fr}
+.topbar{
+  grid-column:1/-1;display:flex;align-items:center;
+  background:#0b0b0b;border-bottom:1px solid #242424;
+}
+.brand{
+  width:198px;height:100%;display:flex;align-items:center;gap:8px;
+  padding:0 16px;border-right:1px solid #242424;font-weight:700
+}
+.logo{width:16px;height:16px;border-radius:4px;background:#725eff;
+  display:grid;place-items:center;font-size:10px}
+.crumb{display:flex;gap:8px;color:#777;padding-left:12px}
+.crumb b{color:#c6c6c6;font-weight:500}
+.top-actions{margin-left:auto;display:flex;align-items:center;gap:9px;padding-right:10px}
+.top-search{
+  width:162px;height:27px;background:#111;border:1px solid #2b2b2b;
+  border-radius:4px;color:#aaa;padding:0 9px;font-size:10px;outline:none
+}
+.new{height:27px;border:0;border-radius:4px;background:#725eff;color:white;
+  padding:0 12px;font-size:10px;font-weight:700}
+.icon{width:27px;height:27px;display:grid;place-items:center;color:#999}
+.avatar{width:24px;height:24px;border-radius:50%;background:#6254d5;
+  display:grid;place-items:center;font-size:9px;font-weight:700}
+.user{color:#aaa;font-size:11px;margin-left:-5px}
+
+.sidebar{
+  grid-column:1;grid-row:2;background:#121212;border-right:1px solid #262626;
+  display:flex;flex-direction:column;min-height:0
+}
+.workspace{height:39px;display:flex;align-items:center;gap:8px;padding:0 8px;border-bottom:1px solid #202020}
+.back{width:21px;height:21px;border:1px solid #2b2b2b;border-radius:4px;
+  display:grid;place-items:center;color:#bbb}
+.wsname{font-weight:700;color:#ddd}
+.nav{padding:6px 7px}
+.nav a{
+  height:28px;display:flex;align-items:center;gap:10px;padding:0 9px;
+  border-radius:4px;text-decoration:none;color:#7b7b7b;font-size:11px
+}
+.nav a.active{background:#1b1b1b;color:#f0f0f0}
+.ico{width:10px;text-align:center;color:#8e8e8e;font-size:10px}
+.section{font-size:9px;color:#686868;letter-spacing:.08em;text-transform:uppercase;padding:7px 9px}
+.projects{padding:0 7px}
+.projects a{
+  height:26px;display:flex;align-items:center;gap:8px;padding:0 9px;
+  color:#858585;text-decoration:none;font-size:11px
+}
+.dot{width:7px;height:7px;border-radius:50%}
+.blue{background:#7064ea}.green{background:#2ec767}.orange{background:#ff8214}.purple{background:#a256f1}
+.bottom{margin-top:auto;border-top:1px solid #202020;padding:8px}
+.bottom-row{height:29px;display:flex;align-items:center;gap:9px;padding:0 9px;color:#7d7d7d;font-size:11px}
+.db{height:29px;background:#181818;border-radius:3px;display:flex;align-items:center;
+  gap:7px;padding:0 7px;color:#777;font-family:ui-monospace,monospace;font-size:9px}
+.db-dot{width:5px;height:5px;background:#2fd077;border-radius:50%}
+
+.report-list{
+  grid-column:2;grid-row:2;background:#0e0e0e;border-right:1px solid #262626;
+  min-width:0;display:flex;flex-direction:column
+}
+.report-head{
+  height:40px;display:flex;align-items:center;justify-content:space-between;
+  padding:0 8px;border-bottom:1px solid #262626
+}
+.report-head strong{font-size:12px}
+.small-new{height:24px;background:#725eff;border:0;border-radius:3px;color:#fff;
+  font-weight:700;font-size:9px;padding:0 10px}
+.report-items{padding:3px 5px}
+.report-item{
+  min-height:41px;padding:7px 9px;border-radius:4px;color:#8a8a8a;
+  position:relative
+}
+.report-item.selected{background:#191919;color:#dcdcdc}
+.report-date{font-family:ui-monospace,monospace;font-size:9px}
+.report-author{font-size:9px;text-align:right;margin-top:5px;color:#777}
+.report-item.selected .report-author{color:#9b9b9b}
+.report-item.selected .report-date{color:#e0e0e0}
+.report-item.selected .report-date::after{content:"";display:inline-block;width:5px;height:5px;
+  border-radius:50%;background:#7b61ff;margin-left:4px;vertical-align:1px}
+
+.content{
+  grid-column:3;grid-row:2;min-width:0;overflow:auto;background:#0b0b0b
+}
+.report-top{
+  height:52px;border-bottom:1px solid #252525;padding:8px 10px;
+  display:flex;align-items:flex-start;justify-content:space-between
+}
+.title{font-size:16px;font-weight:700}
+.subtitle{font-size:9px;color:#6d6d6d;margin-top:3px}
+.edit{height:27px;background:#111;border:1px solid #2a2a2a;color:#ddd;
+  border-radius:4px;padding:0 10px;font-size:10px}
+.report{
+  padding:7px 10px 30px;
+  max-width:100%;
+}
+.section-block{margin-top:0;margin-bottom:15px}
+.section-title{
+  font-weight:700;font-size:11px;margin:0 0 7px 0;color:#eee
+}
+.box{
+  background:#191919;border:1px solid #202020;border-radius:3px;
+  padding:10px 14px;min-height:54px
+}
+.line{margin:0 0 6px 0;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+  font-size:10px;color:#f0f0f0;white-space:normal}
+.line:last-child{margin-bottom:0}
+.bullet{color:#7b61ff;margin-right:7px}
+.notes{color:#777;font-family:inherit;font-size:10px}
+@media(max-width:800px){
+  .app{grid-template-columns:58px 170px 1fr}
+  .brand{width:58px;justify-content:center;padding:0}
+  .brand-text,.crumb{display:none}
+  .sidebar{width:58px}
+  .nav a{justify-content:center;padding:0}
+  .nav a span:not(.ico),.section,.projects,.bottom-row{display:none}
+  .bottom{padding:7px 4px}
+  .db span:last-child{display:none}
+  .top-search{display:none}
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+<header class="topbar">
+  <div class="brand">
+    <div class="logo">T</div><span class="brand-text">Thoth Dev</span>
+  </div>
+  <div class="crumb"><span>/</span><b>Reports</b></div>
+  <div class="top-actions">
+    <input class="top-search" placeholder="⌕  Search..." />
+    <button class="new">+ New</button>
+    <div class="icon">♟</div><div class="icon">◯</div>
+    <div class="avatar">AC</div><span class="user">Aria</span>
+  </div>
+</header>
+
+<aside class="sidebar">
+  <div class="workspace"><div class="back">‹</div><div class="wsname">thoth</div></div>
+  <nav class="nav">
+    <a href="#"><span class="ico">▦</span><span>Dashboard</span></a>
+    <a href="#"><span class="ico">◫</span><span>Projects</span></a>
+    <a href="#"><span class="ico">⊞</span><span>Kanban</span></a>
+    <a href="#"><span class="ico">☑</span><span>Tasks</span></a>
+    <a href="#"><span class="ico">⊗</span><span>Bugs</span></a>
+    <a href="#"><span class="ico">□</span><span>Calendar</span></a>
+    <a href="#"><span class="ico">◇</span><span>Milestones</span></a>
+    <a class="active" href="#"><span class="ico">≡</span><span>Reports</span></a>
+    <a href="#"><span class="ico">M</span><span>Markdown</span></a>
+  </nav>
+  <div class="section">Projects</div>
+  <div class="projects">
+    <a href="#"><span class="dot blue"></span>Thoth Core</a>
+    <a href="#"><span class="dot green"></span>API Gateway</a>
+    <a href="#"><span class="dot orange"></span>Data Pipeline</a>
+    <a href="#"><span class="dot purple"></span>Mobile Client</a>
+  </div>
+  <div class="bottom">
+    <div class="bottom-row">◦ <span>Workspace</span></div>
+    <div class="bottom-row">⚙ <span>Settings</span></div>
+    <div class="db"><span class="db-dot"></span><span>SQLite connected</span></div>
+  </div>
+</aside>
+
+<section class="report-list">
+  <div class="report-head"><strong>Daily Reports</strong><button class="small-new">+ New</button></div>
+  <div class="report-items">
+    <div class="report-item selected">
+      <div class="report-date">2026-08-22</div>
+      <div class="report-author">Aria Chen</div>
+    </div>
+    <div class="report-item">
+      <div class="report-date">2026-08-21</div>
+      <div class="report-author">Marcus Webb</div>
+    </div>
+  </div>
+</section>
+
+<main class="content">
+  <div class="report-top">
+    <div>
+      <div class="title">Report — 2026-08-22</div>
+      <div class="subtitle">Aria Chen · Thoth Core</div>
+    </div>
+    <button class="edit">Edit</button>
+  </div>
+
+  <div class="report">
+    <section class="section-block">
+      <div class="section-title">✓ Tasks Done</div>
+      <div class="box">
+        <p class="line"><span class="bullet">·</span>Completed WAL mode implementation (TASK-101)</p>
+        <p class="line"><span class="bullet">·</span>Reviewed PR for milestone tracking (TASK-107)</p>
+        <p class="line"><span class="bullet">·</span>Merged GraphQL subscription fix</p>
+      </div>
+    </section>
+
+    <section class="section-block">
+      <div class="section-title">⌛ Backlog</div>
+      <div class="box">
+        <p class="line"><span class="bullet">·</span>TASK-102 blocked on design review</p>
+        <p class="line"><span class="bullet">·</span>TASK-108 day view still pending</p>
+      </div>
+    </section>
+
+    <section class="section-block">
+      <div class="section-title">⚙ Fixes</div>
+      <div class="box">
+        <p class="line"><span class="bullet">·</span>Fixed RESOLVED-91 write lock issue</p>
+        <p class="line"><span class="bullet">·</span>Patched undefined initials in avatar component</p>
+      </div>
+    </section>
+
+    <section class="section-block">
+      <div class="section-title">+ Added</div>
+      <div class="box">
+        <p class="line"><span class="bullet">·</span>Added 'db.pragma("journal_mode = WAL")' to connection init</p>
+        <p class="line"><span class="bullet">·</span>Added connection pool health check endpoint</p>
+      </div>
+    </section>
+
+    <section class="section-block">
+      <div class="section-title">≡ Notes</div>
+      <div class="box">
+        <p class="line notes">Staging environment was down for 2h due to certificate renewal. Lost some testing time. Team velocity is good overall.</p>
+      </div>
+    </section>
+  </div>
+</main>
+
+</div>
+
+<script>
+document.querySelector('.new').addEventListener('click',()=>alert('Create a new report'));
+document.querySelector('.small-new').addEventListener('click',()=>alert('Create a new daily report'));
+document.querySelector('.edit').addEventListener('click',()=>alert('Edit report'));
+document.querySelectorAll('.report-item').forEach(item=>{
+  item.addEventListener('click',()=>{
+    document.querySelectorAll('.report-item').forEach(x=>x.classList.remove('selected'));
+    item.classList.add('selected');
+  });
+});
+</script>
+</body>
+</html>

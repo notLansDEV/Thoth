@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Thoth Dashboard</title>
+<style>
+  :root{
+    --bg:#0b0b0b;
+    --panel:#121212;
+    --panel-2:#151515;
+    --border:#2a2a2a;
+    --text:#e8e8e8;
+    --muted:#737373;
+    --muted-2:#555;
+    --purple:#6f63ff;
+    --green:#20d66b;
+    --red:#ff4141;
+    --orange:#ff7a18;
+    --yellow:#ffc400;
+    --blue:#4c8dff;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;min-height:100%;background:var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:12px}
+  body{overflow:hidden}
+  button,input{font:inherit}
+  .app{height:100vh;display:flex;flex-direction:column}
+  .topbar{
+    height:36px;border-bottom:1px solid #292929;background:#0d0d0d;
+    display:flex;align-items:center;justify-content:space-between;padding:0 8px;
+  }
+  .top-left,.top-right{display:flex;align-items:center;gap:8px}
+  .workspace-btn{display:flex;align-items:center;gap:7px;color:#fff;font-weight:600}
+  .app-icon{width:16px;height:16px;border-radius:3px;display:grid;place-items:center;background:#675cff;font-size:10px;font-weight:700}
+  .crumb{color:#777}
+  .crumb strong{color:#9a9a9a;font-weight:500}
+  .search{width:162px;height:27px;border:1px solid #2b2b2b;background:#111;border-radius:4px;color:#aaa;padding:0 9px;outline:none}
+  .top-btn{height:27px;min-width:28px;border:1px solid #2b2b2b;background:#111;color:#ddd;border-radius:4px;padding:0 8px}
+  .new-btn{background:#685cff;border-color:#685cff;color:white;font-weight:600}
+  .avatar{width:23px;height:23px;border-radius:50%;display:grid;place-items:center;background:#6666ff;font-size:10px;font-weight:700;color:#fff}
+  .user-name{font-weight:600;margin-left:-4px}
+  .layout{display:grid;grid-template-columns:198px 1fr;height:calc(100vh - 36px)}
+  .sidebar{border-right:1px solid #272727;background:#111;display:flex;flex-direction:column;min-width:0}
+  .side-head{height:38px;border-bottom:1px solid #242424;display:flex;align-items:center;padding:0 10px;gap:8px;font-weight:700}
+  .collapse{width:20px;height:20px;border:1px solid #303030;background:#0b0b0b;color:#ddd;border-radius:4px}
+  .nav{padding:8px 6px}
+  .nav-title{padding:7px 10px 5px;color:#444;text-transform:uppercase;letter-spacing:.07em;font-size:10px}
+  .nav-item{height:28px;display:flex;align-items:center;gap:9px;padding:0 10px;color:#8a8a8a;border-radius:3px}
+  .nav-item.active{background:#1d1d1d;color:#eee}
+  .ico{width:12px;text-align:center;color:#777;font-size:11px}
+  .dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+  .purple{background:#7063ff}.green{background:#18d66a}.orange{background:#ff7915}.violet{background:#9d4df7}
+  .projects{padding:2px 6px}
+  .project{height:27px;display:flex;align-items:center;gap:8px;padding:0 10px;color:#8a8a8a}
+  .project span:last-child{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+  .sidebar-bottom{margin-top:auto;border-top:1px solid #242424;padding:8px 6px}
+  .db-status{margin-top:3px;padding:6px 10px;color:#666;font-size:10px}
+  .db-dot{display:inline-block;width:5px;height:5px;background:#15bd57;border-radius:50%;margin-right:5px;vertical-align:middle}
+  .main{padding:16px;overflow:auto;min-width:0}
+  .stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+  .card{border:1px solid var(--border);background:var(--panel);border-radius:4px}
+  .stat{height:86px;padding:13px}
+  .label{color:#707070;font-size:11px;margin-bottom:3px}
+  .value{font-size:26px;line-height:1.1;font-weight:500}
+  .value.green{color:#20d66b}.value.red{color:#ff4a4a}
+  .sub{color:#606060;font-size:10px;margin-top:4px}
+  .section-row{display:grid;grid-template-columns:minmax(0,1fr) 515px;gap:10px;margin-top:10px}
+  .section-title{color:#777;text-transform:uppercase;letter-spacing:.08em;font-size:11px;margin:0 0 8px}
+  .panel{border:1px solid var(--border);background:var(--panel);border-radius:4px}
+  .projects-list{display:flex;flex-direction:column;gap:10px}
+  .project-card{padding:12px}
+  .project-head{display:flex;justify-content:space-between;gap:12px}
+  .project-name{display:flex;align-items:center;gap:8px;font-weight:700}
+  .status{font-size:10px;padding:2px 5px;border-radius:2px;background:#12351f;color:#20d66b;font-weight:700}
+  .status.paused{background:#222;color:#9b9b9b}
+  .meta{color:#777;font-size:10px}
+  .project-desc{color:#676767;font-size:10px;margin:10px 0 9px}
+  .progress-wrap{display:grid;grid-template-columns:1fr 35px;gap:10px;align-items:center}
+  .progress{height:3px;background:#272727;border-radius:2px;overflow:hidden}
+  .progress > span{height:100%;display:block;background:#7366ff}
+  .progress.green > span{background:#16d35f}
+  .progress.orange > span{background:#ff7516}
+  .progress.violet > span{background:#a34dff}
+  .percent{text-align:right;color:#777;font-size:10px}
+  .milestones{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+  .mile{color:#777;font-size:9px}.mile::before{content:"";display:inline-block;width:5px;height:5px;border-radius:50%;background:#14d55f;margin-right:4px}
+  .mile.yellow::before{background:#f6c400}.mile.red::before{background:#f33}
+  .right-col{min-width:0}
+  .activity{height:290px;overflow:hidden;padding:9px 11px}
+  .activity-item{display:grid;grid-template-columns:18px 1fr;gap:8px;padding:4px 0}
+  .mini-avatar{width:18px;height:18px;border-radius:50%;display:grid;place-items:center;color:#fff;font-size:7px;font-weight:700}
+  .av-green{background:#18cb67}.av-blue{background:#5b60ff}.av-orange{background:#ff7d1c}.av-yellow{background:#e7b900}.av-purple{background:#9e54fb}
+  .act-line{font-size:10px;line-height:1.25}.act-line b{color:#ddd}.act-line a{color:#5d75ff}
+  .time{display:block;color:#666;font-size:8px;margin-top:2px}
+  .bugs{margin-top:10px;padding:0}
+  .bug-row{height:38px;border-bottom:1px solid #222;display:grid;grid-template-columns:90px 1fr 58px 22px;align-items:center;padding:0 10px;gap:10px}
+  .bug-row:last-child{border-bottom:0}
+  .bug-id{color:#6d6d6d;font-size:9px}
+  .bug-title{font-size:10px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .priority{font-size:9px;font-weight:700;text-align:right}
+  .critical{color:#ff4141}.high{color:#ff6b14}.medium{color:#ffc400}
+  .scroll::-webkit-scrollbar{width:5px}.scroll::-webkit-scrollbar-thumb{background:#2d2d2d;border-radius:3px}
+  @media(max-width:1000px){
+    .layout{grid-template-columns:180px 1fr}
+    .section-row{grid-template-columns:1fr}
+  }
+  @media(max-width:760px){
+    body{overflow:auto}
+    .app{height:auto;min-height:100vh}
+    .layout{display:block;height:auto}
+    .sidebar{display:none}
+    .main{padding:10px}
+    .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .topbar{position:sticky;top:0;z-index:5}
+    .search{display:none}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="top-left">
+      <div class="workspace-btn"><span class="app-icon">T</span> Thoth Dev <span class="crumb">/</span> <strong>Dashboard</strong></div>
+    </div>
+    <div class="top-right">
+      <input class="search" placeholder="⌕  Search..." />
+      <button class="top-btn new-btn">+ New</button>
+      <button class="top-btn" title="Notifications">🔔</button>
+      <button class="top-btn">○</button>
+      <span class="avatar">AC</span><span class="user-name">Aria</span>
+    </div>
+  </header>
+
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="side-head"><button class="collapse">‹</button><span>thoth</span></div>
+
+      <nav class="nav">
+        <div class="nav-item active"><span class="ico">▦</span>Dashboard</div>
+        <div class="nav-item"><span class="ico">◫</span>Projects</div>
+        <div class="nav-item"><span class="ico">⊞</span>Kanban</div>
+        <div class="nav-item"><span class="ico">☑</span>Tasks</div>
+        <div class="nav-item"><span class="ico">⊗</span>Bugs</div>
+        <div class="nav-item"><span class="ico">□</span>Calendar</div>
+        <div class="nav-item"><span class="ico">◇</span>Milestones</div>
+        <div class="nav-item"><span class="ico">≡</span>Reports</div>
+        <div class="nav-item"><span class="ico">Mᵈ</span>Markdown</div>
+      </nav>
+
+      <div class="nav-title">Projects</div>
+      <div class="projects">
+        <div class="project"><span class="dot purple"></span><span>Thoth Core</span></div>
+        <div class="project"><span class="dot green"></span><span>API Gateway</span></div>
+        <div class="project"><span class="dot orange"></span><span>Data Pipeline</span></div>
+        <div class="project"><span class="dot violet"></span><span>Mobile Client</span></div>
+      </div>
+
+      <div class="sidebar-bottom">
+        <div class="nav-item"><span class="ico">◦</span>Workspace</div>
+        <div class="nav-item"><span class="ico">⚙</span>Settings</div>
+        <div class="db-status"><span class="db-dot"></span>SQLite connected</div>
+      </div>
+    </aside>
+
+    <main class="main scroll">
+      <section class="stats">
+        <div class="card stat"><div class="label">Total Users</div><div class="value">5</div><div class="sub">across all projects</div></div>
+        <div class="card stat"><div class="label">Active Users</div><div class="value" style="color:#6d78ff">5</div><div class="sub">this week</div></div>
+        <div class="card stat"><div class="label">Tasks Completed</div><div class="value green">2/8</div><div class="sub">this sprint</div></div>
+        <div class="card stat"><div class="label">Open Bugs</div><div class="value red">4</div><div class="sub">2 critical</div></div>
+      </section>
+
+      <section class="section-row">
+        <div>
+          <h3 class="section-title">Projects</h3>
+          <div class="projects-list">
+            <div class="panel project-card">
+              <div class="project-head"><div class="project-name"><span class="dot purple"></span>Thoth Core <span class="status">active</span></div><div class="meta">34 tasks&nbsp;&nbsp;7 bugs&nbsp;&nbsp;3 milestones</div></div>
+              <div class="project-desc">Core application engine and data layer</div>
+              <div class="progress-wrap"><div class="progress"><span style="width:68%"></span></div><div class="percent">68%</div></div>
+              <div class="milestones"><span class="mile">v1.0 Alpha 88%</span><span class="mile yellow">v1.0 Beta 34%</span></div>
+            </div>
+
+            <div class="panel project-card">
+              <div class="project-head"><div class="project-name"><span class="dot green"></span>API Gateway <span class="status">active</span></div><div class="meta">21 tasks&nbsp;&nbsp;3 bugs&nbsp;&nbsp;2 milestones</div></div>
+              <div class="project-desc">RESTful and GraphQL API gateway service</div>
+              <div class="progress-wrap"><div class="progress green"><span style="width:82%"></span></div><div class="percent">82%</div></div>
+              <div class="milestones"><span class="mile">API v2 91%</span></div>
+            </div>
+
+            <div class="panel project-card">
+              <div class="project-head"><div class="project-name"><span class="dot orange"></span>Data Pipeline <span class="status paused">paused</span></div><div class="meta">18 tasks&nbsp;&nbsp;11 bugs&nbsp;&nbsp;4 milestones</div></div>
+              <div class="project-desc">ETL pipeline and analytics infrastructure</div>
+              <div class="progress-wrap"><div class="progress orange"><span style="width:45%"></span></div><div class="percent">45%</div></div>
+              <div class="milestones"><span class="mile red">Pipeline MVP 52%</span></div>
+            </div>
+
+            <div class="panel project-card">
+              <div class="project-head"><div class="project-name"><span class="dot violet"></span>Mobile Client <span class="status">active</span></div><div class="meta">29 tasks&nbsp;&nbsp;14 bugs&nbsp;&nbsp;5 milestones</div></div>
+              <div class="project-desc">React Native mobile app for iOS and Android</div>
+              <div class="progress-wrap"><div class="progress violet"><span style="width:31%"></span></div><div class="percent">31%</div></div>
+              <div class="milestones"><span class="mile yellow">Mobile Alpha 18%</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="right-col">
+          <h3 class="section-title">Recent Activity</h3>
+          <div class="panel activity">
+            <div class="activity-item"><div class="mini-avatar av-green">MW</div><div class="act-line"><b>Marcus resolved</b> <a>RESOLVED-91</a><span class="time">2026-08-22 14:32</span></div></div>
+            <div class="activity-item"><div class="mini-avatar av-blue">AC</div><div class="act-line"><b>Aria merged PR for</b> <a>TASK-104</a><span class="time">2026-08-22 13:15</span></div></div>
+            <div class="activity-item"><div class="mini-avatar av-orange">PN</div><div class="act-line"><b>Priya started testing</b> <a>TASK-103</a><span class="time">2026-08-22 11:00</span></div></div>
+            <div class="activity-item"><div class="mini-avatar av-yellow">DO</div><div class="act-line"><b>Devon opened bug</b> <a>NEW-14</a><span class="time">2026-08-22 10:18</span></div></div>
+            <div class="activity-item"><div class="mini-avatar av-purple">ST</div><div class="act-line"><b>Sable escalated</b> <a>URGENT-5</a><span class="time">2026-08-22 09:30</span></div></div>
+            <div class="activity-item"><div class="mini-avatar av-blue">AC</div><div class="act-line"><b>Aria created report for</b> <a>2026-08-22</a><span class="time">2026-08-22 18:08</span></div></div>
+            <div class="activity-item"><div class="mini-avatar av-orange">PN</div><div class="act-line"><b>Priya updated</b> <a>TASK-108</a><span class="time">2026-08-22 17:40</span></div></div>
+          </div>
+
+          <h3 class="section-title" style="margin-top:10px">Recent Bugs</h3>
+          <div class="panel bugs">
+            <div class="bug-row"><div class="bug-id">RESOLVED-91</div><div class="bug-title">Write lock not released on transaction timeout</div><div class="priority critical">CRITICAL</div><div class="mini-avatar av-green">MW</div></div>
+            <div class="bug-row"><div class="bug-id">TESTING-2</div><div class="bug-title">Markdown preview desynchronizes on rapid input</div><div class="priority medium">MEDIUM</div><div class="mini-avatar av-orange">PN</div></div>
+            <div class="bug-row"><div class="bug-id">NEW-14</div><div class="bug-title">Calendar event click handler not firing on mobile</div><div class="priority high">HIGH</div><div class="mini-avatar av-yellow">DO</div></div>
+            <div class="bug-row"><div class="bug-id">URGENT-5</div><div class="bug-title">Kafka consumer group rebalance causes duplicate processing</div><div class="priority critical">CRITICAL</div><div class="mini-avatar av-purple">ST</div></div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+</body>
+</html>

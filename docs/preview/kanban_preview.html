@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Thoth Dev — Kanban</title>
+<style>
+  :root{
+    --bg:#0d0d0d;
+    --panel:#151515;
+    --panel-2:#181818;
+    --panel-3:#121212;
+    --border:#272727;
+    --border-soft:#222;
+    --text:#e7e7e7;
+    --muted:#777;
+    --muted-2:#555;
+    --purple:#7c5cff;
+    --blue:#4c9aff;
+    --red:#ff4438;
+    --orange:#ff7b00;
+    --green:#36d36c;
+    --yellow:#ffcb3d;
+    --cyan:#35d4ff;
+  }
+
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{
+    font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    background:#0a0a0a;
+    color:var(--text);
+    overflow:hidden;
+    font-size:13px;
+  }
+
+  .app{
+    height:100vh;
+    display:grid;
+    grid-template-columns:198px 1fr;
+    grid-template-rows:40px 1fr;
+  }
+
+  /* top bar */
+  .topbar{
+    grid-column:1 / -1;
+    display:flex;
+    align-items:center;
+    border-bottom:1px solid #242424;
+    background:#0b0b0b;
+    min-width:0;
+  }
+
+  .brand{
+    width:198px;
+    height:100%;
+    display:flex;
+    align-items:center;
+    gap:8px;
+    padding:0 16px;
+    border-right:1px solid #242424;
+    font-weight:600;
+    color:#eee;
+  }
+
+  .brand-icon{
+    width:16px;height:16px;border-radius:4px;
+    background:#6b5cff;
+    display:grid;place-items:center;
+    font-size:10px;color:white;font-weight:800;
+  }
+
+  .crumb{
+    display:flex;
+    align-items:center;
+    gap:9px;
+    padding-left:14px;
+    color:#b6b6b6;
+    white-space:nowrap;
+  }
+  .crumb .slash{color:#444}
+  .crumb strong{color:#bdbdbd;font-weight:500}
+
+  .top-actions{
+    margin-left:auto;
+    display:flex;
+    align-items:center;
+    height:100%;
+    gap:10px;
+    padding:0 10px;
+  }
+
+  .search-top{
+    height:28px;
+    width:162px;
+    border:1px solid #2b2b2b;
+    border-radius:4px;
+    background:#111;
+    color:#a8a8a8;
+    padding:0 11px 0 28px;
+    font-size:11px;
+    outline:none;
+    background-image:linear-gradient(#111,#111);
+  }
+
+  .search-wrap{position:relative}
+  .search-wrap::before{
+    content:"⌕";
+    position:absolute;
+    left:10px;
+    top:4px;
+    color:#7f7f7f;
+    font-size:14px;
+  }
+
+  .new-btn{
+    height:28px;
+    padding:0 11px;
+    border:0;
+    border-radius:4px;
+    background:#7558ff;
+    color:white;
+    font-weight:700;
+    font-size:11px;
+    cursor:pointer;
+  }
+
+  .icon-btn{
+    width:28px;height:28px;
+    border:0;background:transparent;color:#9a9a9a;
+    display:grid;place-items:center;
+    font-size:14px;
+  }
+
+  .avatar{
+    width:25px;height:25px;border-radius:50%;
+    background:#6652d8;
+    color:#fff;
+    display:grid;place-items:center;
+    font-size:10px;font-weight:700;
+  }
+
+  /* sidebar */
+  .sidebar{
+    grid-row:2;
+    border-right:1px solid #242424;
+    background:#111;
+    display:flex;
+    flex-direction:column;
+    min-height:0;
+  }
+
+  .workspace{
+    padding:9px 9px 7px;
+    display:flex;
+    align-items:center;
+    gap:9px;
+    font-weight:700;
+    color:#ddd;
+  }
+  .back{
+    width:20px;height:20px;
+    display:grid;place-items:center;
+    border:1px solid #2b2b2b;border-radius:4px;
+    color:#aaa;font-size:13px;
+  }
+
+  .nav{
+    padding:5px 8px 0;
+  }
+  .nav a{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    height:31px;
+    padding:0 9px;
+    color:#7d7d7d;
+    text-decoration:none;
+    border-radius:4px;
+    font-size:11px;
+  }
+  .nav a.active{
+    color:#efefef;
+    background:#1a1a1a;
+  }
+  .nav .ico{width:11px;text-align:center;font-size:10px;color:#8c8c8c}
+  .nav a.active .ico{color:#dcdcdc}
+
+  .section-title{
+    margin:12px 9px 6px;
+    color:#717171;
+    font-size:10px;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+  }
+
+  .project{padding:0 8px}
+  .project a{
+    display:flex;align-items:center;gap:8px;
+    height:25px;padding:0 9px;
+    color:#888;text-decoration:none;font-size:11px;
+  }
+  .dot{width:7px;height:7px;border-radius:50%}
+  .blue{background:#6e6cff}.green{background:#31cb69}.orange{background:#ff7b00}.purple{background:#9a5cf0}
+
+  .sidebar-bottom{
+    margin-top:auto;
+    border-top:1px solid #1f1f1f;
+    padding:8px 8px 9px;
+  }
+  .bottom-link{
+    height:31px;display:flex;align-items:center;gap:10px;
+    padding:0 9px;color:#7e7e7e;font-size:11px;
+  }
+  .db-status{
+    margin-top:4px;
+    height:30px;
+    display:flex;align-items:center;gap:7px;
+    padding:0 7px;
+    background:#171717;
+    border-radius:3px;
+    color:#7b7b7b;
+    font-size:9px;
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  .status-dot{width:5px;height:5px;background:#35d57b;border-radius:50%}
+
+  /* main */
+  .main{
+    min-width:0; min-height:0;
+    display:flex; flex-direction:column;
+    background:#111;
+  }
+
+  .toolbar{
+    height:58px;
+    border-bottom:1px solid #232323;
+    display:flex;align-items:center;
+    gap:8px;
+    padding:0 10px;
+    overflow:hidden;
+  }
+
+  .input{
+    height:30px;
+    border:1px solid #292929;
+    background:#151515;
+    color:#bdbdbd;
+    border-radius:4px;
+    padding:0 10px;
+    outline:none;
+    font-size:11px;
+  }
+  .input.search{width:162px}
+
+  .filter{
+    height:30px;
+    padding:0 10px;
+    border:1px solid #242424;
+    border-radius:4px;
+    background:#141414;
+    color:#c0c0c0;
+    font-size:10px;
+    display:flex;align-items:center;
+    gap:8px;
+    white-space:nowrap;
+  }
+  .filter.active{color:#fff;background:#1c1c1c}
+
+  .cards-count{
+    margin-left:auto;
+    color:#6e6e6e;
+    font-size:9px;
+    white-space:nowrap;
+  }
+
+  .board-wrap{
+    flex:1;
+    min-height:0;
+    overflow:auto hidden;
+    padding:8px 10px 14px;
+  }
+
+  .board{
+    display:flex;
+    gap:8px;
+    min-width:max-content;
+    height:100%;
+  }
+
+  .column{
+    width:210px;
+    border:1px solid #282828;
+    border-radius:5px;
+    background:#191919;
+    display:flex;
+    flex-direction:column;
+    min-height:410px;
+  }
+
+  .col-header{
+    height:38px;
+    padding:7px 8px;
+    display:flex;align-items:flex-start;justify-content:space-between;
+    border-bottom:1px solid #232323;
+  }
+
+  .col-name{
+    display:inline-flex;
+    align-items:center;
+    height:18px;
+    padding:0 5px;
+    border-radius:3px;
+    color:#fff;
+    font-size:10px;
+    font-weight:700;
+  }
+
+  .new{background:#214e91}.urgent{background:#531f29;color:#ff5248}.progress{background:#163f29;color:#42d46e}.testing{background:#2a205c;color:#927aff}.resolved{background:#173c2a;color:#43da78}.forward{background:#1e3156;color:#76aaff}
+  .count{font-size:9px;color:#777;margin-top:2px}
+
+  .cards{
+    padding:6px;
+    display:flex;flex-direction:column;
+    gap:6px;
+  }
+
+  .card{
+    background:#151515;
+    border:1px solid #282828;
+    border-radius:4px;
+    min-height:91px;
+    padding:8px 8px 7px;
+    position:relative;
+  }
+  .card:hover{border-color:#363636}
+
+  .card-id{
+    font-size:8px;
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+    color:#777;
+    margin-bottom:5px;
+  }
+  .card-title{
+    color:#f0f0f0;
+    font-size:12px;
+    line-height:1.22;
+    font-weight:600;
+    padding-right:13px;
+  }
+
+  .priority{
+    position:absolute;
+    right:8px;top:9px;
+    font-size:11px;
+  }
+  .priority.orange{color:#ff8d20}
+  .priority.red{color:#ff3d3d}
+  .priority.green{color:#35d579}
+
+  .meta{
+    display:flex;align-items:center;
+    gap:8px;
+    margin-top:10px;
+    color:#666;
+    font-size:9px;
+  }
+
+  .assignee{
+    width:16px;height:16px;border-radius:50%;
+    display:grid;place-items:center;
+    color:#fff;font-size:7px;font-weight:700;
+  }
+  .pn{background:#f26b16}.st{background:#9b53ff}.mw{background:#13b76a}.ac{background:#6552db}.do{background:#d7a400}
+
+  .extra{
+    margin-left:auto;
+    display:flex;align-items:center;gap:6px;color:#777;
+  }
+  .comment::before{content:"▤";font-size:8px;margin-right:2px}
+  .clip::before{content:"▥";font-size:8px;margin-right:2px}
+
+  .progress-text{margin-left:auto;color:#777}
+  .bug{
+    position:absolute;
+    top:9px;right:26px;
+    color:#ff4a3d;
+    font-size:8px;font-weight:700;
+  }
+
+  .arrow{
+    position:absolute;right:9px;top:9px;
+    font-size:10px;color:#e8e8e8;
+  }
+
+  /* responsive */
+  @media (max-width:700px){
+    .app{grid-template-columns:54px 1fr}
+    .brand{width:54px;justify-content:center;padding:0}
+    .brand-text,.crumb{display:none}
+    .sidebar{width:54px}
+    .nav a{justify-content:center;padding:0}
+    .nav a span:not(.ico),.project,.section-title,.bottom-link{display:none}
+    .sidebar-bottom{padding:8px 4px}
+    .db-status{justify-content:center;padding:0}
+    .db-status span:last-child{display:none}
+    .top-actions .search-wrap{display:none}
+    .column{width:205px}
+  }
+</style>
+</head>
+
+<body>
+<div class="app">
+
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-icon">T</div>
+      <span class="brand-text">Thoth Dev</span>
+    </div>
+
+    <div class="crumb">
+      <strong>/</strong>
+      <span class="slash">Kanban</span>
+    </div>
+
+    <div class="top-actions">
+      <div class="search-wrap">
+        <input class="search-top" placeholder="Search..." />
+      </div>
+      <button class="new-btn">＋ New</button>
+      <button class="icon-btn" aria-label="Notifications">♟</button>
+      <button class="icon-btn" aria-label="Theme">◐</button>
+      <div class="avatar">AC</div>
+      <span style="font-size:11px;color:#aaa;">Aria</span>
+    </div>
+  </header>
+
+  <aside class="sidebar">
+    <div class="workspace">
+      <div class="back">‹</div>
+      <span>thoth</span>
+    </div>
+
+    <nav class="nav">
+      <a href="#"><span class="ico">▦</span><span>Dashboard</span></a>
+      <a href="#"><span class="ico">◫</span><span>Projects</span></a>
+      <a href="#" class="active"><span class="ico">⊞</span><span>Kanban</span></a>
+      <a href="#"><span class="ico">☑</span><span>Tasks</span></a>
+      <a href="#"><span class="ico">⊗</span><span>Bugs</span></a>
+      <a href="#"><span class="ico">□</span><span>Calendar</span></a>
+      <a href="#"><span class="ico">◇</span><span>Milestones</span></a>
+      <a href="#"><span class="ico">≡</span><span>Reports</span></a>
+      <a href="#"><span class="ico">M</span><span>Markdown</span></a>
+    </nav>
+
+    <div class="section-title">Projects</div>
+
+    <div class="project">
+      <a href="#"><span class="dot blue"></span>Thoth Core</a>
+      <a href="#"><span class="dot green"></span>API Gateway</a>
+      <a href="#"><span class="dot orange"></span>Data Pipeline</a>
+      <a href="#"><span class="dot purple"></span>Mobile Client</a>
+    </div>
+
+    <div class="sidebar-bottom">
+      <div class="bottom-link">◦ <span>Workspace</span></div>
+      <div class="bottom-link">⚙ <span>Settings</span></div>
+      <div class="db-status"><span class="status-dot"></span><span>SQLite connected</span></div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="toolbar">
+      <input class="input search" placeholder="Search cards..." />
+      <button class="filter active">All</button>
+      <button class="filter">Tasks</button>
+      <button class="filter">Bugs</button>
+      <button class="filter">All priorities⌄</button>
+      <button class="filter">All assignees⌄</button>
+      <div class="cards-count">14 cards</div>
+    </div>
+
+    <div class="board-wrap">
+      <div class="board">
+
+        <!-- NEW -->
+        <section class="column">
+          <div class="col-header">
+            <span class="col-name new">New</span><span class="count">3</span>
+          </div>
+          <div class="cards">
+            <article class="card">
+              <div class="card-id">TASK-102</div>
+              <div class="card-title">Design and implement Kanban column reordering</div>
+              <div class="arrow">→</div>
+              <div class="meta">
+                <span class="assignee pn">PN</span><span>09-05</span>
+                <span class="progress-text">0/3</span>
+              </div>
+            </article>
+
+            <article class="card">
+              <div class="card-id">TASK-106</div>
+              <div class="card-title">Implement offline-first sync for mobile client</div>
+              <div class="priority orange">↑</div>
+              <div class="meta">
+                <span class="assignee pn">PN</span><span>09-15</span>
+                <span class="progress-text">1/3</span>
+              </div>
+            </article>
+
+            <article class="card">
+              <div class="card-id" style="color:#f37a0b">NEW-14</div>
+              <div class="card-title">Calendar event click handler not firing on mobile</div>
+              <div class="priority orange">↑</div>
+              <div class="bug">BUG</div>
+              <div class="meta">
+                <span class="assignee do">DO</span>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <!-- URGENT -->
+        <section class="column">
+          <div class="col-header">
+            <span class="col-name urgent">Urgent</span><span class="count">2</span>
+          </div>
+          <div class="cards">
+            <article class="card">
+              <div class="card-id">TASK-105</div>
+              <div class="card-title">Migrate pipeline jobs to Apache Kafka</div>
+              <div class="priority red">⚑</div>
+              <div class="meta">
+                <span class="assignee st">ST</span><span>08-27</span>
+                <span class="progress-text">1/4</span>
+              </div>
+            </article>
+
+            <article class="card">
+              <div class="card-id" style="color:#ff3c38">URGENT-5</div>
+              <div class="card-title">Kafka consumer group rebalance causes duplicate processing</div>
+              <div class="priority red">⚑</div>
+              <div class="bug" style="right:24px;">BUG</div>
+              <div class="meta">
+                <span class="assignee st">ST</span>
+                <span class="extra"><span class="comment"></span><span class="clip"></span></span>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <!-- IN PROGRESS -->
+        <section class="column">
+          <div class="col-header">
+            <span class="col-name progress">In Progress</span><span class="count">3</span>
+          </div>
+          <div class="cards">
+            <article class="card">
+              <div class="card-id">TASK-101</div>
+              <div class="card-title">Implement SQLite WAL mode for concurrent reads</div>
+              <div class="priority orange">↑</div>
+              <div class="meta">
+                <span class="assignee mw">MW</span><span>08-28</span>
+                <span class="progress-text">2/3</span>
+                <span class="comment"></span>
+                <span class="clip"></span>
+              </div>
+            </article>
+
+            <article class="card">
+              <div class="card-id">TASK-108</div>
+              <div class="card-title">Calendar view with task and bug overlays</div>
+              <div class="arrow">→</div>
+              <div class="meta">
+                <span class="assignee pn">PN</span><span>09-01</span>
+                <span class="progress-text">2/4</span>
+              </div>
+            </article>
+
+            <article class="card">
+              <div class="card-id" style="color:#f36d0c">INPROGRESS-8</div>
+              <div class="card-title">GraphQL subscription memory leak on long connections</div>
+              <div class="priority orange">↑</div>
+              <div class="meta">
+                <span class="assignee mw">MW</span>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <!-- TESTING -->
+        <section class="column">
+          <div class="col-header">
+            <span class="col-name testing">Testing</span><span class="count">2</span>
+          </div>
+          <div class="cards">
+            <article class="card">
+              <div class="card-id">TASK-103</div>
+              <div class="card-title">Build daily report Markdown export</div>
+              <div class="arrow">→</div>
+              <div class="meta">
+                <span class="assignee ac">AC</span><span>08-30</span>
+                <span class="progress-text">3/4</span>
+                <span class="comment"></span>
+                <span class="clip"></span>
+              </div>
+            </article>
+
+            <article class="card">
+              <div class="card-id" style="color:#ff522c">TESTING-2</div>
+              <div class="card-title">Markdown preview desynchronizes on rapid input</div>
+              <div class="arrow">→</div>
+              <div class="bug">BUG</div>
+              <div class="meta">
+                <span class="assignee pn">PN</span>
+                <span class="extra"><span class="comment"></span></span>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <!-- RESOLVED -->
+        <section class="column">
+          <div class="col-header">
+            <span class="col-name resolved">Resolved</span><span class="count">2</span>
+          </div>
+          <div class="cards">
+            <article class="card">
+              <div class="card-id">TASK-107</div>
+              <div class="card-title">Add milestone progress tracking to dashboard</div>
+              <div class="priority green">✓</div>
+              <div class="meta">
+                <span class="assignee pn">PN</span><span>08-20</span>
+                <span class="progress-text">2/2</span>
+              </div>
+            </article>
+
+            <article class="card">
+              <div class="card-id" style="color:#ff4a3e">RESOLVED-91</div>
+              <div class="card-title">Write lock not released on transaction timeout</div>
+              <div class="priority red">⚑</div>
+              <div class="bug">BUG</div>
+              <div class="meta">
+                <span class="assignee mw">MW</span>
+                <span class="extra"><span class="comment"></span><span class="clip"></span></span>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <!-- PARTIAL FORWARD COLUMN, matching screenshot's right edge -->
+        <section class="column">
+          <div class="col-header">
+            <span class="col-name forward">For...</span><span class="count">2</span>
+          </div>
+          <div class="cards">
+            <article class="card">
+              <div class="card-id">TASK-109</div>
+              <div class="card-title">Add support for scheduled deployments</div>
+              <div class="meta">
+                <span class="assignee mw">MW</span>
+              </div>
+            </article>
+          </div>
+        </section>
+
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+  // Small interactions to make the mockup usable without any external library.
+  document.querySelectorAll('.filter').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      document.querySelectorAll('.filter').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+    });
+  });
+
+  document.querySelector('.new-btn').addEventListener('click',()=>{
+    const title = prompt('New card title:');
+    if(!title) return;
+    const firstColumn = document.querySelector('.column .cards');
+    const card = document.createElement('article');
+    card.className = 'card';
+    card.innerHTML = `
+      <div class="card-id">NEW-${Math.floor(Math.random()*90+10)}</div>
+      <div class="card-title"></div>
+      <div class="meta">
+        <span class="assignee ac">AC</span><span>today</span>
+        <span class="progress-text">0/1</span>
+      </div>`;
+    card.querySelector('.card-title').textContent = title;
+    firstColumn.appendChild(card);
+  });
+</script>
+</body>
+</html>

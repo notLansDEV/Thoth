@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Thoth — Projects</title>
+<style>
+:root{
+  --bg:#0b0b0b;--panel:#121212;--panel2:#151515;--border:#292929;
+  --text:#e7e7e7;--muted:#777;--muted2:#505050;
+  --purple:#7165ff;--green:#20d86b;--orange:#ff7918;--red:#ff4040;--blue:#5f74ff;
+}
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;overflow:hidden}
+body{
+  background:var(--bg);color:var(--text);
+  font:12px Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+}
+button,input{font:inherit}
+.app{height:100vh;display:flex;flex-direction:column}
+.topbar{
+  height:36px;display:flex;align-items:center;justify-content:space-between;
+  padding:0 8px;border-bottom:1px solid #282828;background:#0d0d0d;
+}
+.top-left,.top-right{display:flex;align-items:center;gap:8px}
+.brand{display:flex;align-items:center;gap:6px;font-weight:700;color:#fff}
+.brand-icon{
+  width:16px;height:16px;border-radius:3px;background:#6d62ff;
+  display:grid;place-items:center;font-size:10px;color:#fff;
+}
+.breadcrumb{color:#777;font-size:11px}
+.search{
+  width:162px;height:27px;background:#101010;border:1px solid #2a2a2a;
+  border-radius:4px;color:#bbb;padding:0 9px;outline:0;
+}
+.btn{
+  height:27px;padding:0 9px;border:1px solid #2a2a2a;background:#111;
+  color:#ddd;border-radius:4px;
+}
+.btn.primary{background:#695df0;border-color:#695df0;color:#fff;font-weight:600}
+.avatar{
+  width:22px;height:22px;border-radius:50%;background:#6864ff;
+  display:grid;place-items:center;color:#fff;font-size:9px;font-weight:700;
+}
+.user{font-weight:600;margin-left:-3px}
+.layout{height:calc(100vh - 36px);display:grid;grid-template-columns:198px 1fr}
+.sidebar{
+  background:#111;border-right:1px solid #292929;display:flex;flex-direction:column;
+}
+.sidebar-head{
+  height:36px;border-bottom:1px solid #252525;display:flex;align-items:center;
+  gap:8px;padding:0 9px;font-weight:700;
+}
+.back{
+  width:22px;height:22px;border:1px solid #333;background:#0d0d0d;
+  border-radius:4px;color:#ddd;
+}
+.nav{padding:8px 5px}
+.nav-item{
+  height:30px;padding:0 11px;display:flex;align-items:center;gap:9px;
+  color:#858585;border-radius:4px;margin-bottom:1px;
+}
+.nav-item.active{
+  color:#fff;background:#161616;border:1px solid #eee;
+}
+.icon{width:12px;text-align:center;color:#777;font-size:11px}
+.nav-item.active .icon{color:#ddd}
+.section-title{
+  padding:7px 11px 5px;color:#444;text-transform:uppercase;
+  letter-spacing:.08em;font-size:10px;
+}
+.project{height:27px;padding:0 12px;display:flex;align-items:center;gap:8px;color:#8a8a8a}
+.dot{width:8px;height:8px;border-radius:50%;flex:none}
+.purple{background:#6e61ff}.green{background:#20d969}.orange{background:#ff7818}.violet{background:#a14cff}
+.bottom{margin-top:auto;border-top:1px solid #252525;padding:8px 5px}
+.status{padding:6px 10px;color:#666;font-size:10px}
+.status-dot{display:inline-block;width:5px;height:5px;border-radius:50%;background:#18bf58;margin-right:5px}
+.content{padding:16px;overflow:auto;min-width:0}
+.page-head{
+  display:flex;align-items:flex-start;justify-content:space-between;
+  margin-bottom:18px;
+}
+.page-title{font-size:17px;font-weight:700;margin:0 0 4px;color:#f1f1f1}
+.page-subtitle{color:#737373;font-size:11px}
+.new-project{height:28px;padding:0 11px;border-radius:4px;background:#675bf0;border:0;color:#fff;font-weight:600}
+.grid{
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;
+}
+.card{
+  border:1px solid var(--border);background:var(--panel);
+  border-radius:4px;padding:12px 13px 11px;
+}
+.card-head{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+}
+.name{font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px}
+.badge{
+  font-size:9px;line-height:17px;height:17px;padding:0 6px;border-radius:2px;
+  color:#20d86b;background:#13321e;font-weight:700;
+}
+.badge.paused{background:#1b1b1b;color:#8d8d8d}
+.description{color:#707070;font-size:10px;margin:9px 0 10px}
+.progress-row{display:grid;grid-template-columns:1fr 32px;gap:10px;align-items:center}
+.progress{height:3px;background:#292929;border-radius:2px;overflow:hidden}
+.progress span{display:block;height:100%;background:var(--purple)}
+.progress.green span{background:var(--green)}
+.progress.orange span{background:var(--orange)}
+.progress.violet span{background:#a14cff}
+.percent{text-align:right;color:#777;font-size:9px}
+.meta{
+  margin-top:10px;color:#707070;font-size:9px;display:flex;gap:11px;
+}
+.meta-item{display:flex;align-items:center;gap:4px}
+.meta-icon{color:#777}
+@media(max-width:900px){
+  .grid{grid-template-columns:1fr}
+}
+@media(max-width:700px){
+  body{overflow:auto}
+  .layout{display:block;height:auto;min-height:calc(100vh - 36px)}
+  .sidebar{display:none}
+  .content{padding:10px}
+  .search{display:none}
+  .page-head{gap:10px}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="top-left">
+      <div class="brand"><span class="brand-icon">T</span>Thoth Dev</div>
+      <span class="breadcrumb">/ &nbsp;Projects</span>
+    </div>
+    <div class="top-right">
+      <input class="search" placeholder="⌕  Search..." aria-label="Search">
+      <button class="btn primary">+ New</button>
+      <button class="btn">🔔</button>
+      <button class="btn">○</button>
+      <span class="avatar">AC</span>
+      <span class="user">Aria</span>
+    </div>
+  </header>
+
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="sidebar-head">
+        <button class="back">‹</button>
+        <span>thoth</span>
+      </div>
+
+      <nav class="nav">
+        <div class="nav-item"><span class="icon">▦</span>Dashboard</div>
+        <div class="nav-item active"><span class="icon">◫</span>Projects</div>
+        <div class="nav-item"><span class="icon">⊞</span>Kanban</div>
+        <div class="nav-item"><span class="icon">☑</span>Tasks</div>
+        <div class="nav-item"><span class="icon">⊗</span>Bugs</div>
+        <div class="nav-item"><span class="icon">□</span>Calendar</div>
+        <div class="nav-item"><span class="icon">◇</span>Milestones</div>
+        <div class="nav-item"><span class="icon">≡</span>Reports</div>
+        <div class="nav-item"><span class="icon">Mᴅ</span>Markdown</div>
+      </nav>
+
+      <div class="section-title">Projects</div>
+      <div>
+        <div class="project"><span class="dot purple"></span>Thoth Core</div>
+        <div class="project"><span class="dot green"></span>API Gateway</div>
+        <div class="project"><span class="dot orange"></span>Data Pipeline</div>
+        <div class="project"><span class="dot violet"></span>Mobile Client</div>
+      </div>
+
+      <div class="bottom">
+        <div class="nav-item"><span class="icon">◦</span>Workspace</div>
+        <div class="nav-item"><span class="icon">⚙</span>Settings</div>
+        <div class="status"><span class="status-dot"></span>SQLite connected</div>
+      </div>
+    </aside>
+
+    <main class="content">
+      <div class="page-head">
+        <div>
+          <h1 class="page-title">Projects</h1>
+          <div class="page-subtitle">4 projects in this workspace</div>
+        </div>
+        <button class="new-project">+ New Project</button>
+      </div>
+
+      <section class="grid">
+        <article class="card">
+          <div class="card-head">
+            <div class="name"><span class="dot purple"></span>Thoth Core</div>
+            <span class="badge">active</span>
+          </div>
+          <div class="description">Core application engine and data layer</div>
+          <div class="progress-row">
+            <div class="progress"><span style="width:68%"></span></div><div class="percent">68%</div>
+          </div>
+          <div class="meta">
+            <span class="meta-item"><span class="meta-icon">☑</span>34 tasks</span>
+            <span class="meta-item"><span class="meta-icon">⊗</span>7 bugs</span>
+            <span class="meta-item"><span class="meta-icon">◇</span>3 milestones</span>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="card-head">
+            <div class="name"><span class="dot green"></span>API Gateway</div>
+            <span class="badge">active</span>
+          </div>
+          <div class="description">RESTful and GraphQL API gateway service</div>
+          <div class="progress-row">
+            <div class="progress green"><span style="width:82%"></span></div><div class="percent">82%</div>
+          </div>
+          <div class="meta">
+            <span class="meta-item"><span class="meta-icon">☑</span>21 tasks</span>
+            <span class="meta-item"><span class="meta-icon">⊗</span>3 bugs</span>
+            <span class="meta-item"><span class="meta-icon">◇</span>2 milestones</span>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="card-head">
+            <div class="name"><span class="dot orange"></span>Data Pipeline</div>
+            <span class="badge paused">paused</span>
+          </div>
+          <div class="description">ETL pipeline and analytics infrastructure</div>
+          <div class="progress-row">
+            <div class="progress orange"><span style="width:45%"></span></div><div class="percent">45%</div>
+          </div>
+          <div class="meta">
+            <span class="meta-item"><span class="meta-icon">☑</span>18 tasks</span>
+            <span class="meta-item"><span class="meta-icon">⊗</span>11 bugs</span>
+            <span class="meta-item"><span class="meta-icon">◇</span>4 milestones</span>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="card-head">
+            <div class="name"><span class="dot violet"></span>Mobile Client</div>
+            <span class="badge">active</span>
+          </div>
+          <div class="description">React Native mobile app for iOS and Android</div>
+          <div class="progress-row">
+            <div class="progress violet"><span style="width:31%"></span></div><div class="percent">31%</div>
+          </div>
+          <div class="meta">
+            <span class="meta-item"><span class="meta-icon">☑</span>29 tasks</span>
+            <span class="meta-item"><span class="meta-icon">⊗</span>14 bugs</span>
+            <span class="meta-item"><span class="meta-icon">◇</span>5 milestones</span>
+          </div>
+        </article>
+      </section>
+    </main>
+  </div>
+</div>
+</body>
+</html>
