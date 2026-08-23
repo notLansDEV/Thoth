@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS projects (
   archived BOOLEAN DEFAULT FALSE,
   start_date TIMESTAMP,
   deadline TIMESTAMP,
+  priority VARCHAR(50) DEFAULT 'medium',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   UNIQUE(workspace_id, slug)
@@ -38,6 +39,7 @@ CREATE TABLE IF NOT EXISTS projects (
 -- Ensure new columns on existing installs
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS start_date TIMESTAMP;
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS deadline TIMESTAMP;
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS priority VARCHAR(50) DEFAULT 'medium';
 
 -- Milestones Table
 CREATE TABLE IF NOT EXISTS milestones (

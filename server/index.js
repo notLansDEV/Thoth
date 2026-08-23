@@ -15,6 +15,7 @@ import projectRepository from '../src/db/repositories/project.repository.js'
 import workspaceRepository from '../src/db/repositories/workspace.repository.js'
 import taskRepository from '../src/db/repositories/task.repository.js'
 import milestoneRepository from '../src/db/repositories/milestone.repository.js'
+import bugRepository from '../src/db/repositories/bug.repository.js'
 
 const PORT = process.env.PORT || 4000
 const JWT_SECRET = process.env.JWT_SECRET || 'devsecret'

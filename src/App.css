@@ -37,9 +37,24 @@ button,input{font:inherit}
 }
 .user{font-weight:600;margin-left:-3px}
 .layout{height:calc(100vh - 36px);display:grid;grid-template-columns:198px 1fr}
+.layout.collapsed{grid-template-columns:0 1fr}
+.collapse-btn{
+  width:22px;height:22px;border:1px solid #2a2a2a;background:#0d0d0d;
+  border-radius:4px;color:#bbb;cursor:pointer;font-size:11px;line-height:1;
+  display:inline-flex;align-items:center;justify-content:center;
+}
+.collapse-btn:hover{color:#fff;border-color:#3a3a3a}
+.ws-btn{
+  display:inline-flex;align-items:center;gap:6px;height:27px;
+  padding:0 10px;border-radius:4px;background:#111;border:1px solid #2a2a2a;
+  color:#ddd;cursor:pointer;font-weight:600;max-width:180px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.ws-btn:hover{border-color:#3a3a3a;color:#fff}
 .sidebar{
   background:#111;border-right:1px solid #292929;display:flex;flex-direction:column;
 }
+.sidebar.collapsed{display:none}
 .sidebar-head{
   height:36px;border-bottom:1px solid #252525;display:flex;align-items:center;
   gap:8px;padding:0 9px;font-weight:700;

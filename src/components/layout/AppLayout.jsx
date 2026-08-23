@@ -1,24 +1,19 @@
-﻿import Topbar from './Topbar'
+﻿import { useState } from 'react'
+import Topbar from './Topbar'
 import Sidebar from './Sidebar'
-import Breadcrumb from './Breadcrumb'
 
-function AppLayout({ children, title, subtitle, actions, className = '' }) {
+function AppLayout({ children }) {
+  const [collapsed, setCollapsed] = useState(false)
+
   return (
-    <div className={`app ${className}`}>
-      <Topbar />
-      <div className="layout">
-        <Sidebar />
+    <div className="app">
+      <Topbar
+        collapsed={collapsed}
+        onToggleCollapse={() => setCollapsed((v) => !v)}
+      />
+      <div className={`layout${collapsed ? ' collapsed' : ''}`}>
+        <Sidebar collapsed={collapsed} />
         <main className="content" role="main">
-          <div className="page-head" aria-hidden={!(title || subtitle || actions)}>
-            <div>
-              {title && <h1 className="page-title">{title}</h1>}
-              {subtitle && <div className="page-subtitle">{subtitle}</div>}
-            </div>
-            {actions ? <div className="page-actions">{actions}</div> : <div />}
-          </div>
-
-          <Breadcrumb />
-
           <div className="page-body">
             {children}
           </div>

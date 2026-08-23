@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import './auth.css'
+import { setCurrentWorkspace } from '../features/workspaces/workspaces.service.js'
 
 function navigate(path) {
   window.history.pushState({}, '', path)
@@ -42,6 +43,8 @@ export default function Signup() {
         return
       }
       localStorage.setItem('token', data.token)
+      localStorage.setItem('thoth_user', JSON.stringify(data.user))
+      setCurrentWorkspace(null)
       navigate('/workspaces')
     } catch {
       setError('Network error. Please try again.')

@@ -36,17 +36,9 @@ export default function Login() {
         return
       }
       localStorage.setItem('token', data.token)
-
-      // Users with no workspace go through workspace creation first
-      try {
-        const res2 = await fetch('/api/workspaces', {
-          headers: { Authorization: `Bearer ${data.token}` },
-        })
-        const workspaces = res2.ok ? await res2.json() : []
-        navigate(Array.isArray(workspaces) && workspaces.length > 0 ? '/dashboard' : '/workspaces')
-      } catch {
-        navigate('/dashboard')
-      }
+      localStorage.setItem('thoth_user', JSON.stringify(data.user))
+      // Always route through the workspace module after login
+      navigate('/workspaces')
     } catch {
       setError('Network error. Please try again.')
     } finally {

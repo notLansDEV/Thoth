@@ -53,6 +53,7 @@ export default function TaskPreviewModal({ task, workspaceId, onUpdated, onClose
   const [comments, setComments] = useState(task.meta?.comments || [])
   const [checklist, setChecklist] = useState(task.meta?.checklist || [])
   const [files, setFiles] = useState(task.meta?.files || [])
+  const [tab, setTab] = useState('description')
   const [newComment, setNewComment] = useState('')
   const [newCheckItem, setNewCheckItem] = useState('')
   const [newFile, setNewFile] = useState('')
@@ -173,93 +174,130 @@ export default function TaskPreviewModal({ task, workspaceId, onUpdated, onClose
             )}
           </div>
 
-          <label style={labelStyle}>Description</label>
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            onBlur={onDescriptionBlur}
-            placeholder="Add a more detailed description…"
-            style={{ ...inputStyle, minHeight: '70px', resize: 'vertical', marginBottom: '18px' }}
-          />
+          {/* Section tabs in a row */}
+          <div style={{ display: 'flex', gap: '6px', borderBottom: '1px solid #292929', marginBottom: '14px' }}>
+            {[
+              { key: 'description', label: 'Description' },
+              { key: 'comments', label: `Comments${comments.length ? ` (${comments.length})` : ''}` },
+              { key: 'checklist', label: `Checklist${checklist.length ? ` (${doneCount}/${checklist.length})` : ''}` },
+              { key: 'files', label: `Files${files.length ? ` (${files.length})` : ''}` },
+            ].map((t) => (
+              <button
+                key={t.key}
+                type="button"
+                onClick={() => setTab(t.key)}
+                style={{
+                  padding: '7px 10px', fontSize: '11px', fontWeight: 600,
+                  background: 'transparent',
+                  color: tab === t.key ? '#fff' : '#777',
+                  border: 0, borderTop: '2px solid transparent',
+                  borderBottom: tab === t.key ? '2px solid #695df0' : '2px solid transparent',
+                  cursor: 'pointer', fontFamily: 'inherit',
+                }}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+
+          {tab === 'description' && (
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              onBlur={onDescriptionBlur}
+              placeholder="Add a more detailed description…"
+              style={{ ...inputStyle, minHeight: '140px', resize: 'vertical', marginBottom: '18px' }}
+            />
+          )}
 
           {/* Checklist */}
-          <label style={labelStyle}>
-            Checklist {checklist.length > 0 ? `(${doneCount}/${checklist.length})` : ''}
-          </label>
-          <div style={{ marginBottom: '6px' }}>
-            {checklist.map((item, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '3px 0' }}>
-                <input
-                  type="checkbox" checked={!!item.done} onChange={() => toggleCheck(i)}
-                  style={{ accentColor: '#695df0', cursor: 'pointer' }}
-                />
-                <span style={{
-                  fontSize: '11px', color: item.done ? '#555' : '#ccc',
-                  textDecoration: item.done ? 'line-through' : 'none',
-                }}>{item.text}</span>
+          {tab === 'checklist' && (
+            <>
+              <div style={{ marginBottom: '6px' }}>
+                {checklist.length === 0 && (
+                  <div style={{ color: '#555', fontSize: '11px' }}>No checklist items yet</div>
+                )}
+                {checklist.map((item, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '3px 0' }}>
+                    <input
+                      type="checkbox" checked={!!item.done} onChange={() => toggleCheck(i)}
+                      style={{ accentColor: '#695df0', cursor: 'pointer' }}
+                    />
+                    <span style={{
+                      fontSize: '11px', color: item.done ? '#555' : '#ccc',
+                      textDecoration: item.done ? 'line-through' : 'none',
+                    }}>{item.text}</span>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-          <form onSubmit={addCheckItem} style={{ display: 'flex', gap: '6px', marginBottom: '18px' }}>
-            <input
-              type="text" value={newCheckItem}
-              onChange={(e) => setNewCheckItem(e.target.value)}
-              placeholder="+ Add an item"
-              style={{ ...inputStyle, padding: '5px 8px' }}
-            />
-          </form>
+              <form onSubmit={addCheckItem} style={{ display: 'flex', gap: '6px', marginBottom: '18px' }}>
+                <input
+                  type="text" value={newCheckItem}
+                  onChange={(e) => setNewCheckItem(e.target.value)}
+                  placeholder="+ Add an item"
+                  style={{ ...inputStyle, padding: '5px 8px' }}
+                />
+              </form>
+            </>
+          )}
 
           {/* Comments */}
-          <label style={labelStyle}>Comments</label>
-          <div style={{ marginBottom: '8px' }}>
-            {comments.length === 0 && (
-              <div style={{ color: '#555', fontSize: '11px' }}>No comments yet</div>
-            )}
-            {comments.map((c, i) => (
-              <div key={i} style={{
-                background: '#101010', border: '1px solid #242424', borderRadius: '4px',
-                padding: '7px 9px', marginBottom: '6px',
-              }}>
-                <div style={{ fontSize: '11px', color: '#ddd' }}>{c.text}</div>
-                <div style={{ fontSize: '9px', color: '#555', marginTop: '3px' }}>
-                  {new Date(c.at).toLocaleString()}
-                </div>
+          {tab === 'comments' && (
+            <>
+              <div style={{ marginBottom: '8px' }}>
+                {comments.length === 0 && (
+                  <div style={{ color: '#555', fontSize: '11px' }}>No comments yet</div>
+                )}
+                {comments.map((c, i) => (
+                  <div key={i} style={{
+                    background: '#101010', border: '1px solid #242424', borderRadius: '4px',
+                    padding: '7px 9px', marginBottom: '6px',
+                  }}>
+                    <div style={{ fontSize: '11px', color: '#ddd' }}>{c.text}</div>
+                    <div style={{ fontSize: '9px', color: '#555', marginTop: '3px' }}>
+                      {new Date(c.at).toLocaleString()}
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-          <form onSubmit={addComment} style={{ display: 'flex', gap: '6px', marginBottom: '18px' }}>
-            <input
-              type="text" value={newComment}
-              onChange={(e) => setNewComment(e.target.value)}
-              placeholder="Write a comment…"
-              style={{ ...inputStyle, padding: '5px 8px' }}
-            />
-            <button type="submit" className="btn primary" style={{ cursor: 'pointer', flexShrink: 0 }}>Send</button>
-          </form>
+              <form onSubmit={addComment} style={{ display: 'flex', gap: '6px', marginBottom: '18px' }}>
+                <input
+                  type="text" value={newComment}
+                  onChange={(e) => setNewComment(e.target.value)}
+                  placeholder="Write a comment…"
+                  style={{ ...inputStyle, padding: '5px 8px' }}
+                />
+                <button type="submit" className="btn primary" style={{ cursor: 'pointer', flexShrink: 0 }}>Send</button>
+              </form>
+            </>
+          )}
 
           {/* Files */}
-          <label style={labelStyle}>Files</label>
-          <div style={{ marginBottom: '6px' }}>
-            {files.length === 0 && (
-              <div style={{ color: '#555', fontSize: '11px' }}>No files attached</div>
-            )}
-            {files.map((f, i) => (
-              <div key={i} style={{
-                display: 'flex', alignItems: 'center', gap: '7px', padding: '4px 0',
-                fontSize: '11px', color: '#bbb',
-              }}>
-                <span style={{ color: '#695df0' }}>📎</span> {f.name}
+          {tab === 'files' && (
+            <>
+              <div style={{ marginBottom: '6px' }}>
+                {files.length === 0 && (
+                  <div style={{ color: '#555', fontSize: '11px' }}>No files attached</div>
+                )}
+                {files.map((f, i) => (
+                  <div key={i} style={{
+                    display: 'flex', alignItems: 'center', gap: '7px', padding: '4px 0',
+                    fontSize: '11px', color: '#bbb',
+                  }}>
+                    <span style={{ color: '#695df0' }}>📎</span> {f.name}
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-          <form onSubmit={addFile} style={{ display: 'flex', gap: '6px' }}>
-            <input
-              type="text" value={newFile}
-              onChange={(e) => setNewFile(e.target.value)}
-              placeholder="+ Attach a file or link"
-              style={{ ...inputStyle, padding: '5px 8px' }}
-            />
-          </form>
+              <form onSubmit={addFile} style={{ display: 'flex', gap: '6px' }}>
+                <input
+                  type="text" value={newFile}
+                  onChange={(e) => setNewFile(e.target.value)}
+                  placeholder="+ Attach a file or link"
+                  style={{ ...inputStyle, padding: '5px 8px' }}
+                />
+              </form>
+            </>
+          )}
         </div>
 
         {/* RIGHT */}

@@ -1,4 +1,5 @@
 ﻿import { useState, useEffect } from 'react'
+import { setCurrentWorkspace } from '../../features/workspaces/workspaces.service.js'
 
 const NAV = [
   {key:'dashboard',label:'Dashboard'},
@@ -26,7 +27,7 @@ function navigateTo(workspace, page){
   window.dispatchEvent(new PopStateEvent('popstate'))
 }
 
-export default function Sidebar(){
+export default function Sidebar({ collapsed }){
   const [route, setRoute] = useState(parsePath())
 
   useEffect(() => {
@@ -38,7 +39,7 @@ export default function Sidebar(){
   const { workspace, page } = route
 
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar${collapsed ? ' collapsed' : ''}`}>
       <div className="sidebar-head">
         <button className="back">‹</button>
         <span>thoth</span>
@@ -64,7 +65,15 @@ export default function Sidebar(){
       <div className="bottom">
         <a href={`/Thoth/${workspace}/workspaces`} className={`nav-item ${page === 'workspaces' ? 'active' : ''}`} onClick={(e)=>{e.preventDefault(); navigateTo(workspace,'workspaces')}}>Workspace</a>
         <a href={`/Thoth/${workspace}/settings`} className={`nav-item ${page === 'settings' ? 'active' : ''}`} onClick={(e)=>{e.preventDefault(); navigateTo(workspace,'settings')}}>Settings</a>
-        <div className="status"><span className="status-dot" />SQLite connected</div>
+        <a href="/login" className="nav-item" onClick={(e)=>{
+          e.preventDefault()
+          localStorage.removeItem('token')
+          localStorage.removeItem('thoth_user')
+          setCurrentWorkspace(null)
+          window.history.pushState({}, '', '/login')
+          window.dispatchEvent(new PopStateEvent('popstate'))
+        }}>Log out</a>
+        <div className="status"><span className="status-dot" />PostgreSQL connected</div>
       </div>
     </aside>
   )
