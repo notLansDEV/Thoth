@@ -1,9 +1,10 @@
-﻿import React from 'react'
-import { getProjects } from '../dashboard.service'
+﻿import { getProjects } from '../dashboard.service'
 
 export default function ProjectOverview(){
   const projects = getProjects()
   return (
+
+    // Project Overview
     <section className="card">
       <div className="card-head">
         <div className="name">Projects</div>

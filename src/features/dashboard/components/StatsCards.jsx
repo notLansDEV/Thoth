@@ -1,9 +1,10 @@
-﻿import React from 'react'
-import { getDashboardStats } from '../dashboard.service'
+﻿import { getDashboardStats } from '../dashboard.service'
 
 export default function StatsCards(){
   const stats = getDashboardStats()
   return (
+
+    // Stats Cards
     <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:12}}>
       {stats.map(s => (
         <div key={s.id} style={{padding:12,background:'#121212',border:'1px solid #292929',borderRadius:6}}>

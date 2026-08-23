@@ -1,9 +1,10 @@
-﻿import React from 'react'
-import { getRecentActivity } from '../dashboard.service'
+﻿import { getRecentActivity } from '../dashboard.service'
 
 export default function RecentActivity(){
   const items = getRecentActivity()
   return (
+
+    // Recent Activity
     <div className="card">
       <div className="card-head"><div className="name">Recent activity</div></div>
       <ul style={{marginTop:10,listStyle:'none',paddingLeft:0}}>

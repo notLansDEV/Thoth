@@ -1,9 +1,10 @@
-﻿import React from 'react'
-import { getRecentBugs } from '../dashboard.service'
+﻿import { getRecentBugs } from '../dashboard.service'
 
 export default function RecentBugs(){
   const bugs = getRecentBugs()
   return (
+
+    // Recent Bugs
     <div className="card">
       <div className="card-head"><div className="name">Recent bugs</div></div>
       <ul style={{marginTop:10,listStyle:'none',paddingLeft:0}}>

@@ -1,7 +1,7 @@
 # App Overview
 
 - Local First
-- Sqlite
+- Postgres
 
 # Technical Stack
 - React
