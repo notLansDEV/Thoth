@@ -75,7 +75,7 @@ export default function AppRouter(){
     case 'signup': return render(<Signup />)
     case 'dashboard': return render(<Dashboard workspace={workspace} />)
     case 'projects': return render(<Projects workspace={workspace} projectId={routeId} />)
-    case 'tasks': return render(<Tasks workspace={workspace} />)
+    case 'tasks': return render(<Tasks workspace={workspace} subPage={routeId} />)
     case 'bugs': return render(<Bugs workspace={workspace} />)
     case 'calendar': return render(<Calendar workspace={workspace} />)
     case 'milestones': return render(<Milestones workspace={workspace} />)

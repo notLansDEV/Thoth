@@ -98,9 +98,14 @@ function TaskCard({ task, onOpen, onDragStart }) {
   )
 }
 
-export default function Tasks() {
+function navigateTo(path) {
+  window.history.pushState({}, '', path)
+  window.dispatchEvent(new PopStateEvent('popstate'))
+}
+
+export default function Tasks({ subPage }) {
   const ws = getCurrentWorkspace()
-  const [tab, setTab] = useState('all')
+  const tab = subPage === 'stages' ? 'stages' : 'all'
   const [tasks, setTasks] = useState([])
   const [projects, setProjects] = useState([])
   const [stages, setStages] = useState([])
@@ -246,7 +251,7 @@ export default function Tasks() {
           <button
             key={t.key}
             className={`tab-btn${tab === t.key ? ' active' : ''}`}
-            onClick={() => setTab(t.key)}
+            onClick={() => navigateTo(`/Thoth/${ws?.slug || 'ws'}/tasks/${t.key}`)}
           >
             {t.label}
           </button>
@@ -255,21 +260,21 @@ export default function Tasks() {
 
       {/* 3 stat cards */}
       <div className="stat-grid">
-        <StatCard icon="?" label="Total stage" value={stages.length} />
-        <StatCard icon="?" label="Total task" value={tasks.length} />
-        <StatCard icon="?" label={defaultStageName} value={counts[defaultStageName] || 0} />
+        <StatCard icon="◉" label={defaultStageName} value={counts[defaultStageName] || 0} />
+        <StatCard icon="☑" label="Total task" value={tasks.length} />
+        <StatCard icon="◈" label="Total stage" value={stages.length} />
       </div>
 
       {projects.length === 0 && !loading && (
         <div className="card">
           <div className="description" style={{ margin: 0 }}>
-            Create a project first � tasks live inside projects.
+            Create a project first — tasks live inside projects.
           </div>
         </div>
       )}
 
       {loading ? (
-        <div className="card"><div className="description" style={{ margin: 0 }}>Loading tasks�</div></div>
+        <div className="card"><div className="description" style={{ margin: 0 }}>Loading tasks…</div></div>
       ) : tab === 'all' ? (
         <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.max(stages.length, 1)}, minmax(230px, 1fr))`, gap: '10px', alignItems: 'start', overflowX: 'auto' }}>
           {stages.map((stage) => {

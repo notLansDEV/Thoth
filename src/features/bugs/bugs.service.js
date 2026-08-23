@@ -32,6 +32,13 @@ export async function getBugs({ workspaceId, projectId } = {}) {
   return apiRequest(`/bugs?workspace_id=${encodeURIComponent(workspaceId)}`)
 }
 
+export async function createBug(data) {
+  return apiRequest('/bugs', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
 export async function getStages(workspaceId) {
   if (!workspaceId) return []
   const rows = await apiRequest(`/bug-stages?workspace_id=${encodeURIComponent(workspaceId)}`)

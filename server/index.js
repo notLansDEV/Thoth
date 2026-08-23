@@ -357,6 +357,37 @@ app.delete('/api/projects/:id', auth, async (req, res) => {
   }
 })
 
+app.post('/api/bugs', auth, async (req, res) => {
+  try {
+    const { project_id, title, description, priority, kanban_column } = req.body
+    if (!project_id || !title || !title.trim()) {
+      return res.status(400).json({ error: 'project_id and title are required' })
+    }
+    const project = await projectRepository.findById(project_id)
+    if (!project) return res.status(404).json({ error: 'Project not found' })
+
+    const stage = kanban_column || 'New'
+    let bugId = null
+    try {
+      bugId = await bugRepository.generateBugId(project_id, stage)
+    } catch { /* non-fatal */ }
+
+    const created = await bugRepository.create({
+      project_id,
+      title: title.trim(),
+      description: description || null,
+      priority: priority || 'medium',
+      kanban_column: stage,
+      status: stage,
+      bug_id: bugId,
+    })
+    res.json(created)
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
 app.get('/api/bugs', auth, async (req, res) => {
   try {
     const { project_id, workspace_id } = req.query

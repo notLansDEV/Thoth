@@ -13,6 +13,7 @@ import { getProjects } from '../features/projects/projects.service.js'
 import { getCurrentWorkspace } from '../features/workspaces/workspaces.service.js'
 import StageBoard from '../components/StageBoard.jsx'
 import ConfirmModal from '../components/ConfirmModal.jsx'
+import ReportBugModal from '../features/bugs/components/ReportBugModal.jsx'
 
 function StatCard({ icon, label, value }) {
   return (
@@ -27,13 +28,15 @@ function StatCard({ icon, label, value }) {
 
 export default function Bugs() {
   const ws = getCurrentWorkspace()
-  const [tab, setTab] = useState('all')
+  const tab = subPage === 'stages' ? 'stages' : 'all'
+  //const [tab, setTab] = useState('all')
   const [bugs, setBugs] = useState([])
   const [projects, setProjects] = useState([])
   const [stages, setStages] = useState([])
   const [loading, setLoading] = useState(true)
   const [confirmDelete, setConfirmDelete] = useState(null)
   const [deleting, setDeleting] = useState(false)
+  const [showReport, setShowReport] = useState(false)
 
   async function refresh() {
     try {
@@ -130,6 +133,10 @@ export default function Bugs() {
           <h1 className="page-title">Bugs</h1>
           <p className="page-subtitle">Track and squash bugs across your projects</p>
         </div>
+
+        <button className="btn primary" onClick={() => setShowReport(true)} style={{ cursor: 'pointer' }}>
+          🐞 Report a Bug
+        </button>
       </div>
 
       {/* Sub-module tabs */}
@@ -147,20 +154,20 @@ export default function Bugs() {
 
       {/* 3 stat cards */}
       <div className="stat-grid">
-        <StatCard icon="?" label="Total stage" value={stages.length} />
-        <StatCard icon="??" label="Total bug" value={bugs.length} />
-        <StatCard icon="?" label={defaultStageName} value={counts[defaultStageName] || 0} />
+        <StatCard icon="◉" label={defaultStageName} value={counts[defaultStageName] || 0} />
+        <StatCard icon="🐞" label="Total bug" value={bugs.length} />
+        <StatCard icon="◈" label="Total stage" value={stages.length} />
       </div>
 
       {loading ? (
-        <div className="card"><div className="description" style={{ margin: 0 }}>Loading bugs�</div></div>
+        <div className="card"><div className="description" style={{ margin: 0 }}>Loading bugs…</div></div>
       ) : tab === 'all' ? (
         bugs.length === 0 ? (
           <div style={{
             border: '1px dashed #2a2a2a', borderRadius: '4px', padding: '40px',
             textAlign: 'center', color: '#555', fontSize: '12px',
           }}>
-            No bugs reported � your projects are healthy.
+            No bugs reported — your projects are healthy.
           </div>
         ) : (
           <div className="card" style={{ padding: 0, overflowX: 'auto' }}>
@@ -177,9 +184,9 @@ export default function Bugs() {
               <tbody>
                 {bugs.map((b) => (
                   <tr key={b.id}>
-                    <td style={{ color: '#888', fontFamily: 'monospace', fontSize: '10.5px' }}>{b.bug_id || '�'}</td>
+                    <td style={{ color: '#888', fontFamily: 'monospace', fontSize: '10.5px' }}>{b.bug_id || '—'}</td>
                     <td style={{ color: '#ddd', fontWeight: 600 }}>{b.title}</td>
-                    <td>{projects.find((p) => p.id === b.project_id)?.name || '�'}</td>
+                    <td>{projects.find((p) => p.id === b.project_id)?.name || '—'}</td>
                     <td>
                       <span className="badge" style={{ ...priorityStyle(b.priority), background: 'transparent', fontSize: '9px' }}>
                         {b.priority || 'medium'}
@@ -213,6 +220,19 @@ export default function Bugs() {
           busy={deleting}
           onConfirm={handleConfirmDelete}
           onCancel={() => setConfirmDelete(null)}
+        />
+      )}
+
+      {showReport && (
+        <ReportBugModal
+          projects={projects}
+          stages={stages}
+          defaultStageName={defaultStageName}
+          onCreated={(bug) => {
+            setBugs((current) => [bug, ...current])
+            setShowReport(false)
+          }}
+          onClose={() => setShowReport(false)}
         />
       )}
     </div>

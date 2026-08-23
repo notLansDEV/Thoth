@@ -59,8 +59,8 @@ export class BugRepository extends BaseRepository {
       `SELECT COUNT(*) as count FROM bugs WHERE project_id = $1 AND kanban_column = $2`,
       [projectId, kanbanColumn]
     );
-    const count = (result?.count || 0) + 1;
-    return `${kanbanColumn}-${count}`;
+    const count = Number(result?.count || 0) + 1;
+    return `${kanbanColumn}-${String(count).padStart(2, '0')}`;
   }
 
   /**
