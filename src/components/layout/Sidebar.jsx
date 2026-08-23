@@ -2,14 +2,14 @@
 import { setCurrentWorkspace } from '../../features/workspaces/workspaces.service.js'
 
 const NAV = [
-  {key:'dashboard',label:'Dashboard'},
-  {key:'projects',label:'Projects'},
-  {key:'tasks',label:'Tasks'},
-  {key:'bugs',label:'Bugs'},
-  {key:'calendar',label:'Calendar'},
-  {key:'milestones',label:'Milestones'},
-  {key:'reports',label:'Reports'},
-  {key:'markdown',label:'Markdown'},
+  {key:'dashboard',label:'Dashboard',icon:'◫'},
+  {key:'projects',label:'Projects',icon:'▤'},
+  {key:'tasks',label:'Tasks',icon:'☑'},
+  {key:'bugs',label:'Bugs',icon:'🐞'},
+  {key:'calendar',label:'Calendar',icon:'▦'},
+  {key:'milestones',label:'Milestones',icon:'◈'},
+  {key:'reports',label:'Reports',icon:'▥'},
+  {key:'markdown',label:'Markdown',icon:'✎'},
 ]
 
 function parsePath(){
@@ -41,39 +41,47 @@ export default function Sidebar({ collapsed }){
   return (
     <aside className={`sidebar${collapsed ? ' collapsed' : ''}`}>
       <div className="sidebar-head">
-        <button className="back">‹</button>
-        <span>thoth</span>
+        <button className="back" title="Thoth">‹</button>
+        <span className="label">thoth</span>
       </div>
 
       <nav className="nav">
         {NAV.map(item => (
           <a key={item.key}
              href={`/Thoth/${workspace}/${item.key}`}
+             title={item.label}
              className={`nav-item ${page === item.key ? 'active' : ''}`}
              onClick={(e)=>{e.preventDefault(); navigateTo(workspace, item.key)}}>
-            <span className="icon">◫</span>{item.label}
+            <span className="icon">{item.icon}</span>
+            <span className="label">{item.label}</span>
           </a>
         ))}
       </nav>
 
-      <div className="section-title">Projects</div>
-      <div>
-        <div className="project"><span className="dot purple" />Thoth Core</div>
-        <div className="project"><span className="dot green" />API Gateway</div>
-      </div>
+      {!collapsed && (
+        <>
+          <div className="section-title">Projects</div>
+          <div>
+            <div className="project"><span className="dot purple" />Thoth Core</div>
+            <div className="project"><span className="dot green" />API Gateway</div>
+          </div>
+        </>
+      )}
 
       <div className="bottom">
-        <a href={`/Thoth/${workspace}/workspaces`} className={`nav-item ${page === 'workspaces' ? 'active' : ''}`} onClick={(e)=>{e.preventDefault(); navigateTo(workspace,'workspaces')}}>Workspace</a>
-        <a href={`/Thoth/${workspace}/settings`} className={`nav-item ${page === 'settings' ? 'active' : ''}`} onClick={(e)=>{e.preventDefault(); navigateTo(workspace,'settings')}}>Settings</a>
-        <a href="/login" className="nav-item" onClick={(e)=>{
+        <a href={`/Thoth/${workspace}/workspaces`} title="Workspaces" className={`nav-item ${page === 'workspaces' ? 'active' : ''}`} onClick={(e)=>{e.preventDefault(); navigateTo(workspace,'workspaces')}}><span className="icon">▣</span><span className="label">Workspace</span></a>
+        <a href={`/Thoth/${workspace}/settings`} title="Settings" className={`nav-item ${page === 'settings' ? 'active' : ''}`} onClick={(e)=>{e.preventDefault(); navigateTo(workspace,'settings')}}><span className="icon">⚙</span><span className="label">Settings</span></a>
+        <a href="/login" title="Log out" className="nav-item" onClick={(e)=>{
           e.preventDefault()
           localStorage.removeItem('token')
           localStorage.removeItem('thoth_user')
           setCurrentWorkspace(null)
           window.history.pushState({}, '', '/login')
           window.dispatchEvent(new PopStateEvent('popstate'))
-        }}>Log out</a>
-        <div className="status"><span className="status-dot" />PostgreSQL connected</div>
+        }}><span className="icon">⏻</span><span className="label">Log out</span></a>
+        {!collapsed && (
+          <div className="status"><span className="status-dot" />PostgreSQL connected</div>
+        )}
       </div>
     </aside>
   )

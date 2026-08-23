@@ -158,7 +158,7 @@ app.get('/api/projects', auth, async (req, res) => {
 
 app.post('/api/projects', auth, async (req, res) => {
   try {
-    const { workspace_id, name, description, slug, status, start_date, deadline } = req.body
+    const { workspace_id, name, description, slug, status, priority, start_date, deadline } = req.body
     if (!workspace_id || !name) return res.status(400).json({ error: 'Missing fields' })
 
     const baseSlug = slug || `${name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')}-${Date.now().toString(36)}`
@@ -173,6 +173,7 @@ app.post('/api/projects', auth, async (req, res) => {
           slug: currentSlug,
           description: description || null,
           status: status || 'active',
+          priority: priority || 'medium',
           start_date: start_date || null,
           deadline: deadline || null,
         })
@@ -295,6 +296,69 @@ app.patch('/api/tasks/:id', auth, async (req, res) => {
     const updated = await taskRepository.updateById(req.params.id, toUpdate)
     if (!updated) return res.status(404).json({ error: 'Task not found' })
     res.json(updated)
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
+app.get('/api/projects/:id', auth, async (req, res) => {
+  try {
+    const project = await projectRepository.findById(req.params.id)
+    if (!project) return res.status(404).json({ error: 'Project not found' })
+
+    const stats = await projectRepository.getStats(project.id)
+    const members = await workspaceRepository.getMembers(project.workspace_id)
+    res.json({
+      ...project,
+      stats,
+      members_count: members.length,
+    })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
+const PROJECT_ALLOWED_FIELDS = [
+  'name', 'description', 'status', 'priority', 'start_date', 'deadline', 'color', 'archived',
+]
+
+app.patch('/api/projects/:id', auth, async (req, res) => {
+  try {
+    const data = {}
+    for (const field of PROJECT_ALLOWED_FIELDS) {
+      if (req.body[field] !== undefined) data[field] = req.body[field]
+    }
+    if (Object.keys(data).length === 0) {
+      return res.status(400).json({ error: 'No valid fields to update' })
+    }
+    const updated = await projectRepository.updateById(req.params.id, data)
+    if (!updated) return res.status(404).json({ error: 'Project not found' })
+    res.json(updated)
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
+app.delete('/api/projects/:id', auth, async (req, res) => {
+  try {
+    const deleted = await projectRepository.deleteById(req.params.id)
+    if (!deleted) return res.status(404).json({ error: 'Project not found' })
+    res.json({ ok: true })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
+app.get('/api/bugs', auth, async (req, res) => {
+  try {
+    const { project_id } = req.query
+    if (!project_id) return res.status(400).json({ error: 'project_id is required' })
+    const rows = await bugRepository.findByCondition('project_id = $1', [project_id])
+    res.json(rows)
   } catch (err) {
     console.error(err)
     res.status(500).json({ error: 'Server error' })

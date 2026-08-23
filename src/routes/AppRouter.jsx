@@ -89,6 +89,8 @@ export default function AppRouter(){
     if(!token || AUTH_PAGES.includes(page)){
       return element
     }
-    return <AppLayout>{element}</AppLayout>
+    // Key on the selected workspace so pages remount (and refetch) when it changes
+    const wsKey = getCurrentWorkspace()?.id || 'none'
+    return <AppLayout key={wsKey}>{element}</AppLayout>
   }
 }

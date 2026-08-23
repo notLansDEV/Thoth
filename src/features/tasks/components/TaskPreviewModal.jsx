@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   TASK_STAGES,
   TASK_PRIORITIES,
@@ -36,6 +36,34 @@ function toDateInput(value) {
   return Number.isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10)
 }
 
+function currentUser() {
+  try {
+    const u = JSON.parse(localStorage.getItem('thoth_user') || 'null')
+    if (!u) return { id: null, name: 'Unknown' }
+    return { id: u.id || null, name: u.full_name || u.username || 'Unknown' }
+  } catch {
+    return { id: null, name: 'Unknown' }
+  }
+}
+
+function formatSize(bytes) {
+  const n = Number(bytes) || 0
+  if (n < 1024) return `${n} B`
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function fileIcon(name = '') {
+  const ext = name.split('.').pop().toLowerCase()
+  if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp'].includes(ext)) return '🖼'
+  if (ext === 'pdf') return '📕'
+  if (['txt', 'md', 'log'].includes(ext)) return '📃'
+  if (['zip', 'rar', '7z'].includes(ext)) return '🗜'
+  if (['doc', 'docx'].includes(ext)) return '📘'
+  if (['xls', 'xlsx', 'csv'].includes(ext)) return '📗'
+  return '📎'
+}
+
 export default function TaskPreviewModal({ task, workspaceId, onUpdated, onClose }) {
   const [title, setTitle] = useState(task.title)
   const [description, setDescription] = useState(task.description || '')
@@ -56,7 +84,7 @@ export default function TaskPreviewModal({ task, workspaceId, onUpdated, onClose
   const [tab, setTab] = useState('description')
   const [newComment, setNewComment] = useState('')
   const [newCheckItem, setNewCheckItem] = useState('')
-  const [newFile, setNewFile] = useState('')
+  const fileInputRef = useRef(null)
 
   useEffect(() => {
     let alive = true
@@ -93,9 +121,12 @@ export default function TaskPreviewModal({ task, workspaceId, onUpdated, onClose
   async function addComment(e) {
     e.preventDefault()
     if (!newComment.trim()) return
+    const user = currentUser()
     const next = [...comments, {
       text: newComment.trim(),
       at: new Date().toISOString(),
+      author_id: user.id,
+      author_name: user.name,
     }]
     setComments(next)
     setNewComment('')
@@ -112,6 +143,13 @@ export default function TaskPreviewModal({ task, workspaceId, onUpdated, onClose
     if (!updated) setChecklist(checklist)
   }
 
+  async function removeCheckItem(index) {
+    const next = checklist.filter((_, i) => i !== index)
+    setChecklist(next)
+    const updated = await patch({ meta: { checklist: next } })
+    if (!updated) setChecklist(checklist)
+  }
+
   async function addCheckItem(e) {
     e.preventDefault()
     if (!newCheckItem.trim()) return
@@ -122,12 +160,27 @@ export default function TaskPreviewModal({ task, workspaceId, onUpdated, onClose
     if (!updated) setChecklist(checklist)
   }
 
-  async function addFile(e) {
-    e.preventDefault()
-    if (!newFile.trim()) return
-    const next = [...files, { name: newFile.trim(), added_at: new Date().toISOString() }]
+  function onFilesPicked(e) {
+    const picked = Array.from(e.target.files || [])
+    e.target.value = ''
+    if (picked.length === 0) return
+    const additions = picked.map((f) => ({
+      name: f.name,
+      size: f.size,
+      type: f.type || null,
+      added_at: new Date().toISOString(),
+      added_by: currentUser().name,
+    }))
+    const next = [...files, ...additions]
     setFiles(next)
-    setNewFile('')
+    patch({ meta: { files: next } }).then((updated) => {
+      if (!updated) setFiles(files)
+    })
+  }
+
+  async function removeFile(index) {
+    const next = files.filter((_, i) => i !== index)
+    setFiles(next)
     const updated = await patch({ meta: { files: next } })
     if (!updated) setFiles(files)
   }
@@ -213,23 +266,69 @@ export default function TaskPreviewModal({ task, workspaceId, onUpdated, onClose
           {/* Checklist */}
           {tab === 'checklist' && (
             <>
-              <div style={{ marginBottom: '6px' }}>
-                {checklist.length === 0 && (
-                  <div style={{ color: '#555', fontSize: '11px' }}>No checklist items yet</div>
-                )}
-                {checklist.map((item, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '3px 0' }}>
-                    <input
-                      type="checkbox" checked={!!item.done} onChange={() => toggleCheck(i)}
-                      style={{ accentColor: '#695df0', cursor: 'pointer' }}
-                    />
-                    <span style={{
-                      fontSize: '11px', color: item.done ? '#555' : '#ccc',
-                      textDecoration: item.done ? 'line-through' : 'none',
-                    }}>{item.text}</span>
-                  </div>
-                ))}
+              <div style={{
+                background: '#101010', border: '1px solid #242424', borderRadius: '4px',
+                padding: '10px 12px', marginBottom: '10px',
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '7px' }}>
+                  <span style={{ fontSize: '10px', fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                    Checklist
+                  </span>
+                  <span style={{ fontSize: '10px', color: doneCount === checklist.length && checklist.length > 0 ? '#20d96b' : '#777' }}>
+                    {doneCount}/{checklist.length} done
+                  </span>
+                </div>
+                <div className="progress" style={{ height: '4px' }}>
+                  <span style={{
+                    width: `${checklist.length ? Math.round((doneCount / checklist.length) * 100) : 0}%`,
+                    background: doneCount === checklist.length && checklist.length > 0 ? '#20d96b' : undefined,
+                  }} />
+                </div>
               </div>
+
+              {checklist.length === 0 ? (
+                <div style={{ color: '#555', fontSize: '11px', marginBottom: '8px' }}>No checklist items yet</div>
+              ) : (
+                <div style={{ marginBottom: '10px' }}>
+                  {checklist.map((item, i) => (
+                    <div
+                      key={i}
+                      className="check-row"
+                      style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px', borderRadius: '4px' }}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => toggleCheck(i)}
+                        aria-label={item.done ? 'Mark as not done' : 'Mark as done'}
+                        style={{
+                          width: '15px', height: '15px', flexShrink: 0, borderRadius: '3px',
+                          border: item.done ? '0' : '1px solid #3a3a3a',
+                          background: item.done ? '#695df0' : 'transparent',
+                          color: '#fff', fontSize: '9px', lineHeight: 1, cursor: 'pointer',
+                          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                        }}
+                      >
+                        {item.done ? '✓' : ''}
+                      </button>
+                      <span style={{
+                        flex: 1, fontSize: '11.5px',
+                        color: item.done ? '#555' : '#ccc',
+                        textDecoration: item.done ? 'line-through' : 'none',
+                      }}>{item.text}</span>
+                      <button
+                        type="button"
+                        className="row-delete"
+                        onClick={() => removeCheckItem(i)}
+                        aria-label="Delete item"
+                        style={{
+                          background: 'transparent', border: 0, color: '#555', cursor: 'pointer',
+                          fontSize: '11px', lineHeight: 1, padding: '2px 4px', opacity: 0,
+                        }}
+                      >✕</button>
+                    </div>
+                  ))}
+                </div>
+              )}
               <form onSubmit={addCheckItem} style={{ display: 'flex', gap: '6px', marginBottom: '18px' }}>
                 <input
                   type="text" value={newCheckItem}
@@ -237,6 +336,9 @@ export default function TaskPreviewModal({ task, workspaceId, onUpdated, onClose
                   placeholder="+ Add an item"
                   style={{ ...inputStyle, padding: '5px 8px' }}
                 />
+                {newCheckItem.trim() && (
+                  <button type="submit" className="btn primary" style={{ cursor: 'pointer', flexShrink: 0 }}>Add</button>
+                )}
               </form>
             </>
           )}
@@ -248,23 +350,34 @@ export default function TaskPreviewModal({ task, workspaceId, onUpdated, onClose
                 {comments.length === 0 && (
                   <div style={{ color: '#555', fontSize: '11px' }}>No comments yet</div>
                 )}
-                {comments.map((c, i) => (
-                  <div key={i} style={{
-                    background: '#101010', border: '1px solid #242424', borderRadius: '4px',
-                    padding: '7px 9px', marginBottom: '6px',
-                  }}>
-                    <div style={{ fontSize: '11px', color: '#ddd' }}>{c.text}</div>
-                    <div style={{ fontSize: '9px', color: '#555', marginTop: '3px' }}>
-                      {new Date(c.at).toLocaleString()}
+                {comments.map((c, i) => {
+                  const name = c.author_name || 'Unknown'
+                  return (
+                    <div key={i} style={{ display: 'flex', gap: '8px', marginBottom: '9px' }}>
+                      <span className="avatar" style={{ width: '24px', height: '24px', fontSize: '9px', flexShrink: 0 }}>
+                        {name.slice(0, 2).toUpperCase()}
+                      </span>
+                      <div style={{
+                        flex: 1, background: '#101010', border: '1px solid #242424',
+                        borderRadius: '4px', padding: '7px 9px',
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', marginBottom: '3px' }}>
+                          <span style={{ fontSize: '10.5px', fontWeight: 700, color: '#ddd' }}>{name}</span>
+                          <span style={{ fontSize: '9px', color: '#555' }}>
+                            {new Date(c.at).toLocaleString()}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: '11px', color: '#ccc', lineHeight: 1.5 }}>{c.text}</div>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
               <form onSubmit={addComment} style={{ display: 'flex', gap: '6px', marginBottom: '18px' }}>
                 <input
                   type="text" value={newComment}
                   onChange={(e) => setNewComment(e.target.value)}
-                  placeholder="Write a comment…"
+                  placeholder={`Comment as ${currentUser().name}…`}
                   style={{ ...inputStyle, padding: '5px 8px' }}
                 />
                 <button type="submit" className="btn primary" style={{ cursor: 'pointer', flexShrink: 0 }}>Send</button>
@@ -275,27 +388,65 @@ export default function TaskPreviewModal({ task, workspaceId, onUpdated, onClose
           {/* Files */}
           {tab === 'files' && (
             <>
-              <div style={{ marginBottom: '6px' }}>
-                {files.length === 0 && (
-                  <div style={{ color: '#555', fontSize: '11px' }}>No files attached</div>
-                )}
-                {files.map((f, i) => (
-                  <div key={i} style={{
-                    display: 'flex', alignItems: 'center', gap: '7px', padding: '4px 0',
-                    fontSize: '11px', color: '#bbb',
-                  }}>
-                    <span style={{ color: '#695df0' }}>📎</span> {f.name}
-                  </div>
-                ))}
-              </div>
-              <form onSubmit={addFile} style={{ display: 'flex', gap: '6px' }}>
-                <input
-                  type="text" value={newFile}
-                  onChange={(e) => setNewFile(e.target.value)}
-                  placeholder="+ Attach a file or link"
-                  style={{ ...inputStyle, padding: '5px 8px' }}
-                />
-              </form>
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept=".png,.jpg,.jpeg,.gif,.webp,.svg,.pdf,.txt,.md,.log,.doc,.docx,.xls,.xlsx,.csv,.zip"
+                style={{ display: 'none' }}
+                onChange={onFilesPicked}
+              />
+              {files.length === 0 ? (
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  style={{
+                    border: '1px dashed #2a2a2a', borderRadius: '4px', padding: '22px',
+                    textAlign: 'center', color: '#666', fontSize: '11px', cursor: 'pointer',
+                    marginBottom: '8px',
+                  }}
+                >
+                  📎 Click to attach files<br />
+                  <span style={{ fontSize: '9px', color: '#444' }}>PNG, JPG, PDF, TXT, DOC, XLS, ZIP…</span>
+                </div>
+              ) : (
+                <div style={{ marginBottom: '10px' }}>
+                  {files.map((f, i) => (
+                    <div
+                      key={i}
+                      className="check-row"
+                      style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px', borderRadius: '4px' }}
+                    >
+                      <span style={{ fontSize: '13px' }}>{fileIcon(f.name)}</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: '11px', color: '#ccc', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {f.name}
+                        </div>
+                        <div style={{ fontSize: '9px', color: '#555' }}>
+                          {[f.size != null ? formatSize(f.size) : null, f.added_by].filter(Boolean).join(' · ')}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        className="row-delete"
+                        onClick={() => removeFile(i)}
+                        aria-label="Remove file"
+                        style={{
+                          background: 'transparent', border: 0, color: '#555', cursor: 'pointer',
+                          fontSize: '11px', lineHeight: 1, padding: '2px 4px', opacity: 0,
+                        }}
+                      >✕</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="btn"
+                style={{ cursor: 'pointer' }}
+              >
+                📎 Attach files
+              </button>
             </>
           )}
         </div>

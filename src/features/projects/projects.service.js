@@ -33,9 +33,38 @@ export const PROJECT_STATUSES = [
   { value: 'cancelled', label: 'Cancelled' },
 ]
 
+export const PROJECT_PRIORITIES = [
+  { value: 'low', label: 'Low', color: '#20d96b' },
+  { value: 'medium', label: 'Medium', color: '#e8c547' },
+  { value: 'high', label: 'High', color: '#ff7918' },
+  { value: 'critical', label: 'Critical', color: '#ff4040' },
+]
+
 export async function getProjects(workspaceId) {
   if (!workspaceId) return []
   return apiRequest(`/projects?workspace_id=${encodeURIComponent(workspaceId)}`)
+}
+
+export async function getProject(projectId) {
+  return apiRequest(`/projects/${encodeURIComponent(projectId)}`)
+}
+
+export async function updateProject(projectId, data) {
+  return apiRequest(`/projects/${encodeURIComponent(projectId)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function deleteProject(projectId) {
+  return apiRequest(`/projects/${encodeURIComponent(projectId)}`, {
+    method: 'DELETE',
+  })
+}
+
+export async function getProjectBugs(projectId) {
+  if (!projectId) return []
+  return apiRequest(`/bugs?project_id=${encodeURIComponent(projectId)}`)
 }
 
 export async function addProject(workspaceId, { name, description, status, start_date, deadline }) {

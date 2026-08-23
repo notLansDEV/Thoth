@@ -1,4 +1,9 @@
-﻿import { getCurrentWorkspace } from '../../features/workspaces/workspaces.service.js'
+﻿import { useEffect, useRef, useState } from 'react'
+import {
+  getCurrentWorkspace,
+  setCurrentWorkspace,
+  getWorkspaces,
+} from '../../features/workspaces/workspaces.service.js'
 
 const PAGE_LABELS = {
   dashboard: 'Dashboard',
@@ -26,9 +31,45 @@ function getUser() {
   }
 }
 
+function logout() {
+  localStorage.removeItem('token')
+  localStorage.removeItem('thoth_user')
+  setCurrentWorkspace(null)
+  navigate('/login')
+}
+
 export default function Topbar({ collapsed, onToggleCollapse }) {
   const ws = getCurrentWorkspace()
   const user = getUser()
+  const [wsOpen, setWsOpen] = useState(false)
+  const [wsList, setWsList] = useState(null)
+  const [profileOpen, setProfileOpen] = useState(false)
+  const menuRef = useRef(null)
+
+  useEffect(() => {
+    function onDocClick(e) {
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        setWsOpen(false)
+        setProfileOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', onDocClick)
+    return () => document.removeEventListener('mousedown', onDocClick)
+  }, [])
+
+  async function toggleWsMenu() {
+    const next = !wsOpen
+    setWsOpen(next)
+    setProfileOpen(false)
+    if (next && wsList === null) {
+      try {
+        const rows = await getWorkspaces()
+        setWsList(Array.isArray(rows) ? rows : [])
+      } catch {
+        setWsList([])
+      }
+    }
+  }
 
   const parts = window.location.pathname.split('/').filter(Boolean)
   const pageKey = parts[parts.length - 1] || 'dashboard'
@@ -61,13 +102,77 @@ export default function Topbar({ collapsed, onToggleCollapse }) {
         </span>
       </div>
 
-      <div className="top-right">
-        <button className="btn ws-btn" onClick={() => navigate('/workspaces')} title="Switch workspace">
-          <span className="dot purple" />
-          {ws ? ws.name : 'No workspace'}
-        </button>
-        <span className="avatar">{initials}</span>
-        <span className="user">{name}</span>
+      <div className="top-right" ref={menuRef}>
+        {/* Workspace switcher */}
+        <div style={{ position: 'relative' }}>
+          <button
+            className="btn ws-btn"
+            onClick={toggleWsMenu}
+            title="Switch workspace"
+            aria-haspopup="menu"
+            aria-expanded={wsOpen}
+          >
+            <span className="dot purple" />
+            {ws ? ws.name : 'No workspace'}
+            <span style={{ fontSize: '8px', color: '#666' }}>▼</span>
+          </button>
+          {wsOpen && (
+            <div className="dropdown-menu" role="menu">
+              <div className="dropdown-head">Workspaces</div>
+              {wsList === null && <div className="dropdown-empty">Loading…</div>}
+              {Array.isArray(wsList) && wsList.length === 0 && (
+                <div className="dropdown-empty">No workspaces yet</div>
+              )}
+              {Array.isArray(wsList) && wsList.map((w) => (
+                <button
+                  key={w.id}
+                  className={`dropdown-item${ws?.id === w.id ? ' active' : ''}`}
+                  onClick={() => {
+                    setWsOpen(false)
+                    if (ws?.id !== w.id) {
+                      setCurrentWorkspace(w)
+                      navigate('/dashboard')
+                    }
+                  }}
+                >
+                  <span className="dot purple" />
+                  {w.name}
+                </button>
+              ))}
+              {Array.isArray(wsList) && (
+                <button
+                  className="dropdown-item"
+                  onClick={() => { setWsOpen(false); navigate('/workspaces') }}
+                >
+                  + New workspace
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Profile menu */}
+        <div style={{ position: 'relative' }}>
+          <button
+            className="profile-btn"
+            onClick={() => { setProfileOpen(!profileOpen); setWsOpen(false) }}
+            aria-haspopup="menu"
+            aria-expanded={profileOpen}
+            title="Account"
+          >
+            <span className="avatar">{initials}</span>
+            <span className="user">{name}</span>
+          </button>
+          {profileOpen && (
+            <div className="dropdown-menu right" role="menu">
+              <div className="dropdown-head">{name}</div>
+              {user?.email && <div className="dropdown-email">{user.email}</div>}
+              <button className="dropdown-item danger" onClick={logout}>
+                ⏻ Log out
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </header>
   )
