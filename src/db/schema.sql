@@ -28,10 +28,16 @@ CREATE TABLE IF NOT EXISTS projects (
   icon VARCHAR(50),
   order_index INTEGER DEFAULT 0,
   archived BOOLEAN DEFAULT FALSE,
+  start_date TIMESTAMP,
+  deadline TIMESTAMP,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   UNIQUE(workspace_id, slug)
 );
+
+-- Ensure new columns on existing installs
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS start_date TIMESTAMP;
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS deadline TIMESTAMP;
 
 -- Milestones Table
 CREATE TABLE IF NOT EXISTS milestones (
@@ -63,9 +69,15 @@ CREATE TABLE IF NOT EXISTS tasks (
   completed_at TIMESTAMP,
   order_index INTEGER DEFAULT 0,
   parent_task_id UUID REFERENCES tasks(id) ON DELETE SET NULL,
+  progress INTEGER DEFAULT 0,
+  meta JSONB DEFAULT '{}',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Ensure new columns on existing installs
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS progress INTEGER DEFAULT 0;
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS meta JSONB DEFAULT '{}';
 
 -- Bugs Table
 CREATE TABLE IF NOT EXISTS bugs (

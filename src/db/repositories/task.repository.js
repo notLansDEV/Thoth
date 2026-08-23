@@ -7,6 +7,27 @@ export class TaskRepository extends BaseRepository {
   }
 
   /**
+   * Find all tasks in a workspace (joined with project + assignee info)
+   */
+  async findByWorkspace(workspaceId) {
+    const sql = `
+      SELECT
+        t.*,
+        p.name AS project_name,
+        p.color AS project_color,
+        u.username AS assignee_name,
+        m.name AS milestone_name
+      FROM tasks t
+      JOIN projects p ON t.project_id = p.id
+      LEFT JOIN users u ON t.assigned_to = u.id
+      LEFT JOIN milestones m ON t.milestone_id = m.id
+      WHERE p.workspace_id = $1
+      ORDER BY t.order_index, t.created_at DESC
+    `;
+    return getMany(sql, [workspaceId]);
+  }
+
+  /**
    * Find tasks by project
    */
   async findByProject(projectId, filters = {}) {
@@ -35,7 +56,6 @@ export class TaskRepository extends BaseRepository {
     if (filters.milestone) {
       sql += ` AND milestone_id = $${paramIndex}`;
       params.push(filters.milestone);
-      paramIndex++;
     }
 
     sql += ' ORDER BY order_index, created_at DESC';

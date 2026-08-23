@@ -1,7 +1,6 @@
 ﻿import { useState, useEffect } from 'react'
 import Dashboard from '../features/dashboard/Dashboard'
 import Projects from '../pages/Projects'
-import Kanban from '../pages/Kanban'
 import Tasks from '../pages/Tasks'
 import Bugs from '../pages/Bugs'
 import Calendar from '../pages/Calendar'
@@ -62,7 +61,6 @@ export default function AppRouter(){
     case 'signup': return <Signup />
     case 'dashboard': return <Dashboard workspace={workspace} />
     case 'projects': return <Projects workspace={workspace} />
-    case 'kanban': return <Kanban workspace={workspace} />
     case 'tasks': return <Tasks workspace={workspace} />
     case 'bugs': return <Bugs workspace={workspace} />
     case 'calendar': return <Calendar workspace={workspace} />

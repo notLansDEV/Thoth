@@ -1,9 +1,8 @@
-﻿import React, { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 
 const NAV = [
   {key:'dashboard',label:'Dashboard'},
   {key:'projects',label:'Projects'},
-  {key:'kanban',label:'Kanban'},
   {key:'tasks',label:'Tasks'},
   {key:'bugs',label:'Bugs'},
   {key:'calendar',label:'Calendar'},

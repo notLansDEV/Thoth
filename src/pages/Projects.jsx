@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { getProjects, addProject } from '../features/projects/projects.service.js'
+import { getCurrentWorkspace } from '../features/workspaces/workspaces.service.js'
 import ProjectForm from '../features/projects/components/ProjectForm.jsx'
 import ProjectCard from '../features/projects/components/ProjectCard.jsx'
 
@@ -11,7 +12,8 @@ export default function Projects({ workspace }) {
     let alive = true
 
     async function loadProjects() {
-      const rows = await getProjects(workspace?.id)
+      const ws = getCurrentWorkspace()
+      const rows = await getProjects(ws?.id || undefined)
       if (alive) setProjects(rows)
     }
 
@@ -20,10 +22,11 @@ export default function Projects({ workspace }) {
     return () => {
       alive = false
     }
-  }, [workspace?.id])
+  }, [workspace])
 
-  const handleAddProject = async (name, description) => {
-    const newProject = await addProject(workspace?.id, name, description)
+  const handleAddProject = async (fields) => {
+    const ws = getCurrentWorkspace()
+    const newProject = await addProject(ws?.id || workspace?.id, fields)
     setProjects((current) => [...current, newProject])
     setShowForm(false)
   }

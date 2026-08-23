@@ -17,6 +17,20 @@ export class WorkspaceRepository extends BaseRepository {
   }
 
   /**
+   * Find all workspaces a user belongs to
+   */
+  async findByUserId(userId) {
+    return getMany(
+      `SELECT w.*, wm.role
+       FROM workspaces w
+       JOIN workspace_members wm ON wm.workspace_id = w.id
+       WHERE wm.user_id = $1
+       ORDER BY w.created_at`,
+      [userId]
+    );
+  }
+
+  /**
    * Get workspace with projects
    */
   async getWithProjects(workspaceId, includeArchived = false) {

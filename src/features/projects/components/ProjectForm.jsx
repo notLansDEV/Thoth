@@ -1,16 +1,43 @@
 import { useState } from 'react'
+import { PROJECT_STATUSES } from '../projects.service.js'
+
+const inputStyle = {
+  width: '100%',
+  padding: '8px 9px',
+  border: '1px solid #2a2a2a',
+  background: '#101010',
+  color: '#ddd',
+  borderRadius: '4px',
+  fontSize: '12px',
+  boxSizing: 'border-box',
+  outline: 'none'
+}
+
+const labelStyle = {
+  display: 'block',
+  marginBottom: '6px',
+  fontSize: '12px',
+  fontWeight: '600',
+  color: '#ddd'
+}
 
 export default function ProjectForm({ onSubmit, onCancel }) {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
+  const [status, setStatus] = useState('planning')
+  const [startDate, setStartDate] = useState('')
+  const [deadline, setDeadline] = useState('')
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    if (name.trim()) {
-      onSubmit(name, description)
-      setName('')
-      setDescription('')
-    }
+    if (!name.trim()) return
+    onSubmit({
+      name: name.trim(),
+      description: description.trim(),
+      status,
+      start_date: startDate || null,
+      deadline: deadline || null,
+    })
   }
 
   return (
@@ -32,7 +59,9 @@ export default function ProjectForm({ onSubmit, onCancel }) {
         borderRadius: '6px',
         padding: '24px',
         width: '100%',
-        maxWidth: '400px',
+        maxWidth: '440px',
+        maxHeight: '90vh',
+        overflowY: 'auto',
         boxShadow: '0 20px 25px rgba(0, 0, 0, 0.3)'
       }}>
         <div style={{ marginBottom: '16px' }}>
@@ -41,67 +70,60 @@ export default function ProjectForm({ onSubmit, onCancel }) {
         </div>
 
         <form onSubmit={handleSubmit}>
-          <div style={{ marginBottom: '16px' }}>
-            <label style={{
-              display: 'block',
-              marginBottom: '6px',
-              fontSize: '12px',
-              fontWeight: '600',
-              color: '#ddd'
-            }}>
-              Project Name
-            </label>
+          <div style={{ marginBottom: '14px' }}>
+            <label style={labelStyle}>Project Title</label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g., My Awesome Project"
-              style={{
-                width: '100%',
-                padding: '8px 9px',
-                border: '1px solid #2a2a2a',
-                background: '#101010',
-                color: '#ddd',
-                borderRadius: '4px',
-                fontSize: '12px',
-                boxSizing: 'border-box',
-                outline: 'none'
-              }}
-              onFocus={(e) => e.target.style.borderColor = '#6e61ff'}
-              onBlur={(e) => e.target.style.borderColor = '#2a2a2a'}
+              style={inputStyle}
+              autoFocus
             />
           </div>
 
-          <div style={{ marginBottom: '20px' }}>
-            <label style={{
-              display: 'block',
-              marginBottom: '6px',
-              fontSize: '12px',
-              fontWeight: '600',
-              color: '#ddd'
-            }}>
-              Description (optional)
-            </label>
+          <div style={{ marginBottom: '14px' }}>
+            <label style={labelStyle}>Description (optional)</label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Describe your project..."
-              style={{
-                width: '100%',
-                padding: '8px 9px',
-                border: '1px solid #2a2a2a',
-                background: '#101010',
-                color: '#ddd',
-                borderRadius: '4px',
-                fontSize: '12px',
-                boxSizing: 'border-box',
-                outline: 'none',
-                minHeight: '80px',
-                resize: 'vertical'
-              }}
-              onFocus={(e) => e.target.style.borderColor = '#6e61ff'}
-              onBlur={(e) => e.target.style.borderColor = '#2a2a2a'}
+              style={{ ...inputStyle, minHeight: '70px', resize: 'vertical' }}
             />
+          </div>
+
+          <div style={{ marginBottom: '14px' }}>
+            <label style={labelStyle}>Status</label>
+            <select
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+              style={inputStyle}
+            >
+              {PROJECT_STATUSES.map((s) => (
+                <option key={s.value} value={s.value}>{s.label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '20px' }}>
+            <div>
+              <label style={labelStyle}>Start Date</label>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                style={inputStyle}
+              />
+            </div>
+            <div>
+              <label style={labelStyle}>Deadline</label>
+              <input
+                type="date"
+                value={deadline}
+                onChange={(e) => setDeadline(e.target.value)}
+                style={inputStyle}
+              />
+            </div>
           </div>
 
           <div style={{
@@ -112,32 +134,15 @@ export default function ProjectForm({ onSubmit, onCancel }) {
             <button
               type="button"
               onClick={onCancel}
-              style={{
-                height: '27px',
-                padding: '0 11px',
-                border: '1px solid #2a2a2a',
-                background: '#111',
-                color: '#ddd',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '12px'
-              }}
+              className="btn"
+              style={{ cursor: 'pointer' }}
             >
               Cancel
             </button>
             <button
               type="submit"
-              style={{
-                height: '27px',
-                padding: '0 11px',
-                border: '0',
-                background: '#695df0',
-                color: '#fff',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '12px',
-                fontWeight: '600'
-              }}
+              className="btn primary"
+              style={{ cursor: 'pointer' }}
             >
               Create Project
             </button>

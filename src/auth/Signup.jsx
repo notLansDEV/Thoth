@@ -42,7 +42,7 @@ export default function Signup() {
         return
       }
       localStorage.setItem('token', data.token)
-      navigate('/dashboard')
+      navigate('/workspaces')
     } catch {
       setError('Network error. Please try again.')
     } finally {

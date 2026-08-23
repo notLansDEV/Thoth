@@ -25,12 +25,20 @@ function slugify(name) {
     .replace(/^-+|-+$/g, '')
 }
 
+export const PROJECT_STATUSES = [
+  { value: 'planning', label: 'Planning' },
+  { value: 'active', label: 'Active' },
+  { value: 'on_hold', label: 'On Hold' },
+  { value: 'completed', label: 'Completed' },
+  { value: 'cancelled', label: 'Cancelled' },
+]
+
 export async function getProjects(workspaceId) {
   if (!workspaceId) return []
   return apiRequest(`/projects?workspace_id=${encodeURIComponent(workspaceId)}`)
 }
 
-export async function addProject(workspaceId, name, description) {
+export async function addProject(workspaceId, { name, description, status, start_date, deadline }) {
   if (!workspaceId) {
     throw new Error('workspaceId is required to create a project')
   }
@@ -42,6 +50,9 @@ export async function addProject(workspaceId, name, description) {
       name,
       description,
       slug: slugify(name),
+      status: status || 'planning',
+      start_date: start_date || null,
+      deadline: deadline || null,
     }),
   })
 }
