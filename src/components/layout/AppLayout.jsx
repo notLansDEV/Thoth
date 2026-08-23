@@ -1,12 +1,11 @@
 ﻿import React from 'react'
-import PropTypes from 'prop-types'
 import Topbar from './Topbar'
 import Sidebar from './Sidebar'
 import Breadcrumb from './Breadcrumb'
 
-function AppLayout({ children, title, subtitle, actions, className }) {
+function AppLayout({ children, title, subtitle, actions, className = '' }) {
   return (
-    <div className={`app ${className || ''}`}>
+    <div className={`app ${className}`}>
       <Topbar />
       <div className="layout">
         <Sidebar />
@@ -28,22 +27,6 @@ function AppLayout({ children, title, subtitle, actions, className }) {
       </div>
     </div>
   )
-}
-
-AppLayout.propTypes = {
-  children: PropTypes.node,
-  title: PropTypes.node,
-  subtitle: PropTypes.node,
-  actions: PropTypes.node,
-  className: PropTypes.string,
-}
-
-AppLayout.defaultProps = {
-  children: null,
-  title: null,
-  subtitle: null,
-  actions: null,
-  className: '',
 }
 
 export default AppLayout
