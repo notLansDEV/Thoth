@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 import Dashboard from '../features/dashboard/Dashboard'
 import Projects from '../pages/Projects'
 import Kanban from '../pages/Kanban'
@@ -10,6 +10,10 @@ import Reports from '../pages/Reports'
 import Markdown from '../pages/Markdown'
 import Settings from '../pages/Settings'
 import Workspaces from '../pages/Workspaces'
+import Login from '../auth/Login'
+import Signup from '../auth/Signup'
+
+const AUTH_PAGES = ['login', 'signup']
 
 function parsePath(){
   const parts = window.location.pathname.split('/').filter(Boolean)
@@ -18,12 +22,14 @@ function parsePath(){
   if(parts.length === 0){ return {workspace,page} }
   // Support both /Thoth/workspace/page and /workspace/page
   if(parts[0].toLowerCase() === 'thoth'){
-    if(parts[1]) workspace = parts[1]
-    if(parts[2]) page = parts[2]
-  } else {
-    if(parts[0]) workspace = parts[0]
-    if(parts[1]) page = parts[1]
+    parts.shift()
   }
+  // /login and /signup are top-level pages, not workspaces
+  if(parts.length > 0 && AUTH_PAGES.includes(parts[0])){
+    return { workspace: 'default', page: parts[0] }
+  }
+  if(parts[0]) workspace = parts[0]
+  if(parts[1]) page = parts[1]
   return {workspace,page}
 }
 
@@ -36,9 +42,24 @@ export default function AppRouter(){
     return () => window.removeEventListener('popstate', onPop)
   }, [])
 
-  const { workspace, page } = route
+  const { workspace } = route
+  let { page } = route
+
+  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
+
+  // If not authenticated and not on auth pages, show login by default
+  if(!token && page !== 'login' && page !== 'signup'){
+    page = 'login'
+  }
+
+  // Already authenticated? Skip auth pages
+  if(token && AUTH_PAGES.includes(page)){
+    page = 'dashboard'
+  }
 
   switch(page){
+    case 'login': return <Login />
+    case 'signup': return <Signup />
     case 'dashboard': return <Dashboard workspace={workspace} />
     case 'projects': return <Projects workspace={workspace} />
     case 'kanban': return <Kanban workspace={workspace} />
