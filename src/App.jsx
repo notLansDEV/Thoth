@@ -1,11 +1,11 @@
 import './App.css'
 import AppLayout from './components/layout/AppLayout'
-import Dashboard from './features/dashboard/Dashboard'
+import AppRouter from './routes/AppRouter'
 
 export default function App() {
   return (
-    <AppLayout title="Dashboard" subtitle="Overview" actions={<></>}>
-      <Dashboard />
+    <AppLayout>
+      <AppRouter />
     </AppLayout>
   )
 }
