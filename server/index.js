@@ -549,7 +549,7 @@ app.post('/api/bugs', auth, async (req, res) => {
     const stage = kanban_column || 'New'
     let bugId = null
     try {
-      bugId = await bugRepository.generateBugId(project_id, stage)
+      bugId = await bugRepository.generateBugId(project_id)
     } catch { /* non-fatal */ }
 
     const created = await bugRepository.create({

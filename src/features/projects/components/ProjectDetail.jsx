@@ -409,7 +409,7 @@ export default function ProjectDetail({ projectId, onBack }) {
                   <thead>
                     <tr>
                       <th>Activity</th>
-                      <th>By</th>
+                      <th>User</th>
                       <th>Date &amp; Time</th>
                     </tr>
                   </thead>

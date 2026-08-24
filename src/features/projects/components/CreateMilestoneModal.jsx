@@ -121,10 +121,17 @@ export default function CreateMilestoneModal({ projectId, onCreated, onClose }) 
               ))}
             </div>
           )}
-          <form onSubmit={addCheckItem} style={{ display: 'flex', gap: '7px', marginBottom: '16px' }}>
-            <input type="text" value={newItem} onChange={(e) => setNewItem(e.target.value)} placeholder="+ Add checklist item" style={{ ...inputStyle, flex: 1 }} />
-            <button type="submit" className="btn" style={{ cursor: 'pointer' }}>Add</button>
-          </form>
+          <div style={{ display: 'flex', gap: '7px', marginBottom: '16px' }}>
+            <input
+              type="text"
+              value={newItem}
+              onChange={(e) => setNewItem(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') addCheckItem(e) }}
+              placeholder="+ Add checklist item"
+              style={{ ...inputStyle, flex: 1 }}
+            />
+            <button type="button" className="btn" onClick={addCheckItem} style={{ cursor: 'pointer' }}>Add</button>
+          </div>
 
           <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
             <button type="button" className="btn" onClick={onClose} style={{ cursor: 'pointer' }}>Cancel</button>

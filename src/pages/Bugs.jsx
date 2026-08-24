@@ -16,6 +16,7 @@ import StageBoard from '../components/StageBoard.jsx'
 import ConfirmModal from '../components/ConfirmModal.jsx'
 import ListToolbar from '../components/ListToolbar.jsx'
 import ReportBugModal from '../features/bugs/components/ReportBugModal.jsx'
+import BugPreviewModal from '../features/bugs/components/BugPreviewModal.jsx'
 
 function StatCard({ icon, label, value }) {
   return (
@@ -28,14 +29,15 @@ function StatCard({ icon, label, value }) {
   )
 }
 
-function BugCard({ bug, projectName, projectColor, onDragStart }) {
+function BugCard({ bug, projectName, projectColor, onDragStart, onOpen }) {
   return (
     <div
       draggable
       onDragStart={(e) => onDragStart(e, bug.id)}
+      onClick={() => onOpen(bug)}
       style={{
         background: '#101010', border: '1px solid #2a2a2a',
-        borderRadius: '4px', padding: '10px', marginBottom: '8px', cursor: 'grab',
+        borderRadius: '4px', padding: '10px', marginBottom: '8px', cursor: 'pointer',
         transition: 'border-color 0.15s',
       }}
       onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#ff6b6b' }}
@@ -87,6 +89,7 @@ export default function Bugs({ subPage }) {
   const [confirmDelete, setConfirmDelete] = useState(null)
   const [deleting, setDeleting] = useState(false)
   const [showReport, setShowReport] = useState(false)
+  const [preview, setPreview] = useState(null)
   const dragId = useRef(null)
 
   const [query, setQuery] = useState('')
@@ -271,6 +274,7 @@ export default function Bugs({ subPage }) {
                         projectName={projects.find((p) => p.id === bug.project_id)?.name}
                         projectColor={projects.find((p) => p.id === bug.project_id)?.color}
                         onDragStart={(e, id) => { dragId.current = id; e.dataTransfer.effectAllowed = 'move' }}
+                        onOpen={setPreview}
                       />
                     ))}
 
@@ -322,6 +326,14 @@ export default function Bugs({ subPage }) {
             setShowReport(false)
           }}
           onClose={() => setShowReport(false)}
+        />
+      )}
+
+      {preview && (
+        <BugPreviewModal
+          bug={bugs.find((b) => b.id === preview.id) || preview}
+          projectName={projects.find((p) => p.id === preview.project_id)?.name}
+          onClose={() => setPreview(null)}
         />
       )}
     </div>

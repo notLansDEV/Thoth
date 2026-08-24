@@ -52,15 +52,15 @@ export class BugRepository extends BaseRepository {
   }
 
   /**
-   * Generate bug ID based on kanban column
+   * Generate bug ID scoped to the project: Bug-01, Bug-02, ...
    */
-  async generateBugId(projectId, kanbanColumn) {
+  async generateBugId(projectId) {
     const result = await getOne(
-      `SELECT COUNT(*) as count FROM bugs WHERE project_id = $1 AND kanban_column = $2`,
-      [projectId, kanbanColumn]
+      `SELECT COUNT(*) as count FROM bugs WHERE project_id = $1`,
+      [projectId]
     );
     const count = Number(result?.count || 0) + 1;
-    return `${kanbanColumn}-${String(count).padStart(2, '0')}`;
+    return `Bug-${String(count).padStart(2, '0')}`;
   }
 
   /**
