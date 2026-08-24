@@ -51,6 +51,7 @@ CREATE TABLE IF NOT EXISTS milestones (
   due_date TIMESTAMP,
   status VARCHAR(50) DEFAULT 'planned',
   progress INTEGER DEFAULT 0,
+  meta JSONB DEFAULT '{}',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -89,6 +90,9 @@ WITH numbered AS (
   WHERE task_code IS NULL
 )
 UPDATE tasks t SET task_code = n.code FROM numbered n WHERE t.id = n.id AND t.task_code IS NULL;
+
+-- Milestone checklist/meta storage on existing installs
+ALTER TABLE milestones ADD COLUMN IF NOT EXISTS meta JSONB DEFAULT '{}';
 
 -- Task Stages Table (workspace-level, user-manageable)
 CREATE TABLE IF NOT EXISTS task_stages (

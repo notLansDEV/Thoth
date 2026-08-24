@@ -8,6 +8,9 @@ import { useState } from 'react'
  *  - project/onProject: 'all' | project id
  *  - projects: [{id,name}] for the project filter
  *  - placeholder: input placeholder text
+ * Generic single-filter mode (used by Activity):
+ *  - filterValue/onFilter: current filter value + setter
+ *  - options: [{value,label}] choices for the dropdown select
  */
 export default function ListToolbar({
   query, onQuery,
@@ -15,14 +18,22 @@ export default function ListToolbar({
   project, onProject,
   projects = [],
   placeholder = '🔍 Search…',
+  filterValue,
+  onFilter,
+  options = null,
 }) {
   const [open, setOpen] = useState(false)
   const [text, setText] = useState(query)
-  const active = priority !== 'all' || project !== 'all'
+  const active = options ? (filterValue !== options[0]?.value) : (priority !== 'all' || project !== 'all')
 
   function apply(e) {
     if (e) e.preventDefault()
     onQuery(text)
+  }
+
+  function clearFilters() {
+    if (options) onFilter(options[0]?.value ?? 'all')
+    else { onPriority('all'); onProject('all') }
   }
 
   return (
@@ -58,39 +69,58 @@ export default function ListToolbar({
               padding: '10px', display: 'flex', flexDirection: 'column', gap: '9px', zIndex: 900,
             }}
           >
-            <label style={{ display: 'block', fontSize: '10px', fontWeight: 700, color: '#777', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-              Priority
-            </label>
-            <select
-              value={priority}
-              onChange={(e) => onPriority(e.target.value)}
-              style={{ background: '#101010', border: '1px solid #2a2a2a', color: '#ddd', borderRadius: '4px', fontSize: '11px', padding: '5px 7px', width: '100%' }}
-            >
-              <option value="all">All priorities</option>
-              <option value="high">High</option>
-              <option value="medium">Medium</option>
-              <option value="low">Low</option>
-            </select>
+            {options ? (
+              <>
+                <label style={{ display: 'block', fontSize: '10px', fontWeight: 700, color: '#777', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                  Action
+                </label>
+                <select
+                  value={filterValue}
+                  onChange={(e) => onFilter(e.target.value)}
+                  style={{ background: '#101010', border: '1px solid #2a2a2a', color: '#ddd', borderRadius: '4px', fontSize: '11px', padding: '5px 7px', width: '100%' }}
+                >
+                  {options.map((o) => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
+              </>
+            ) : (
+              <>
+                <label style={{ display: 'block', fontSize: '10px', fontWeight: 700, color: '#777', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                  Priority
+                </label>
+                <select
+                  value={priority}
+                  onChange={(e) => onPriority(e.target.value)}
+                  style={{ background: '#101010', border: '1px solid #2a2a2a', color: '#ddd', borderRadius: '4px', fontSize: '11px', padding: '5px 7px', width: '100%' }}
+                >
+                  <option value="all">All priorities</option>
+                  <option value="high">High</option>
+                  <option value="medium">Medium</option>
+                  <option value="low">Low</option>
+                </select>
 
-            <label style={{ display: 'block', fontSize: '10px', fontWeight: 700, color: '#777', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-              Project
-            </label>
-            <select
-              value={project}
-              onChange={(e) => onProject(e.target.value)}
-              style={{ background: '#101010', border: '1px solid #2a2a2a', color: '#ddd', borderRadius: '4px', fontSize: '11px', padding: '5px 7px', width: '100%' }}
-            >
-              <option value="all">All projects</option>
-              {projects.map((p) => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </select>
+                <label style={{ display: 'block', fontSize: '10px', fontWeight: 700, color: '#777', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                  Project
+                </label>
+                <select
+                  value={project}
+                  onChange={(e) => onProject(e.target.value)}
+                  style={{ background: '#101010', border: '1px solid #2a2a2a', color: '#ddd', borderRadius: '4px', fontSize: '11px', padding: '5px 7px', width: '100%' }}
+                >
+                  <option value="all">All projects</option>
+                  {projects.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              </>
+            )}
 
             {active && (
               <button
                 type="button"
                 className="btn"
-                onClick={() => { onPriority('all'); onProject('all') }}
+                onClick={clearFilters}
                 style={{ cursor: 'pointer' }}
               >
                 Clear filters

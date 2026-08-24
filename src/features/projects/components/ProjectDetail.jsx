@@ -6,6 +6,9 @@ import {
   getProjectBugs,
 } from '../projects.service.js'
 import { getTasks, TASK_STAGES, getMilestones, getWorkspaceMembers, priorityStyle } from '../../tasks/tasks.service.js'
+import { getActivity, describeActivity, actorName } from '../../activity/activity.service.js'
+import CreateMilestoneModal from './CreateMilestoneModal.jsx'
+import ListToolbar from '../../../components/ListToolbar.jsx'
 
 const TABS = ['Overview', 'Team', 'Milestone', 'Task', 'Bugs', 'Attachments', 'Activity', 'Notes']
 
@@ -43,6 +46,11 @@ export default function ProjectDetail({ projectId, onBack }) {
   const [bugs, setBugs] = useState([])
   const [members, setMembers] = useState([])
   const [milestones, setMilestones] = useState([])
+  const [activities, setActivities] = useState([])
+  const [showNewMilestone, setShowNewMilestone] = useState(false)
+  const [activityQuery, setActivityQuery] = useState('')
+  const [activityFilter, setActivityFilter] = useState('all')
+  const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
     let alive = true
@@ -53,17 +61,19 @@ export default function ProjectDetail({ projectId, onBack }) {
         if (!alive) return
         setProject(p)
 
-        const [t, b, m, ms] = await Promise.all([
+        const [t, b, m, ms, acts] = await Promise.all([
           getTasks(p.workspace_id),
           getProjectBugs(projectId),
           getWorkspaceMembers(p.workspace_id),
           getMilestones(projectId).catch(() => []),
+          getActivity({ projectId }).catch(() => []),
         ])
         if (!alive) return
         setTasks(t.filter((x) => x.project_id === projectId))
         setBugs(b)
         setMembers(m)
         setMilestones(ms)
+        setActivities(acts)
       } catch {
         /* leave states empty */
       }
@@ -71,7 +81,7 @@ export default function ProjectDetail({ projectId, onBack }) {
 
     load()
     return () => { alive = false }
-  }, [projectId])
+  }, [projectId, reloadKey])
 
   if (!project) {
     return (
@@ -205,37 +215,63 @@ export default function ProjectDetail({ projectId, onBack }) {
       )}
 
       {tab === 'Milestone' && (
-        milestones.length === 0 ? <Empty text="No milestones yet." /> : (
-          <div className="card" style={{ padding: 0, overflowX: 'auto' }}>
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Title</th>
-                  <th>Description</th>
-                  <th>Due Date</th>
-                  <th>Status</th>
-                  <th>Progress</th>
-                </tr>
-              </thead>
-              <tbody>
-                {milestones.map((ms) => (
-                  <tr key={ms.id}>
-                    <td style={{ color: '#ddd', fontWeight: 600 }}>{ms.name}</td>
-                    <td style={{ color: '#888', maxWidth: '320px' }}>{ms.description || '—'}</td>
-                    <td>{fmtDate(ms.due_date)}</td>
-                    <td><span className="badge paused">{ms.status || 'planned'}</span></td>
-                    <td style={{ minWidth: '110px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
-                        <div className="progress" style={{ flex: 1 }}><span style={{ width: `${Number(ms.progress) || 0}%` }} /></div>
-                        <span style={{ fontSize: '10px', color: '#666' }}>{Number(ms.progress) || 0}%</span>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        <>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '10px' }}>
+            <button className="btn primary" onClick={() => setShowNewMilestone(true)} style={{ cursor: 'pointer' }}>
+              + New Milestone
+            </button>
           </div>
-        )
+
+          {milestones.length === 0 ? <Empty text="No milestones yet. Create the first one." /> : (
+            <div className="card" style={{ padding: 0, overflowX: 'auto' }}>
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Title</th>
+                    <th>Description</th>
+                    <th>Checklist</th>
+                    <th>Start Date</th>
+                    <th>Due Date</th>
+                    <th>Status</th>
+                    <th>Progress</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {milestones.map((ms) => {
+                    const checklist = ms.meta?.checklist || []
+                    const doneCount = checklist.filter((c) => c.done).length
+                    return (
+                      <tr key={ms.id}>
+                        <td style={{ color: '#ddd', fontWeight: 600 }}>{ms.name}</td>
+                        <td style={{ color: '#888', maxWidth: '320px' }}>{ms.description || '—'}</td>
+                        <td style={{ color: '#888', fontSize: '11px' }}>
+                          {checklist.length === 0 ? '—' : `${doneCount}/${checklist.length} done`}
+                        </td>
+                        <td>{fmtDate(ms.start_date)}</td>
+                        <td>{fmtDate(ms.due_date)}</td>
+                        <td><span className="badge paused">{ms.status || 'planned'}</span></td>
+                        <td style={{ minWidth: '110px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+                            <div className="progress" style={{ flex: 1 }}><span style={{ width: `${Number(ms.progress) || 0}%` }} /></div>
+                            <span style={{ fontSize: '10px', color: '#666' }}>{Number(ms.progress) || 0}%</span>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {showNewMilestone && (
+            <CreateMilestoneModal
+              projectId={projectId}
+              onClose={() => setShowNewMilestone(false)}
+              onCreated={() => { setShowNewMilestone(false); setReloadKey((k) => k + 1) }}
+            />
+          )}
+        </>
       )}
 
       {tab === 'Task' && (
@@ -342,7 +378,63 @@ export default function ProjectDetail({ projectId, onBack }) {
       )}
 
       {tab === 'Attachments' && <Empty text="File attachments coming soon." />}
-      {tab === 'Activity' && <Empty text="No recent activity recorded." />}
+      {tab === 'Activity' && (() => {
+        const q = activityQuery.trim().toLowerCase()
+        const filtered = activities.filter((a) => {
+          if (activityFilter !== 'all' && a.action !== activityFilter) return false
+          if (!q) return true
+          const c = a.changes || {}
+          const hay = [
+            c.task_code, c.bug_id, c.title, describeActivity(a), actorName(a), a.entity_type,
+          ].filter(Boolean).join(' ').toLowerCase()
+          return hay.includes(q)
+        })
+        return (
+          <>
+            <ListToolbar
+              query={activityQuery} onQuery={setActivityQuery}
+              placeholder="🔍 Search activity…"
+              filterValue={activityFilter}
+              onFilter={setActivityFilter}
+              options={[
+                { value: 'all', label: 'All actions' },
+                { value: 'created', label: 'Created' },
+                { value: 'status_changed', label: 'Status changed' },
+              ]}
+            />
+
+            {filtered.length === 0 ? <Empty text="No recent activity recorded." /> : (
+              <div className="card" style={{ padding: 0, overflowX: 'auto' }}>
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Activity</th>
+                      <th>By</th>
+                      <th>Date &amp; Time</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filtered.map((a) => (
+                      <tr key={a.id}>
+                        <td style={{ color: '#ddd' }}>
+                          {describeActivity(a)}
+                          {a.action === 'status_changed' && (
+                            <span className="badge" style={{ marginLeft: '7px', fontSize: '9px', background: 'transparent' }}>status</span>
+                          )}
+                        </td>
+                        <td style={{ color: '#888' }}>{actorName(a)}</td>
+                        <td style={{ color: '#666', whiteSpace: 'nowrap', fontSize: '11px' }}>
+                          {new Date(a.created_at).toLocaleDateString()} · {new Date(a.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
+        )
+      })()}
       {tab === 'Notes' && <Empty text="No notes yet." />}
     </div>
   )

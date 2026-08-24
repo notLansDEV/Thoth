@@ -22,26 +22,30 @@ export class ActivityRepository extends BaseRepository {
   }
 
   /**
-   * Get workspace activity
+   * Get workspace activity (with actor info)
    */
   async getWorkspaceActivity(workspaceId, limit = 50, offset = 0) {
     return getMany(
-      `SELECT * FROM activity_logs
-       WHERE workspace_id = $1
-       ORDER BY created_at DESC
+      `SELECT a.*, u.username AS actor_name, u.full_name AS actor_full_name
+       FROM activity_logs a
+       LEFT JOIN users u ON a.actor_id = u.id
+       WHERE a.workspace_id = $1
+       ORDER BY a.created_at DESC
        LIMIT $2 OFFSET $3`,
       [workspaceId, limit, offset]
     );
   }
 
   /**
-   * Get project activity
+   * Get project activity (with actor info)
    */
   async getProjectActivity(projectId, limit = 50, offset = 0) {
     return getMany(
-      `SELECT * FROM activity_logs
-       WHERE project_id = $1
-       ORDER BY created_at DESC
+      `SELECT a.*, u.username AS actor_name, u.full_name AS actor_full_name
+       FROM activity_logs a
+       LEFT JOIN users u ON a.actor_id = u.id
+       WHERE a.project_id = $1
+       ORDER BY a.created_at DESC
        LIMIT $2 OFFSET $3`,
       [projectId, limit, offset]
     );

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import './auth.css'
-import { setCurrentWorkspace } from '../features/workspaces/workspaces.service.js'
+import { setCurrentWorkspace, getWorkspaces } from '../features/workspaces/workspaces.service.js'
 
 function navigate(path) {
   window.history.pushState({}, '', path)
@@ -45,6 +45,18 @@ export default function Signup() {
       localStorage.setItem('token', data.token)
       localStorage.setItem('thoth_user', JSON.stringify(data.user))
       setCurrentWorkspace(null)
+
+      // Auto-select the first workspace if this account already has one;
+      // brand-new accounts go to the workspace picker to create one.
+      try {
+        const workspaces = await getWorkspaces()
+        if (Array.isArray(workspaces) && workspaces.length > 0) {
+          const first = workspaces[0]
+          setCurrentWorkspace(first)
+          navigate(`/Thoth/${first.slug}/dashboard`)
+          return
+        }
+      } catch { /* fall through to the picker */ }
       navigate('/workspaces')
     } catch {
       setError('Network error. Please try again.')

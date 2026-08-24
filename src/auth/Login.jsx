@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import './auth.css'
+import { getWorkspaces, setCurrentWorkspace } from '../features/workspaces/workspaces.service.js'
 
 function navigate(path) {
   window.history.pushState({}, '', path)
@@ -37,7 +38,19 @@ export default function Login() {
       }
       localStorage.setItem('token', data.token)
       localStorage.setItem('thoth_user', JSON.stringify(data.user))
-      // Always route through the workspace module after login
+
+      // Auto-select the first workspace so the router guard lets us through;
+      // users with no workspaces land on the workspace picker instead.
+      try {
+        const workspaces = await getWorkspaces()
+        if (Array.isArray(workspaces) && workspaces.length > 0) {
+          const first = workspaces[0]
+          setCurrentWorkspace(first)
+          navigate(`/Thoth/${first.slug}/dashboard`)
+          return
+        }
+      } catch { /* fall through to the picker */ }
+      // Always route through the workspace module after login when none exist yet
       navigate('/workspaces')
     } catch {
       setError('Network error. Please try again.')

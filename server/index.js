@@ -16,10 +16,19 @@ import workspaceRepository from '../src/db/repositories/workspace.repository.js'
 import taskRepository from '../src/db/repositories/task.repository.js'
 import milestoneRepository from '../src/db/repositories/milestone.repository.js'
 import bugRepository from '../src/db/repositories/bug.repository.js'
+import { ActivityRepository } from '../src/db/repositories/activity.repository.js'
 import { BaseRepository } from '../src/db/repositories/base.repository.js'
 
 const taskStageRepository = new BaseRepository('task_stages')
 const bugStageRepository = new BaseRepository('bug_stages')
+const activityRepository = new ActivityRepository()
+
+// Non-fatal activity logging
+function logActivity(workspaceId, entityType, action, entityId, actorId, changes, projectId) {
+  activityRepository
+    .log(workspaceId, entityType, action, entityId, actorId, changes, projectId)
+    .catch((err) => console.error('activity log failed:', err.message))
+}
 
 const PORT = process.env.PORT || 4000
 const JWT_SECRET = process.env.JWT_SECRET || 'devsecret'
@@ -193,6 +202,7 @@ app.post('/api/projects', auth, async (req, res) => {
     }
 
     if (!created) return res.status(500).json({ error: 'Could not generate a unique slug' })
+    logActivity(created.workspace_id, 'project', 'created', created.id, req.user.id, { title: created.name }, created.id)
     res.json(created)
   } catch (err) {
     console.error(err)
@@ -332,6 +342,51 @@ app.get('/api/milestones', auth, async (req, res) => {
   }
 })
 
+app.post('/api/milestones', auth, async (req, res) => {
+  try {
+    const { project_id, name, description, start_date, due_date, meta } = req.body
+    if (!project_id || !name || !name.trim()) {
+      return res.status(400).json({ error: 'project_id and name are required' })
+    }
+
+    const project = await projectRepository.findById(project_id)
+    if (!project) return res.status(404).json({ error: 'Project not found' })
+
+    const created = await milestoneRepository.create({
+      project_id,
+      name: name.trim(),
+      description: description || null,
+      start_date: start_date || null,
+      due_date: due_date || null,
+      status: 'planned',
+      progress: 0,
+      ...(meta && typeof meta === 'object' ? { meta } : {}),
+    })
+
+    logActivity(project.workspace_id, 'milestone', 'created', created.id, req.user.id, { title: created.name }, project_id)
+    res.json(created)
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
+app.get('/api/activity', auth, async (req, res) => {
+  try {
+    const { project_id, workspace_id } = req.query
+    if (project_id) {
+      return res.json(await activityRepository.getProjectActivity(project_id))
+    }
+    if (workspace_id) {
+      return res.json(await activityRepository.getWorkspaceActivity(workspace_id))
+    }
+    return res.status(400).json({ error: 'project_id or workspace_id is required' })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
 app.get('/api/tasks', auth, async (req, res) => {
   try {
     const { workspace_id } = req.query
@@ -372,6 +427,9 @@ app.post('/api/tasks', auth, async (req, res) => {
       task_code,
       ...data,
     })
+
+    const project = await projectRepository.findById(project_id)
+    logActivity(project?.workspace_id, 'task', 'created', created.id, req.user.id, { task_code: created.task_code, title: created.title }, project_id)
     res.json(created)
   } catch (err) {
     console.error(err)
@@ -393,11 +451,12 @@ app.patch('/api/tasks/:id', auth, async (req, res) => {
       return res.status(400).json({ error: 'meta must be an object' })
     }
 
+    const existing = await taskRepository.findById(req.params.id)
+    if (!existing) return res.status(404).json({ error: 'Task not found' })
+
     // Merge meta instead of overwriting so comments/checklist/files persist independently
     let toUpdate = data
     if (data.meta) {
-      const existing = await taskRepository.findById(req.params.id)
-      if (!existing) return res.status(404).json({ error: 'Task not found' })
       toUpdate = {
         ...data,
         meta: { ...(existing.meta || {}), ...data.meta },
@@ -406,6 +465,20 @@ app.patch('/api/tasks/:id', auth, async (req, res) => {
 
     const updated = await taskRepository.updateById(req.params.id, toUpdate)
     if (!updated) return res.status(404).json({ error: 'Task not found' })
+
+    // Track stage moves as explicit activity entries
+    if (data.status && data.status !== existing.status) {
+      const project = await projectRepository.findById(existing.project_id)
+      logActivity(
+        project?.workspace_id,
+        'task',
+        'status_changed',
+        updated.id,
+        req.user.id,
+        { task_code: existing.task_code, title: existing.title, from: existing.status, to: data.status },
+        existing.project_id
+      )
+    }
     res.json(updated)
   } catch (err) {
     console.error(err)
@@ -488,6 +561,8 @@ app.post('/api/bugs', auth, async (req, res) => {
       status: stage,
       bug_id: bugId,
     })
+
+    logActivity(project.workspace_id, 'bug', 'created', created.id, req.user.id, { bug_id: created.bug_id, title: created.title }, project_id)
     res.json(created)
   } catch (err) {
     console.error(err)
@@ -536,8 +611,26 @@ app.patch('/api/bugs/:id', auth, async (req, res) => {
     if (data.kanban_column && data.status === undefined) {
       data.status = data.kanban_column
     }
+
+    const existing = await bugRepository.findById(req.params.id)
+    if (!existing) return res.status(404).json({ error: 'Bug not found' })
+
     const updated = await bugRepository.updateById(req.params.id, data)
     if (!updated) return res.status(404).json({ error: 'Bug not found' })
+
+    // Track kanban moves as explicit activity entries
+    if (data.kanban_column && data.kanban_column !== existing.kanban_column) {
+      const project = await projectRepository.findById(existing.project_id)
+      logActivity(
+        project?.workspace_id,
+        'bug',
+        'status_changed',
+        updated.id,
+        req.user.id,
+        { bug_id: existing.bug_id, title: existing.title, from: existing.kanban_column, to: data.kanban_column },
+        existing.project_id
+      )
+    }
     res.json(updated)
   } catch (err) {
     console.error(err)

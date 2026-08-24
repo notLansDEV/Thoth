@@ -188,6 +188,179 @@ export default function Workspaces() {
     }
   }
 
+  // Full-screen workspace detail view (opened via 👁 preview)
+  if (preview) {
+    return (
+      <div>
+        {/* Workspace navbar */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: '10px',
+          borderBottom: '1px solid #292929', paddingBottom: '12px', marginBottom: '16px',
+        }}>
+          <button className="btn" onClick={() => { setPreview(null); setPanel(null); setPanelError(null) }} style={{ cursor: 'pointer' }}>
+            ← Back
+          </button>
+          <span className="dot purple" />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: '15px', fontWeight: 700, color: '#f1f1f1', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {preview.name}
+              {current?.id === preview.id && <span className="badge paused" style={{ fontSize: '9px', marginLeft: '7px' }}>current</span>}
+            </div>
+            <div style={{ fontSize: '10px', color: '#666' }}>/{preview.slug} · {members.length} member{members.length === 1 ? '' : 's'}</div>
+          </div>
+          <button
+            className={`btn${panel === 'settings' ? ' primary' : ''}`}
+            onClick={() => setPanel(panel === 'settings' ? null : 'settings')}
+            style={{ cursor: 'pointer' }}
+          >⚙ Settings</button>
+          <button
+            className={`btn${panel === 'invite' ? ' primary' : ''}`}
+            onClick={() => setPanel(panel === 'invite' ? null : 'invite')}
+            style={{ cursor: 'pointer' }}
+          >+ Invite members</button>
+        </div>
+
+        <div>
+          {panelError && (
+            <div style={{
+              marginBottom: '12px', padding: '7px 10px', borderRadius: '4px',
+              border: '1px solid rgba(255,64,64,0.35)', background: 'rgba(255,64,64,0.07)',
+              color: '#ff8a8a', fontSize: '11px',
+            }}>{panelError}</div>
+          )}
+
+          {panel === 'settings' && (
+            <div className="card" style={{ marginBottom: '12px' }}>
+              <label style={labelStyle}>Workspace name</label>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input
+                  type="text"
+                  value={wsName}
+                  onChange={(e) => setWsName(e.target.value)}
+                  className="search"
+                  style={{ flex: 1 }}
+                  autoFocus
+                />
+                <button className="btn primary" onClick={handleSaveName} disabled={savingPanel} style={{ cursor: 'pointer' }}>
+                  {savingPanel ? 'Saving…' : 'Save'}
+                </button>
+                <button className="btn" onClick={() => { setPanel(null); setWsName(preview.name) }} style={{ cursor: 'pointer' }}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
+          {panel === 'invite' && (
+            <form className="card" style={{ marginBottom: '12px' }} onSubmit={handleInvite}>
+              <label style={labelStyle}>Invite by email</label>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input
+                  type="email"
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                  placeholder="teammate@company.com"
+                  className="search"
+                  style={{ flex: 1 }}
+                  autoFocus
+                />
+                <button type="submit" className="btn primary" disabled={savingPanel} style={{ cursor: 'pointer' }}>
+                  {savingPanel ? 'Adding…' : 'Add member'}
+                </button>
+                <button type="button" className="btn" onClick={() => setPanel(null)} style={{ cursor: 'pointer' }}>
+                  Cancel
+                </button>
+              </div>
+              <div style={{ fontSize: '10px', color: '#555', marginTop: '6px' }}>
+                The user must already have a Thoth account.
+              </div>
+            </form>
+          )}
+
+          {/* Members table */}
+          <div className="card" style={{ padding: 0, overflowX: 'auto' }}>
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Member</th>
+                  <th>Email</th>
+                  <th>Role</th>
+                  <th>Joined</th>
+                  <th style={{ width: '70px' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {membersLoading ? (
+                  <tr><td colSpan={5} style={{ color: '#555' }}>Loading members…</td></tr>
+                ) : members.length === 0 ? (
+                  <tr><td colSpan={5} style={{ color: '#555' }}>No members found.</td></tr>
+                ) : members.map((m) => (
+                  <tr key={m.id}>
+                    <td>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                        <span className="avatar">{(m.full_name || m.username || '?').slice(0, 2).toUpperCase()}</span>
+                        <span style={{ color: '#ddd', fontWeight: 600 }}>{m.full_name || m.username}</span>
+                      </span>
+                    </td>
+                    <td>{m.email}</td>
+                    <td>
+                      {editingRole?.userId === m.id ? (
+                        <select
+                          value={editingRole.role}
+                          onChange={(e) => setEditingRole({ userId: m.id, role: e.target.value })}
+                          style={{ background: '#101010', border: '1px solid #2a2a2a', color: '#ddd', borderRadius: '4px', fontSize: '11px', padding: '3px 6px' }}
+                        >
+                          {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
+                        </select>
+                      ) : (
+                        <span className="badge paused">{m.role}</span>
+                      )}
+                    </td>
+                    <td>{m.joined_at ? new Date(m.joined_at).toLocaleDateString() : '—'}</td>
+                    <td>
+                      {editingRole?.userId === m.id ? (
+                        <span style={{ display: 'flex', gap: '4px' }}>
+                          <button className="icon-btn" title="Save role" onClick={handleRoleSave}>✓</button>
+                          <button className="icon-btn" title="Cancel" onClick={() => setEditingRole(null)}>✕</button>
+                        </span>
+                      ) : (
+                        <span style={{ display: 'flex', gap: '4px' }}>
+                          <button
+                            className="icon-btn"
+                            title="Edit role"
+                            onClick={() => setEditingRole({ userId: m.id, role: m.role || 'member' })}
+                          >✎</button>
+                          <button
+                            className="icon-btn"
+                            title="Remove member"
+                            style={{ color: '#ff6b6b' }}
+                            onClick={() => setConfirmDeleteMember(m)}
+                          >🗑</button>
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {confirmDeleteMember && (
+          <ConfirmModal
+            title={`Remove ${confirmDeleteMember.full_name || confirmDeleteMember.username}?`}
+            message="They will lose access to this workspace."
+            note="* Their account is not deleted — they can be invited again later."
+            confirmLabel="Remove"
+            busy={deleting}
+            onConfirm={handleDeleteMember}
+            onCancel={() => setConfirmDeleteMember(null)}
+          />
+        )}
+      </div>
+    )
+  }
+
   return (
     <div>
       <div className="page-head">
@@ -263,172 +436,6 @@ export default function Workspaces() {
             </form>
           </div>
         </>
-      )}
-
-      {/* Workspace preview */}
-      {preview && (
-        <div onClick={() => setPreview(null)} style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(0,0,0,0.65)', display: 'flex',
-          alignItems: 'center', justifyContent: 'center', zIndex: 1100,
-        }}>
-          <div onClick={(e) => e.stopPropagation()} style={{
-            background: '#151515', border: '1px solid #292929', borderRadius: '6px',
-            width: '100%', maxWidth: '720px', maxHeight: '86vh', display: 'flex', flexDirection: 'column',
-            boxShadow: '0 20px 25px rgba(0,0,0,0.4)', overflow: 'hidden',
-          }}>
-            {/* Workspace navbar */}
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px',
-              borderBottom: '1px solid #292929', background: '#111',
-            }}>
-              <span className="dot purple" />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: '14px', fontWeight: 700, color: '#f1f1f1', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {preview.name}
-                </div>
-                <div style={{ fontSize: '10px', color: '#666' }}>/{preview.slug} · {members.length} member{members.length === 1 ? '' : 's'}</div>
-              </div>
-              <button
-                className={`btn${panel === 'settings' ? ' primary' : ''}`}
-                onClick={() => setPanel(panel === 'settings' ? null : 'settings')}
-                style={{ cursor: 'pointer' }}
-              >⚙ Settings</button>
-              <button
-                className={`btn${panel === 'invite' ? ' primary' : ''}`}
-                onClick={() => setPanel(panel === 'invite' ? null : 'invite')}
-                style={{ cursor: 'pointer' }}
-              >+ Invite members</button>
-              <button className="icon-btn" title="Close" onClick={() => setPreview(null)}>✕</button>
-            </div>
-
-            <div style={{ padding: '14px 16px', overflowY: 'auto' }}>
-              {panelError && (
-                <div style={{
-                  marginBottom: '12px', padding: '7px 10px', borderRadius: '4px',
-                  border: '1px solid rgba(255,64,64,0.35)', background: 'rgba(255,64,64,0.07)',
-                  color: '#ff8a8a', fontSize: '11px',
-                }}>{panelError}</div>
-              )}
-
-              {panel === 'settings' && (
-                <div className="card" style={{ marginBottom: '12px' }}>
-                  <label style={labelStyle}>Workspace name</label>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <input
-                      type="text"
-                      value={wsName}
-                      onChange={(e) => setWsName(e.target.value)}
-                      className="search"
-                      style={{ flex: 1 }}
-                      autoFocus
-                    />
-                    <button className="btn primary" onClick={handleSaveName} disabled={savingPanel} style={{ cursor: 'pointer' }}>
-                      {savingPanel ? 'Saving…' : 'Save'}
-                    </button>
-                    <button className="btn" onClick={() => { setPanel(null); setWsName(preview.name) }} style={{ cursor: 'pointer' }}>
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {panel === 'invite' && (
-                <form className="card" style={{ marginBottom: '12px' }} onSubmit={handleInvite}>
-                  <label style={labelStyle}>Invite by email</label>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <input
-                      type="email"
-                      value={inviteEmail}
-                      onChange={(e) => setInviteEmail(e.target.value)}
-                      placeholder="teammate@company.com"
-                      className="search"
-                      style={{ flex: 1 }}
-                      autoFocus
-                    />
-                    <button type="submit" className="btn primary" disabled={savingPanel} style={{ cursor: 'pointer' }}>
-                      {savingPanel ? 'Adding…' : 'Add member'}
-                    </button>
-                    <button type="button" className="btn" onClick={() => setPanel(null)} style={{ cursor: 'pointer' }}>
-                      Cancel
-                    </button>
-                  </div>
-                  <div style={{ fontSize: '10px', color: '#555', marginTop: '6px' }}>
-                    The user must already have a Thoth account.
-                  </div>
-                </form>
-              )}
-
-              {/* Members table */}
-              <div className="card" style={{ padding: 0, overflowX: 'auto' }}>
-                <table className="table">
-                  <thead>
-                    <tr>
-                      <th>Member</th>
-                      <th>Email</th>
-                      <th>Role</th>
-                      <th>Joined</th>
-                      <th style={{ width: '70px' }}>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {membersLoading ? (
-                      <tr><td colSpan={5} style={{ color: '#555' }}>Loading members…</td></tr>
-                    ) : members.length === 0 ? (
-                      <tr><td colSpan={5} style={{ color: '#555' }}>No members found.</td></tr>
-                    ) : members.map((m) => (
-                      <tr key={m.id}>
-                        <td>
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-                            <span className="avatar">{(m.full_name || m.username || '?').slice(0, 2).toUpperCase()}</span>
-                            <span style={{ color: '#ddd', fontWeight: 600 }}>{m.full_name || m.username}</span>
-                          </span>
-                        </td>
-                        <td>{m.email}</td>
-                        <td>
-                          {editingRole?.userId === m.id ? (
-                            <select
-                              value={editingRole.role}
-                              onChange={(e) => setEditingRole({ userId: m.id, role: e.target.value })}
-                              style={{ background: '#101010', border: '1px solid #2a2a2a', color: '#ddd', borderRadius: '4px', fontSize: '11px', padding: '3px 6px' }}
-                            >
-                              {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
-                            </select>
-                          ) : (
-                            <span className="badge paused">{m.role}</span>
-                          )}
-                        </td>
-                        <td>{m.joined_at ? new Date(m.joined_at).toLocaleDateString() : '—'}</td>
-                        <td>
-                          {editingRole?.userId === m.id ? (
-                            <span style={{ display: 'flex', gap: '4px' }}>
-                              <button className="icon-btn" title="Save role" onClick={handleRoleSave}>✓</button>
-                              <button className="icon-btn" title="Cancel" onClick={() => setEditingRole(null)}>✕</button>
-                            </span>
-                          ) : (
-                            <span style={{ display: 'flex', gap: '4px' }}>
-                              <button
-                                className="icon-btn"
-                                title="Edit role"
-                                onClick={() => setEditingRole({ userId: m.id, role: m.role || 'member' })}
-                              >✎</button>
-                              <button
-                                className="icon-btn"
-                                title="Remove member"
-                                style={{ color: '#ff6b6b' }}
-                                onClick={() => setConfirmDeleteMember(m)}
-                              >🗑</button>
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        </div>
       )}
 
       {confirmDeleteWs && (
