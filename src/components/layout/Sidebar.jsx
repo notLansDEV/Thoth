@@ -1,5 +1,14 @@
 ﻿import { useState, useEffect } from 'react'
-import { setCurrentWorkspace } from '../../features/workspaces/workspaces.service.js'
+import { setCurrentWorkspace, getCurrentWorkspace } from '../../features/workspaces/workspaces.service.js'
+import { getProjects } from '../../features/projects/projects.service.js'
+
+const STATUS_COLORS = {
+  planning: '#5f74ff',
+  active: '#20d86b',
+  on_hold: '#ff7918',
+  completed: '#7165ff',
+  cancelled: '#ff4040',
+}
 
 const NAV = [
   { key: 'dashboard', label: 'Dashboard', icon: '◫' },
@@ -34,10 +43,11 @@ function parsePath() {
   return { workspace, page, sub }
 }
 
-function navigateTo(workspace, page, sub) {
-  const path = sub
+function navigateTo(workspace, page, sub, id) {
+  let path = sub
     ? `/Thoth/${workspace}/${page}/${sub}`
     : `/Thoth/${workspace}/${page}`
+  if (id) path += `/${id}`
   window.history.pushState({}, '', path)
   // trigger SPA routing listeners
   window.dispatchEvent(new PopStateEvent('popstate'))
@@ -46,12 +56,26 @@ function navigateTo(workspace, page, sub) {
 export default function Sidebar({ collapsed }) {
   const [route, setRoute] = useState(parsePath())
   const [openKey, setOpenKey] = useState(null)
+  const [projects, setProjects] = useState([])
+
+  useEffect(() => {
+    let alive = true
+    getProjects(getCurrentWorkspace()?.id)
+      .then((rows) => { if (alive) setProjects(Array.isArray(rows) ? rows : []) })
+      .catch(() => { if (alive) setProjects([]) })
+    return () => { alive = false }
+  }, [])
 
   useEffect(() => {
     const onPop = () => setRoute(parsePath())
     window.addEventListener('popstate', onPop)
     return () => window.removeEventListener('popstate', onPop)
   }, [])
+
+  function openProject(e, id) {
+    e.preventDefault()
+    navigateTo(workspace, 'projects', null, id)
+  }
 
   const { workspace, page, sub } = route
 
@@ -117,8 +141,23 @@ export default function Sidebar({ collapsed }) {
         <>
           <div className="section-title">Projects</div>
           <div>
-            <div className="project"><span className="dot purple" />Thoth Core</div>
-            <div className="project"><span className="dot green" />API Gateway</div>
+            {projects.length === 0 ? (
+              <div className="project" style={{ color: '#555' }}>No projects yet</div>
+            ) : (
+              projects.map((p) => (
+                <a
+                  key={p.id}
+                  href={`/Thoth/${workspace}/projects/${p.id}`}
+                  title={p.name}
+                  className="project"
+                  style={{ display: 'flex', cursor: 'pointer' }}
+                  onClick={(e) => openProject(e, p.id)}
+                >
+                  <span className="dot" style={{ background: STATUS_COLORS[p.status] || '#777', flexShrink: 0 }} />
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</span>
+                </a>
+              ))
+            )}
           </div>
         </>
       )}

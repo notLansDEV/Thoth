@@ -218,6 +218,108 @@ app.get('/api/workspaces/:id/members', auth, async (req, res) => {
   }
 })
 
+app.patch('/api/workspaces/:id', auth, async (req, res) => {
+  try {
+    const { name } = req.body
+    if (!name || !name.trim()) return res.status(400).json({ error: 'Workspace name is required' })
+    const updated = await workspaceRepository.updateById(req.params.id, { name: name.trim() })
+    if (!updated) return res.status(404).json({ error: 'Workspace not found' })
+    res.json(updated)
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
+app.delete('/api/workspaces/:id', auth, async (req, res) => {
+  try {
+    const deleted = await workspaceRepository.deleteById(req.params.id)
+    if (!deleted) return res.status(404).json({ error: 'Workspace not found' })
+    res.json({ ok: true })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
+app.post('/api/workspaces/:id/members', auth, async (req, res) => {
+  try {
+    const { email, role } = req.body
+    if (!email || !email.trim()) return res.status(400).json({ error: 'Email is required' })
+
+    const workspace = await workspaceRepository.findById(req.params.id)
+    if (!workspace) return res.status(404).json({ error: 'Workspace not found' })
+
+    const user = await userRepository.findByEmail(email.trim().toLowerCase())
+    if (!user) return res.status(404).json({ error: 'No user found with that email' })
+
+    try {
+      const added = await workspaceRepository.addMember(req.params.id, user.id, role || 'member')
+      if (!added) {
+        return res.status(409).json({ error: 'User is already a member of this workspace' })
+      }
+    } catch (err) {
+      if (err.code === '23505') {
+        return res.status(409).json({ error: 'User is already a member of this workspace' })
+      }
+      throw err
+    }
+
+    res.json({
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      full_name: user.full_name,
+      avatar_url: user.avatar_url,
+      role: role || 'member',
+      joined_at: new Date().toISOString(),
+    })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
+app.patch('/api/workspaces/:id/members/:userId', auth, async (req, res) => {
+  try {
+    const { role } = req.body
+    if (!role) return res.status(400).json({ error: 'Role is required' })
+
+    const row = await workspaceRepository.updateMemberRole(req.params.id, req.params.userId, role)
+    if (!row) return res.status(404).json({ error: 'Member not found' })
+
+    const user = await userRepository.findById(req.params.userId)
+    res.json({
+      id: req.params.userId,
+      username: user?.username,
+      email: user?.email,
+      full_name: user?.full_name,
+      avatar_url: user?.avatar_url,
+      role,
+      joined_at: row.joined_at,
+    })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
+app.delete('/api/workspaces/:id/members/:userId', auth, async (req, res) => {
+  try {
+    const memberCount = await workspaceRepository.countMembers(req.params.id)
+    if (memberCount <= 1) {
+      return res.status(400).json({ error: 'Cannot remove the last member — delete the workspace instead' })
+    }
+
+    const removed = await workspaceRepository.removeMember(req.params.id, req.params.userId)
+    if (!removed) return res.status(404).json({ error: 'Member not found' })
+    res.json({ ok: true })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
 app.get('/api/milestones', auth, async (req, res) => {
   try {
     const { project_id } = req.query

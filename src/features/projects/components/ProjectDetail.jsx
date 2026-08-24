@@ -300,19 +300,45 @@ export default function ProjectDetail({ projectId, onBack }) {
       )}
 
       {tab === 'Bugs' && (
-        bugs.length === 0 ? <Empty text="No bugs reported for this project." /> : (
-          <div className="card">
-            {bugs.map((b) => (
-              <div key={b.id} style={{ display: 'flex', alignItems: 'center', gap: '9px', padding: '7px 0', borderBottom: '1px solid #222' }}>
-                <div style={{ flex: 1, fontSize: '12px', color: '#ddd' }}>
-                  {b.bug_id ? `${b.bug_id} — ` : ''}{b.title}
-                </div>
-                <span className="badge paused">{b.priority || 'medium'}</span>
-                <span className="badge paused">{b.kanban_column || b.status || 'New'}</span>
-              </div>
-            ))}
+        <>
+          <div className="stat-grid">
+            <StatCard icon="🐞" label="Total Current Bugs" value={bugs.length} />
+            <StatCard icon="◐" label="Total Current In Progress" value={bugs.filter((b) => b.kanban_column === 'In Progress').length} />
+            <StatCard icon="○" label="Total Current Pending" value={bugs.filter((b) => !b.kanban_column || b.kanban_column === 'New').length} />
+            <StatCard icon="✔" label="Total Current Done" value={bugs.filter((b) => ['Fixed', 'Closed', 'Archived'].includes(b.kanban_column)).length} />
           </div>
-        )
+
+          {bugs.length === 0 ? <Empty text="No bugs reported for this project." /> : (
+            <div className="card" style={{ padding: 0, overflowX: 'auto' }}>
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Code</th>
+                    <th>Title</th>
+                    <th>Priority</th>
+                    <th>Stage</th>
+                    <th>Created</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {bugs.map((b) => (
+                    <tr key={b.id}>
+                      <td style={{ color: '#888', fontFamily: 'monospace', fontSize: '10.5px' }}>{b.bug_id || '—'}</td>
+                      <td style={{ color: '#ddd', fontWeight: 600 }}>{b.title}</td>
+                      <td>
+                        <span className="badge" style={{ ...priorityStyle(b.priority), background: 'transparent', fontSize: '9px' }}>
+                          {b.priority || 'medium'}
+                        </span>
+                      </td>
+                      <td>{b.kanban_column || b.status || 'New'}</td>
+                      <td>{fmtDate(b.created_at)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
       )}
 
       {tab === 'Attachments' && <Empty text="File attachments coming soon." />}

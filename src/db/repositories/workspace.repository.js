@@ -1,5 +1,5 @@
 import BaseRepository from './base.repository.js';
-import { getMany, getOne } from '../database.js';
+import { query, getMany, getOne } from '../database.js';
 
 export class WorkspaceRepository extends BaseRepository {
   constructor() {
@@ -21,7 +21,8 @@ export class WorkspaceRepository extends BaseRepository {
    */
   async findByUserId(userId) {
     return getMany(
-      `SELECT w.*, wm.role
+      `SELECT w.*, wm.role,
+              (SELECT COUNT(*) FROM workspace_members c WHERE c.workspace_id = w.id) AS members_count
        FROM workspaces w
        JOIN workspace_members wm ON wm.workspace_id = w.id
        WHERE wm.user_id = $1
@@ -71,9 +72,29 @@ export class WorkspaceRepository extends BaseRepository {
     return getOne(
       `INSERT INTO workspace_members (workspace_id, user_id, role)
        VALUES ($1, $2, $3)
-       ON CONFLICT (workspace_id, user_id)
-       DO UPDATE SET role = $3
+       ON CONFLICT (workspace_id, user_id) DO NOTHING
        RETURNING *`,
+      [workspaceId, userId, role]
+    );
+  }
+
+  /**
+   * Count members of a workspace
+   */
+  async countMembers(workspaceId) {
+    const result = await getOne(
+      'SELECT COUNT(*) as count FROM workspace_members WHERE workspace_id = $1',
+      [workspaceId]
+    );
+    return Number(result.count);
+  }
+
+  /**
+   * Update a member's role
+   */
+  async updateMemberRole(workspaceId, userId, role) {
+    return getOne(
+      'UPDATE workspace_members SET role = $3 WHERE workspace_id = $1 AND user_id = $2 RETURNING *',
       [workspaceId, userId, role]
     );
   }
@@ -82,7 +103,7 @@ export class WorkspaceRepository extends BaseRepository {
    * Remove member from workspace
    */
   async removeMember(workspaceId, userId) {
-    const result = await getMany(
+    const result = await query(
       'DELETE FROM workspace_members WHERE workspace_id = $1 AND user_id = $2',
       [workspaceId, userId]
     );

@@ -14,6 +14,7 @@ import { getProjects } from '../features/projects/projects.service.js'
 import { getCurrentWorkspace } from '../features/workspaces/workspaces.service.js'
 import StageBoard from '../components/StageBoard.jsx'
 import ConfirmModal from '../components/ConfirmModal.jsx'
+import ListToolbar from '../components/ListToolbar.jsx'
 import ReportBugModal from '../features/bugs/components/ReportBugModal.jsx'
 
 function StatCard({ icon, label, value }) {
@@ -87,6 +88,10 @@ export default function Bugs({ subPage }) {
   const [deleting, setDeleting] = useState(false)
   const [showReport, setShowReport] = useState(false)
   const dragId = useRef(null)
+
+  const [query, setQuery] = useState('')
+  const [priorityFilter, setPriorityFilter] = useState('all')
+  const [projectFilter, setProjectFilter] = useState('all')
 
   async function refresh() {
     try {
@@ -189,6 +194,15 @@ export default function Bugs({ subPage }) {
 
   const defaultStageName = stages[0]?.name || 'New'
 
+  // Board filters (stat cards above always show workspace-wide totals)
+  const q = query.trim().toLowerCase()
+  const visibleBugs = bugs.filter((b) => {
+    if (priorityFilter !== 'all' && (b.priority || 'medium') !== priorityFilter) return false
+    if (projectFilter !== 'all' && b.project_id !== projectFilter) return false
+    if (q && !`${b.bug_id || ''} ${b.title || ''} ${b.description || ''}`.toLowerCase().includes(q)) return false
+    return true
+  })
+
   return (
     <div>
       <div className="page-head">
@@ -217,59 +231,72 @@ export default function Bugs({ subPage }) {
             Create a project first — bugs live inside projects.
           </div>
         </div>
-      ) : tab === 'all' ? (
-        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.max(stages.length, 1)}, minmax(230px, 1fr))`, gap: '10px', alignItems: 'start', overflowX: 'auto' }}>
-          {stages.map((stage) => {
-            const columnBugs = bugs.filter((b) => (b.kanban_column || defaultStageName) === stage.name)
-            return (
-              <div
-                key={stage.id}
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={() => handleDrop(stage.name)}
-                style={{
-                  background: '#121212', border: '1px solid #292929', borderRadius: '5px',
-                  padding: '9px', minHeight: '120px',
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '9px', padding: '0 2px' }}>
-                  <span style={{ fontSize: '11px', fontWeight: '700', color: stage.color || '#999', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    {stage.name}
-                  </span>
-                  <span style={{ fontSize: '10px', color: '#555' }}>{columnBugs.length}</span>
-                </div>
-
-                {columnBugs.map((bug) => (
-                  <BugCard
-                    key={bug.id}
-                    bug={bug}
-                    projectName={projects.find((p) => p.id === bug.project_id)?.name}
-                    projectColor={projects.find((p) => p.id === bug.project_id)?.color}
-                    onDragStart={(e, id) => { dragId.current = id; e.dataTransfer.effectAllowed = 'move' }}
-                  />
-                ))}
-
-                {columnBugs.length === 0 && (
-                  <div style={{
-                    border: '1px dashed #2a2a2a', borderRadius: '4px', padding: '14px',
-                    textAlign: 'center', color: '#444', fontSize: '10px',
-                  }}>
-                    Drop bugs here
-                  </div>
-                )}
-              </div>
-            )
-          })}
-        </div>
       ) : (
-        <StageBoard
-          stages={stages}
-          counts={counts}
-          itemLabel="bugs"
-          onAdd={handleAddStage}
-          onUpdate={handleUpdateStage}
-          onDelete={setConfirmDelete}
-          onReorder={handleReorder}
-        />
+        <>
+          {tab === 'all' && (
+            <ListToolbar
+              query={query} onQuery={setQuery}
+              priority={priorityFilter} onPriority={setPriorityFilter}
+              project={projectFilter} onProject={setProjectFilter}
+              projects={projects}
+            />
+          )}
+
+          {tab === 'all' ? (
+            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.max(stages.length, 1)}, minmax(230px, 1fr))`, gap: '10px', alignItems: 'start', overflowX: 'auto' }}>
+              {stages.map((stage) => {
+                const columnBugs = visibleBugs.filter((b) => (b.kanban_column || defaultStageName) === stage.name)
+                return (
+                  <div
+                    key={stage.id}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={() => handleDrop(stage.name)}
+                    style={{
+                      background: '#121212', border: '1px solid #292929', borderRadius: '5px',
+                      padding: '9px', minHeight: '120px',
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '9px', padding: '0 2px' }}>
+                      <span style={{ fontSize: '11px', fontWeight: '700', color: stage.color || '#999', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                        {stage.name}
+                      </span>
+                      <span style={{ fontSize: '10px', color: '#555' }}>{columnBugs.length}</span>
+                    </div>
+
+                    {columnBugs.map((bug) => (
+                      <BugCard
+                        key={bug.id}
+                        bug={bug}
+                        projectName={projects.find((p) => p.id === bug.project_id)?.name}
+                        projectColor={projects.find((p) => p.id === bug.project_id)?.color}
+                        onDragStart={(e, id) => { dragId.current = id; e.dataTransfer.effectAllowed = 'move' }}
+                      />
+                    ))}
+
+                    {columnBugs.length === 0 && (
+                      <div style={{
+                        border: '1px dashed #2a2a2a', borderRadius: '4px', padding: '14px',
+                        textAlign: 'center', color: '#444', fontSize: '10px',
+                      }}>
+                        Drop bugs here
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            <StageBoard
+              stages={stages}
+              counts={counts}
+              itemLabel="bugs"
+              onAdd={handleAddStage}
+              onUpdate={handleUpdateStage}
+              onDelete={setConfirmDelete}
+              onReorder={handleReorder}
+            />
+          )}
+        </>
       )}
 
       {confirmDelete && (

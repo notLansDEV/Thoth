@@ -16,6 +16,7 @@ import CreateTaskModal from '../features/tasks/components/CreateTaskModal.jsx'
 import TaskPreviewModal from '../features/tasks/components/TaskPreviewModal.jsx'
 import StageBoard from '../components/StageBoard.jsx'
 import ConfirmModal from '../components/ConfirmModal.jsx'
+import ListToolbar from '../components/ListToolbar.jsx'
 
 function isOverdue(task) {
   if (!task.due_date || task.status === 'Done') return false
@@ -117,6 +118,10 @@ export default function Tasks({ subPage }) {
   const [confirmDelete, setConfirmDelete] = useState(null)
   const [deleting, setDeleting] = useState(false)
   const dragId = useRef(null)
+
+  const [query, setQuery] = useState('')
+  const [priorityFilter, setPriorityFilter] = useState('all')
+  const [projectFilter, setProjectFilter] = useState('all')
 
   async function refresh() {
     try {
@@ -234,6 +239,15 @@ export default function Tasks({ subPage }) {
 
   const defaultStageName = stages[0]?.name || 'To Do'
 
+  // Board filters (stat cards above always show workspace-wide totals)
+  const q = query.trim().toLowerCase()
+  const visibleTasks = tasks.filter((t) => {
+    if (priorityFilter !== 'all' && (t.priority || 'medium') !== priorityFilter) return false
+    if (projectFilter !== 'all' && t.project_id !== projectFilter) return false
+    if (q && !`${t.task_code || ''} ${t.title || ''} ${t.description || ''}`.toLowerCase().includes(q)) return false
+    return true
+  })
+
   return (
     <div>
       <div className="page-head">
@@ -262,12 +276,21 @@ export default function Tasks({ subPage }) {
         </div>
       )}
 
+      {!loading && projects.length > 0 && (
+        <ListToolbar
+          query={query} onQuery={setQuery}
+          priority={priorityFilter} onPriority={setPriorityFilter}
+          project={projectFilter} onProject={setProjectFilter}
+          projects={projects}
+        />
+      )}
+
       {loading ? (
         <div className="card"><div className="description" style={{ margin: 0 }}>Loading tasks…</div></div>
       ) : tab === 'all' ? (
         <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.max(stages.length, 1)}, minmax(230px, 1fr))`, gap: '10px', alignItems: 'start', overflowX: 'auto' }}>
           {stages.map((stage) => {
-            const columnTasks = tasks.filter((t) => (t.status || defaultStageName) === stage.name)
+            const columnTasks = visibleTasks.filter((t) => (t.status || defaultStageName) === stage.name)
             return (
               <div
                 key={stage.id}
