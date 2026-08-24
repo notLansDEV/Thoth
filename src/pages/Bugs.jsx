@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   BUG_STAGES,
   getBugs,
   getStages,
   createStage,
+  updateBug,
   updateStage as updateStageApi,
   deleteStage as deleteStageApi,
   reorderStages,
@@ -26,9 +27,53 @@ function StatCard({ icon, label, value }) {
   )
 }
 
-function navigateTo(path) {
-  window.history.pushState({}, '', path)
-  window.dispatchEvent(new PopStateEvent('popstate'))
+function BugCard({ bug, projectName, projectColor, onDragStart }) {
+  return (
+    <div
+      draggable
+      onDragStart={(e) => onDragStart(e, bug.id)}
+      style={{
+        background: '#101010', border: '1px solid #2a2a2a',
+        borderRadius: '4px', padding: '10px', marginBottom: '8px', cursor: 'grab',
+        transition: 'border-color 0.15s',
+      }}
+      onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#ff6b6b' }}
+      onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#2a2a2a' }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', alignItems: 'flex-start' }}>
+        <div style={{ fontSize: '12px', color: '#eee', fontWeight: 600 }}>
+          {bug.bug_id && (
+            <span style={{ fontFamily: 'monospace', fontSize: '9.5px', color: '#ff6b6b', marginRight: '6px' }}>
+              {bug.bug_id}
+            </span>
+          )}
+          {bug.title}
+        </div>
+        <span className="badge" style={{ ...priorityStyle(bug.priority), background: 'transparent', fontSize: '9px', flexShrink: 0 }}>
+          {bug.priority || 'medium'}
+        </span>
+      </div>
+
+      {bug.description && (
+        <div style={{
+          color: '#777', fontSize: '10px', marginTop: '5px',
+          display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+        }}>
+          {bug.description}
+        </div>
+      )}
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px' }}>
+        <span style={{ fontSize: '9px', color: '#666', display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <span className="dot" style={{ background: projectColor || '#6e61ff', width: 6, height: 6 }} />
+          {projectName || 'Project'}
+        </span>
+        <span style={{ fontSize: '9px', color: '#555' }}>
+          {new Date(bug.created_at).toLocaleDateString()}
+        </span>
+      </div>
+    </div>
+  )
 }
 
 export default function Bugs({ subPage }) {
@@ -41,6 +86,7 @@ export default function Bugs({ subPage }) {
   const [confirmDelete, setConfirmDelete] = useState(null)
   const [deleting, setDeleting] = useState(false)
   const [showReport, setShowReport] = useState(false)
+  const dragId = useRef(null)
 
   async function refresh() {
     try {
@@ -77,6 +123,19 @@ export default function Bugs({ subPage }) {
     return () => { alive = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  function handleDrop(stageName) {
+    const id = dragId.current
+    dragId.current = null
+    if (!id) return
+    const bug = bugs.find((b) => b.id === id)
+    if (!bug || (bug.kanban_column || defaultStageName) === stageName) return
+
+    setBugs((current) => current.map((b) => (b.id === id ? { ...b, kanban_column: stageName, status: stageName } : b)))
+    updateBug(id, { kanban_column: stageName })
+      .then((updated) => setBugs((cur) => cur.map((b) => (b.id === id ? { ...b, ...updated } : b))))
+      .catch(() => setBugs((cur) => cur.map((b) => (b.id === id ? { ...b, kanban_column: bug.kanban_column, status: bug.status } : b))))
+  }
 
   async function handleAddStage(data) {
     try {
@@ -143,19 +202,6 @@ export default function Bugs({ subPage }) {
         </button>
       </div>
 
-      {/* Sub-module tabs */}
-      <div className="tab-row">
-        {[{ key: 'all', label: 'All Bugs' }, { key: 'stages', label: 'Bug Stages' }].map((t) => (
-          <button
-            key={t.key}
-            className={`tab-btn${tab === t.key ? ' active' : ''}`}
-            onClick={() => navigateTo(`/Thoth/${ws?.slug || 'ws'}/bugs/${t.key}`)}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
-
       {/* 3 stat cards */}
       <div className="stat-grid">
         <StatCard icon="◉" label={defaultStageName} value={counts[defaultStageName] || 0} />
@@ -165,44 +211,55 @@ export default function Bugs({ subPage }) {
 
       {loading ? (
         <div className="card"><div className="description" style={{ margin: 0 }}>Loading bugs…</div></div>
+      ) : projects.length === 0 ? (
+        <div className="card">
+          <div className="description" style={{ margin: 0 }}>
+            Create a project first — bugs live inside projects.
+          </div>
+        </div>
       ) : tab === 'all' ? (
-        bugs.length === 0 ? (
-          <div style={{
-            border: '1px dashed #2a2a2a', borderRadius: '4px', padding: '40px',
-            textAlign: 'center', color: '#555', fontSize: '12px',
-          }}>
-            No bugs reported — your projects are healthy.
-          </div>
-        ) : (
-          <div className="card" style={{ padding: 0, overflowX: 'auto' }}>
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Bug</th>
-                  <th>Title</th>
-                  <th>Project</th>
-                  <th>Priority</th>
-                  <th>Stage</th>
-                </tr>
-              </thead>
-              <tbody>
-                {bugs.map((b) => (
-                  <tr key={b.id}>
-                    <td style={{ color: '#888', fontFamily: 'monospace', fontSize: '10.5px' }}>{b.bug_id || '—'}</td>
-                    <td style={{ color: '#ddd', fontWeight: 600 }}>{b.title}</td>
-                    <td>{projects.find((p) => p.id === b.project_id)?.name || '—'}</td>
-                    <td>
-                      <span className="badge" style={{ ...priorityStyle(b.priority), background: 'transparent', fontSize: '9px' }}>
-                        {b.priority || 'medium'}
-                      </span>
-                    </td>
-                    <td>{b.kanban_column || b.status || 'New'}</td>
-                  </tr>
+        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.max(stages.length, 1)}, minmax(230px, 1fr))`, gap: '10px', alignItems: 'start', overflowX: 'auto' }}>
+          {stages.map((stage) => {
+            const columnBugs = bugs.filter((b) => (b.kanban_column || defaultStageName) === stage.name)
+            return (
+              <div
+                key={stage.id}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={() => handleDrop(stage.name)}
+                style={{
+                  background: '#121212', border: '1px solid #292929', borderRadius: '5px',
+                  padding: '9px', minHeight: '120px',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '9px', padding: '0 2px' }}>
+                  <span style={{ fontSize: '11px', fontWeight: '700', color: stage.color || '#999', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    {stage.name}
+                  </span>
+                  <span style={{ fontSize: '10px', color: '#555' }}>{columnBugs.length}</span>
+                </div>
+
+                {columnBugs.map((bug) => (
+                  <BugCard
+                    key={bug.id}
+                    bug={bug}
+                    projectName={projects.find((p) => p.id === bug.project_id)?.name}
+                    projectColor={projects.find((p) => p.id === bug.project_id)?.color}
+                    onDragStart={(e, id) => { dragId.current = id; e.dataTransfer.effectAllowed = 'move' }}
+                  />
                 ))}
-              </tbody>
-            </table>
-          </div>
-        )
+
+                {columnBugs.length === 0 && (
+                  <div style={{
+                    border: '1px dashed #2a2a2a', borderRadius: '4px', padding: '14px',
+                    textAlign: 'center', color: '#444', fontSize: '10px',
+                  }}>
+                    Drop bugs here
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
       ) : (
         <StageBoard
           stages={stages}

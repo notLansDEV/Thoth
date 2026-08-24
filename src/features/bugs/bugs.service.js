@@ -39,6 +39,13 @@ export async function createBug(data) {
   })
 }
 
+export async function updateBug(id, data) {
+  return apiRequest(`/bugs/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  })
+}
+
 export async function getStages(workspaceId) {
   if (!workspaceId) return []
   const rows = await apiRequest(`/bug-stages?workspace_id=${encodeURIComponent(workspaceId)}`)

@@ -416,6 +416,33 @@ app.get('/api/bugs', auth, async (req, res) => {
   }
 })
 
+const BUG_ALLOWED_FIELDS = [
+  'title', 'description', 'priority', 'kanban_column', 'status',
+  'assigned_to', 'steps_to_reproduce', 'expected_behavior', 'actual_behavior',
+]
+
+app.patch('/api/bugs/:id', auth, async (req, res) => {
+  try {
+    const data = {}
+    for (const field of BUG_ALLOWED_FIELDS) {
+      if (req.body[field] !== undefined) data[field] = req.body[field]
+    }
+    if (Object.keys(data).length === 0) {
+      return res.status(400).json({ error: 'No valid fields to update' })
+    }
+    // Keep status in sync with the kanban column, like on create
+    if (data.kanban_column && data.status === undefined) {
+      data.status = data.kanban_column
+    }
+    const updated = await bugRepository.updateById(req.params.id, data)
+    if (!updated) return res.status(404).json({ error: 'Bug not found' })
+    res.json(updated)
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
 // ---------- Stage management (tasks + bugs) ----------
 
 const DEFAULT_TASK_STAGES = [

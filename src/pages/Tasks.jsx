@@ -81,7 +81,7 @@ function TaskCard({ task, onOpen, onDragStart }) {
 
       {task.assignee_name && (
         <div style={{ fontSize: '10px', color: '#888', marginTop: '7px' }}>
-          ?? {task.assignee_name}
+          👤 {task.assignee_name}
         </div>
       )}
 
@@ -97,17 +97,12 @@ function TaskCard({ task, onOpen, onDragStart }) {
                 Overdue
               </span>
             )}
-            <span style={{ color: overdue ? '#ff8080' : '#777' }}>? {due}</span>
+            <span style={{ color: overdue ? '#ff8080' : '#777' }}>⏰ {due}</span>
           </span>
         )}
       </div>
     </div>
   )
-}
-
-function navigateTo(path) {
-  window.history.pushState({}, '', path)
-  window.dispatchEvent(new PopStateEvent('popstate'))
 }
 
 export default function Tasks({ subPage }) {
@@ -250,19 +245,6 @@ export default function Tasks({ subPage }) {
         <button className="btn primary" onClick={() => setShowCreate(true)} style={{ cursor: 'pointer' }}>
           + New Task
         </button>
-      </div>
-
-      {/* Sub-module tabs */}
-      <div className="tab-row">
-        {[{ key: 'all', label: 'All Task' }, { key: 'stages', label: 'Task Stages' }].map((t) => (
-          <button
-            key={t.key}
-            className={`tab-btn${tab === t.key ? ' active' : ''}`}
-            onClick={() => navigateTo(`/Thoth/${ws?.slug || 'ws'}/tasks/${t.key}`)}
-          >
-            {t.label}
-          </button>
-        ))}
       </div>
 
       {/* 3 stat cards */}
