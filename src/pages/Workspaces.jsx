@@ -212,24 +212,22 @@ export default function Workspaces() {
         <div className="card"><div className="description" style={{ margin: 0 }}>Loading workspaces…</div></div>
       ) : (
         <>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '18px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '10px', marginBottom: '18px' }}>
             {workspaces.map((ws) => (
-              <div key={ws.id} className="card" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px' }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: '13px', fontWeight: 700, color: '#eee', display: 'flex', alignItems: 'center', gap: '7px' }}>
-                    <span className="dot purple" />
-                    {ws.name}
-                    {current?.id === ws.id && <span className="badge paused" style={{ fontSize: '9px' }}>current</span>}
-                  </div>
-                  <div style={{ fontSize: '11px', color: '#666', marginTop: '3px' }}>
-                    Created {new Date(ws.created_at).toLocaleDateString()}
-                  </div>
+              <div key={ws.id} className="card" style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px' }}>
+                <div style={{ fontSize: '13px', fontWeight: 700, color: '#eee', display: 'flex', alignItems: 'center', gap: '7px', minWidth: 0 }}>
+                  <span className="dot purple" style={{ flexShrink: 0 }} />
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ws.name}</span>
+                  {current?.id === ws.id && <span className="badge paused" style={{ fontSize: '9px', flexShrink: 0 }}>current</span>}
                 </div>
 
-                <span className="badge paused" title="Members">👥 {ws.members_count ?? 1}</span>
-                {ws.role && <span className="badge">{ws.role}</span>}
-
-                <div style={{ display: 'flex', gap: '5px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '7px', flexWrap: 'wrap' }}>
+                  <span className="badge paused" title="Members">👥 {ws.members_count ?? 1}</span>
+                  {ws.role && <span className="badge">{ws.role}</span>}
+                  <span style={{ fontSize: '10px', color: '#555' }}>
+                    Created {new Date(ws.created_at).toLocaleDateString()}
+                  </span>
+                  <span style={{ flex: 1 }} />
                   <button className="icon-btn" title="Preview workspace" onClick={() => openPreview(ws)}>👁</button>
                   <button
                     className="icon-btn"

@@ -1,35 +1,48 @@
 import { useState } from 'react'
 
 /**
- * Search input + filter dropdown used by the Task and Bug boards.
+ * Search bar + Search button + Filter dropdown used by the Task and Bug boards.
  * props:
- *  - query/onQuery: text search value
+ *  - query/onQuery: applied text search value
  *  - priority/onPriority: 'all' | 'high' | 'medium' | 'low'
  *  - project/onProject: 'all' | project id
  *  - projects: [{id,name}] for the project filter
+ *  - placeholder: input placeholder text
  */
 export default function ListToolbar({
   query, onQuery,
   priority, onPriority,
   project, onProject,
   projects = [],
+  placeholder = '🔍 Search…',
 }) {
   const [open, setOpen] = useState(false)
+  const [text, setText] = useState(query)
   const active = priority !== 'all' || project !== 'all'
 
+  function apply(e) {
+    if (e) e.preventDefault()
+    onQuery(text)
+  }
+
   return (
-    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '12px' }}>
+    <form onSubmit={apply} style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '10px' }}>
       <input
-        type="search"
+        type="text"
         className="search-input"
-        placeholder="Search by title or code…"
-        value={query}
-        onChange={(e) => onQuery(e.target.value)}
-        style={{ flex: 1 }}
+        placeholder={placeholder}
+        value={text}
+        onChange={(e) => { setText(e.target.value); onQuery(e.target.value) }}
+        style={{ width: '50%', minWidth: '180px', maxWidth: '340px' }}
       />
+
+      <button type="submit" className="btn primary" style={{ cursor: 'pointer', whiteSpace: 'nowrap' }}>
+        🔍 Search
+      </button>
 
       <div style={{ position: 'relative' }}>
         <button
+          type="button"
           className={`btn${active ? ' primary' : ''}`}
           onClick={() => setOpen((o) => !o)}
           style={{ cursor: 'pointer', whiteSpace: 'nowrap' }}
@@ -75,6 +88,7 @@ export default function ListToolbar({
 
             {active && (
               <button
+                type="button"
                 className="btn"
                 onClick={() => { onPriority('all'); onProject('all') }}
                 style={{ cursor: 'pointer' }}
@@ -85,6 +99,6 @@ export default function ListToolbar({
           </div>
         )}
       </div>
-    </div>
+    </form>
   )
 }

@@ -282,6 +282,7 @@ export default function Tasks({ subPage }) {
           priority={priorityFilter} onPriority={setPriorityFilter}
           project={projectFilter} onProject={setProjectFilter}
           projects={projects}
+          placeholder="🔍 Search tasks…"
         />
       )}
 
