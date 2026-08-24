@@ -33,9 +33,8 @@ const labelStyle = {
 
 export default function Workspaces() {
   const [workspaces, setWorkspaces] = useState(null)
-  const [name, setName] = useState('')
+  const [showCreate, setShowCreate] = useState(false)
   const [error, setError] = useState(null)
-  const [loading, setLoading] = useState(false)
 
   const [preview, setPreview] = useState(null)
   const [members, setMembers] = useState([])
@@ -64,21 +63,9 @@ export default function Workspaces() {
     navigate(`/${workspace.slug}/dashboard`)
   }
 
-  async function handleCreate(e) {
-    e.preventDefault()
-    setError(null)
-    if (!name.trim()) {
-      setError('Please enter a workspace name.')
-      return
-    }
-    setLoading(true)
-    try {
-      const workspace = await createWorkspace(name.trim())
-      enter(workspace)
-    } catch (err) {
-      setError(err.message || 'Could not create workspace')
-      setLoading(false)
-    }
+  async function handleCreate(nameValue) {
+    const workspace = await createWorkspace(nameValue)
+    enter(workspace)
   }
 
   async function openPreview(ws) {
@@ -373,6 +360,13 @@ export default function Workspaces() {
               : 'Create a workspace to get started'}
           </p>
         </div>
+        <button
+          onClick={() => setShowCreate(true)}
+          className="btn primary"
+          style={{ cursor: 'pointer' }}
+        >
+          + Create Workspace
+        </button>
       </div>
 
       {error && (
@@ -384,59 +378,46 @@ export default function Workspaces() {
 
       {workspaces === null ? (
         <div className="card"><div className="description" style={{ margin: 0 }}>Loading workspaces…</div></div>
+      ) : workspaces.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '60px 20px', color: '#777' }}>
+          <div style={{ fontSize: '14px', marginBottom: '12px' }}>No workspaces yet</div>
+          <div style={{ fontSize: '12px', color: '#555' }}>Create your first workspace to get started</div>
+        </div>
       ) : (
-        <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '10px', marginBottom: '18px' }}>
-            {workspaces.map((ws) => (
-              <div key={ws.id} className="card" style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px' }}>
-                <div style={{ fontSize: '13px', fontWeight: 700, color: '#eee', display: 'flex', alignItems: 'center', gap: '7px', minWidth: 0 }}>
-                  <span className="dot purple" style={{ flexShrink: 0 }} />
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ws.name}</span>
-                  {current?.id === ws.id && <span className="badge paused" style={{ fontSize: '9px', flexShrink: 0 }}>current</span>}
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '7px', flexWrap: 'wrap' }}>
-                  <span className="badge paused" title="Members"><Users size={11} /> {ws.members_count ?? 1}</span>
-                  {ws.role && <span className="badge">{ws.role}</span>}
-                  <span style={{ fontSize: '10px', color: '#555' }}>
-                    Created {new Date(ws.created_at).toLocaleDateString()}
-                  </span>
-                  <span style={{ flex: 1 }} />
-                  <button className="icon-btn" title="Preview workspace" onClick={() => openPreview(ws)}><Eye size={12} /></button>
-                  <button
-                    className="icon-btn"
-                    title="Delete workspace"
-                    style={{ color: '#ff6b6b' }}
-                    onClick={() => setConfirmDeleteWs(ws)}
-                  ><Trash2 size={12} /></button>
-                </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '10px', marginBottom: '18px' }}>
+          {workspaces.map((ws) => (
+            <div key={ws.id} className="card" style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px' }}>
+              <div style={{ fontSize: '13px', fontWeight: 700, color: '#eee', display: 'flex', alignItems: 'center', gap: '7px', minWidth: 0 }}>
+                <span className="dot purple" style={{ flexShrink: 0 }} />
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ws.name}</span>
+                {current?.id === ws.id && <span className="badge paused" style={{ fontSize: '9px', flexShrink: 0 }}>current</span>}
               </div>
-            ))}
-          </div>
 
-          <div className="card" style={{ maxWidth: '420px' }}>
-            <div className="card-head">
-              <div className="name">Create workspace</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '7px', flexWrap: 'wrap' }}>
+                <span className="badge paused" title="Members"><Users size={11} /> {ws.members_count ?? 1}</span>
+                {ws.role && <span className="badge">{ws.role}</span>}
+                <span style={{ fontSize: '10px', color: '#555' }}>
+                  Created {new Date(ws.created_at).toLocaleDateString()}
+                </span>
+                <span style={{ flex: 1 }} />
+                <button className="icon-btn" title="Preview workspace" onClick={() => openPreview(ws)}><Eye size={12} /></button>
+                <button
+                  className="icon-btn"
+                  title="Delete workspace"
+                  style={{ color: '#ff6b6b' }}
+                  onClick={() => setConfirmDeleteWs(ws)}
+                ><Trash2 size={12} /></button>
+              </div>
             </div>
-            <div className="description">
-              A workspace holds your projects, tasks and bugs.
-            </div>
-            <form onSubmit={handleCreate} noValidate>
-              <input
-                type="text"
-                className="search"
-                style={{ width: '100%', height: '32px', marginBottom: '10px' }}
-                placeholder="Workspace name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                autoFocus={workspaces.length === 0}
-              />
-              <button type="submit" className="btn primary" disabled={loading}>
-                {loading ? 'Creating…' : '+ Create workspace'}
-              </button>
-            </form>
-          </div>
-        </>
+          ))}
+        </div>
+      )}
+
+      {showCreate && (
+        <CreateWorkspaceModal
+          onCreate={handleCreate}
+          onClose={() => setShowCreate(false)}
+        />
       )}
 
       {confirmDeleteWs && (
@@ -462,6 +443,85 @@ export default function Workspaces() {
           onCancel={() => setConfirmDeleteMember(null)}
         />
       )}
+    </div>
+  )
+}
+
+function CreateWorkspaceModal({ onCreate, onClose }) {
+  const [name, setName] = useState('')
+  const [error, setError] = useState(null)
+  const [loading, setLoading] = useState(false)
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    if (!name.trim()) {
+      setError('Please enter a workspace name.')
+      return
+    }
+    setLoading(true)
+    setError(null)
+    try {
+      await onCreate(name.trim())
+    } catch (err) {
+      setError(err.message || 'Could not create workspace')
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div onClick={onClose} style={{
+      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+      background: 'rgba(0,0,0,0.6)', display: 'flex',
+      alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+    }}>
+      <div onClick={(e) => e.stopPropagation()} style={{
+        background: '#151515', border: '1px solid #292929', borderRadius: '6px',
+        padding: '24px', width: '100%', maxWidth: '440px', maxHeight: '90vh',
+        overflowY: 'auto', boxShadow: '0 20px 25px rgba(0,0,0,0.3)',
+      }}>
+        <div style={{ marginBottom: '16px' }}>
+          <h2 style={{ margin: '0 0 8px 0', fontSize: '16px', fontWeight: '700' }}>New Workspace</h2>
+          <p style={{ margin: 0, color: '#777', fontSize: '12px' }}>
+            A workspace holds your projects, tasks and bugs
+          </p>
+        </div>
+
+        <form onSubmit={handleSubmit} noValidate>
+          {error && (
+            <div style={{
+              marginBottom: '14px', padding: '8px 11px',
+              border: '1px solid rgba(255,64,64,0.35)', borderRadius: '4px',
+              background: 'rgba(255,64,64,0.07)', color: '#ff8a8a', fontSize: '11px',
+            }} role="alert">{error}</div>
+          )}
+
+          <div style={{ marginBottom: '20px' }}>
+            <label style={{
+              display: 'block', marginBottom: '6px',
+              fontSize: '12px', fontWeight: '600', color: '#ddd',
+            }}>Workspace Name</label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g., Game Dev"
+              style={{
+                width: '100%', padding: '8px 9px', border: '1px solid #2a2a2a',
+                background: '#101010', color: '#ddd', borderRadius: '4px',
+                fontSize: '12px', boxSizing: 'border-box', outline: 'none',
+              }}
+              autoFocus
+            />
+          </div>
+
+          <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+            <button type="button" className="btn" onClick={onClose} style={{ cursor: 'pointer' }}>Cancel</button>
+            <button type="submit" className="btn primary" disabled={loading} style={{ cursor: 'pointer' }}>
+              {loading ? 'Creating…' : 'Create Workspace'}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   )
 }

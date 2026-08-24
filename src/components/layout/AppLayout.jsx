@@ -7,12 +7,12 @@ function AppLayout({ children }) {
 
   return (
     <div className="app">
-      <Topbar
-        collapsed={collapsed}
-        onToggleCollapse={() => setCollapsed((v) => !v)}
-      />
-      <div className={`layout${collapsed ? ' collapsed' : ''}`}>
-        <Sidebar collapsed={collapsed} />
+      <Sidebar collapsed={collapsed} />
+      <div className="app-main">
+        <Topbar
+          collapsed={collapsed}
+          onToggleCollapse={() => setCollapsed((v) => !v)}
+        />
         <main className="content" role="main">
           <div className="page-body">
             {children}

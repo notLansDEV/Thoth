@@ -5,6 +5,7 @@ import {
   setCurrentWorkspace,
   getWorkspaces,
 } from '../../features/workspaces/workspaces.service.js'
+import { getProjects } from '../../features/projects/projects.service.js'
 
 const PAGE_LABELS = {
   dashboard: 'Dashboard',
@@ -16,6 +17,11 @@ const PAGE_LABELS = {
   markdown: 'Markdown',
   workspaces: 'Workspaces',
   settings: 'Settings',
+}
+
+const SUB_LABELS = {
+  tasks: { all: 'All Task', stages: 'Task Stages' },
+  bugs: { all: 'All Bugs', stages: 'Bug Stages' },
 }
 
 function navigate(path) {
@@ -73,9 +79,33 @@ export default function Topbar({ collapsed, onToggleCollapse }) {
 
   const parts = window.location.pathname.split('/').filter(Boolean)
   if (parts[0] && parts[0].toLowerCase() === 'thoth') parts.shift()
-  // /{workspace}/{page}[/{id}] — page is always the second segment
+  // /{workspace}/{page}[/{sub|id}] — page is always the second segment
   const pageKey = parts[1] || parts[0] || 'dashboard'
+  const subSeg = parts[2] || null
   const pageLabel = PAGE_LABELS[pageKey] || pageKey
+
+  // Resolve the crumb tail: project name on detail pages, otherwise sub-page label
+  const [projectName, setProjectName] = useState(null)
+  useEffect(() => {
+    setProjectName(null)
+    if (!(pageKey === 'projects' && subSeg)) return undefined
+    let alive = true
+    getProjects(getCurrentWorkspace()?.id)
+      .then((rows) => {
+        if (!alive) return
+        const p = (Array.isArray(rows) ? rows : []).find((x) => x.id === subSeg)
+        setProjectName(p?.name || null)
+      })
+      .catch(() => {})
+    return () => { alive = false }
+  }, [pageKey, subSeg])
+
+  let crumbTail = null
+  if (pageKey === 'projects' && subSeg) {
+    crumbTail = projectName || null
+  } else if (subSeg && SUB_LABELS[pageKey]?.[subSeg]) {
+    crumbTail = SUB_LABELS[pageKey][subSeg]
+  }
 
   const name = user?.full_name || user?.username || 'Guest'
   const initials = name
@@ -88,9 +118,6 @@ export default function Topbar({ collapsed, onToggleCollapse }) {
   return (
     <header className="topbar">
       <div className="top-left">
-        <div className="brand">
-          <span className="brand-icon">T</span>Thoth
-        </div>
         <button
           className="collapse-btn"
           onClick={onToggleCollapse}
@@ -100,7 +127,15 @@ export default function Topbar({ collapsed, onToggleCollapse }) {
           {collapsed ? <Menu size={14} /> : <PanelLeftClose size={14} />}
         </button>
         <span className="breadcrumb">
-          {ws ? `${ws.name} / ` : ''}{pageLabel}
+          <span className="crumb-ws">{ws ? ws.name : 'No workspace'}</span>
+          <span className="crumb-sep">/</span>
+          <span className="crumb-here">{pageLabel}</span>
+          {crumbTail && (
+            <>
+              <span className="crumb-sep">&gt;</span>
+              <span>{crumbTail}</span>
+            </>
+          )}
         </span>
       </div>
 

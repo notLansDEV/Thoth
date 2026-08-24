@@ -108,6 +108,11 @@ export default function Sidebar({ collapsed }) {
 
   return (
     <aside className={`sidebar${collapsed ? ' collapsed' : ''}`}>
+      <div className="side-head">
+        <span className="brand-icon">T</span>
+        <span className="label side-brand">Thoth</span>
+      </div>
+
       <nav className="nav">
         {NAV.map(item => {
           const { Icon } = item
