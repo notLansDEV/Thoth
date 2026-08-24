@@ -1,5 +1,5 @@
-import { useRef, useState } from 'react'
-import { createBug } from '../bugs.service.js'
+import { useEffect, useRef, useState } from 'react'
+import { createBug, getWorkspaceMembers, getMilestones } from '../bugs.service.js'
 import { TASK_PRIORITIES } from '../../tasks/tasks.service.js'
 import { Paperclip, X } from 'lucide-react'
 
@@ -34,15 +34,21 @@ function readFileAsDataUrl(file) {
   })
 }
 
-export default function ReportBugModal({ projects, stages, defaultStageName, onCreated, onClose }) {
+export default function ReportBugModal({ projects, workspaceId, stages, defaultStageName, onCreated, onClose }) {
   const [projectId, setProjectId] = useState(projects[0]?.id || '')
+  const [milestoneId, setMilestoneId] = useState('')
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
+  const [assignee, setAssignee] = useState('')
   const [steps, setSteps] = useState('')
   const [expected, setExpected] = useState('')
   const [actual, setActual] = useState('')
   const [priority, setPriority] = useState('medium')
   const [attachments, setAttachments] = useState([])
+  const [startDate, setStartDate] = useState('')
+  const [dueDate, setDueDate] = useState('')
+  const [members, setMembers] = useState([])
+  const [milestones, setMilestones] = useState([])
   const stageOptions = (stages && stages.length > 0)
     ? stages.filter((s) => s.name !== 'Archived').map((s) => s.name)
     : ['New']
@@ -50,6 +56,23 @@ export default function ReportBugModal({ projects, stages, defaultStageName, onC
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
   const fileInputRef = useRef(null)
+
+  useEffect(() => {
+    let alive = true
+    getWorkspaceMembers(workspaceId || projects[0]?.workspace_id || '')
+      .then((rows) => { if (alive) setMembers(rows) })
+      .catch(() => {})
+    return () => { alive = false }
+  }, [workspaceId, projects])
+
+  useEffect(() => {
+    if (!projectId) return
+    let alive = true
+    getMilestones(projectId)
+      .then((rows) => { if (alive) setMilestones(Array.isArray(rows) ? rows : []) })
+      .catch(() => { if (alive) setMilestones([]) })
+    return () => { alive = false }
+  }, [projectId])
 
   async function onFilesPicked(e) {
     const picked = Array.from(e.target.files || [])
@@ -79,9 +102,13 @@ export default function ReportBugModal({ projects, stages, defaultStageName, onC
         description: description.trim() || null,
         priority,
         kanban_column: stage,
+        assigned_to: assignee || null,
+        milestone_id: milestoneId || null,
         steps_to_reproduce: steps.trim() || null,
         expected_behavior: expected.trim() || null,
         actual_behavior: actual.trim() || null,
+        start_date: startDate || null,
+        due_date: dueDate || null,
         ...(attachments.length > 0 ? { meta: { attachments } } : {}),
       })
       onCreated(bug)
@@ -101,7 +128,7 @@ export default function ReportBugModal({ projects, stages, defaultStageName, onC
     }}>
       <div onClick={(e) => e.stopPropagation()} style={{
         background: '#151515', border: '1px solid #292929', borderRadius: '6px',
-        padding: '24px', width: '100%', maxWidth: '480px', maxHeight: '90vh',
+        padding: '24px', width: '100%', maxWidth: '560px', maxHeight: '90vh',
         overflowY: 'auto', boxShadow: '0 20px 25px rgba(0,0,0,0.3)',
       }}>
         <div style={{ marginBottom: '16px' }}>
@@ -118,16 +145,29 @@ export default function ReportBugModal({ projects, stages, defaultStageName, onC
             }} role="alert">{error}</div>
           )}
 
-          <div style={{ marginBottom: '14px' }}>
-            <label style={labelStyle}>Project</label>
-            <select value={projectId} onChange={(e) => setProjectId(e.target.value)} style={inputStyle}>
-              {projects.length === 0 && <option value="">No projects available</option>}
-              {projects.map((p) => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </select>
+          {/* Row: Project + Milestone */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '14px' }}>
+            <div>
+              <label style={labelStyle}>Project</label>
+              <select value={projectId} onChange={(e) => { setProjectId(e.target.value); setMilestoneId('') }} style={inputStyle}>
+                {projects.length === 0 && <option value="">No projects available</option>}
+                {projects.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label style={labelStyle}>Milestone</label>
+              <select value={milestoneId} onChange={(e) => setMilestoneId(e.target.value)} style={inputStyle}>
+                <option value="">No milestone</option>
+                {milestones.map((m) => (
+                  <option key={m.id} value={m.id}>{m.name}</option>
+                ))}
+              </select>
+            </div>
           </div>
 
+          {/* Title */}
           <div style={{ marginBottom: '14px' }}>
             <label style={labelStyle}>Title</label>
             <input
@@ -138,6 +178,7 @@ export default function ReportBugModal({ projects, stages, defaultStageName, onC
             />
           </div>
 
+          {/* Description */}
           <div style={{ marginBottom: '14px' }}>
             <label style={labelStyle}>Description</label>
             <textarea
@@ -148,45 +189,29 @@ export default function ReportBugModal({ projects, stages, defaultStageName, onC
             />
           </div>
 
+          {/* Assign to */}
           <div style={{ marginBottom: '14px' }}>
-            <label style={labelStyle}>Steps to reproduce</label>
-            <textarea
-              value={steps}
-              onChange={(e) => setSteps(e.target.value)}
-              placeholder={'1. Go to…\n2. Click on…\n3. See error'}
-              style={{ ...inputStyle, minHeight: '70px', resize: 'vertical' }}
-            />
+            <label style={labelStyle}>Assign to</label>
+            <select value={assignee} onChange={(e) => setAssignee(e.target.value)} style={inputStyle}>
+              <option value="">Unassigned</option>
+              {members.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.full_name || m.username}{m.role ? ` (${m.role})` : ''}
+                </option>
+              ))}
+            </select>
           </div>
 
-          <div style={{ marginBottom: '14px' }}>
-            <label style={labelStyle}>Expected behavior</label>
-            <textarea
-              value={expected}
-              onChange={(e) => setExpected(e.target.value)}
-              placeholder="What should have happened?"
-              style={{
-                ...inputStyle, minHeight: '54px', resize: 'vertical',
-                borderColor: 'rgba(32,217,107,0.4)',
-                background: 'rgba(32,217,107,0.04)',
-              }}
-            />
-          </div>
-
-          <div style={{ marginBottom: '14px' }}>
-            <label style={labelStyle}>Actual behavior</label>
-            <textarea
-              value={actual}
-              onChange={(e) => setActual(e.target.value)}
-              placeholder="What actually happened?"
-              style={{
-                ...inputStyle, minHeight: '54px', resize: 'vertical',
-                borderColor: 'rgba(255,64,64,0.4)',
-                background: 'rgba(255,64,64,0.05)',
-              }}
-            />
-          </div>
-
+          {/* Row: Stage + Priority */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '14px' }}>
+            <div>
+              <label style={labelStyle}>Stage</label>
+              <select value={stage} onChange={(e) => setStage(e.target.value)} style={inputStyle}>
+                {stageOptions.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            </div>
             <div>
               <label style={labelStyle}>Priority</label>
               <select
@@ -199,18 +224,52 @@ export default function ReportBugModal({ projects, stages, defaultStageName, onC
                 ))}
               </select>
             </div>
+          </div>
+
+          {/* Steps to reproduce */}
+          <div style={{ marginBottom: '14px' }}>
+            <label style={labelStyle}>Steps to reproduce</label>
+            <textarea
+              value={steps}
+              onChange={(e) => setSteps(e.target.value)}
+              placeholder={'1. Go to…\n2. Click on…\n3. See error'}
+              style={{ ...inputStyle, minHeight: '70px', resize: 'vertical' }}
+            />
+          </div>
+
+          {/* Row: Expected + Actual */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '14px' }}>
             <div>
-              <label style={labelStyle}>Stage</label>
-              <select value={stage} onChange={(e) => setStage(e.target.value)} style={inputStyle}>
-                {stageOptions.map((s) => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
+              <label style={labelStyle}>Expected behavior</label>
+              <textarea
+                value={expected}
+                onChange={(e) => setExpected(e.target.value)}
+                placeholder="What should have happened?"
+                style={{
+                  ...inputStyle, minHeight: '54px', resize: 'vertical',
+                  borderColor: 'rgba(32,217,107,0.4)',
+                  background: 'rgba(32,217,107,0.04)',
+                }}
+              />
+            </div>
+            <div>
+              <label style={labelStyle}>Actual behavior</label>
+              <textarea
+                value={actual}
+                onChange={(e) => setActual(e.target.value)}
+                placeholder="What actually happened?"
+                style={{
+                  ...inputStyle, minHeight: '54px', resize: 'vertical',
+                  borderColor: 'rgba(255,64,64,0.4)',
+                  background: 'rgba(255,64,64,0.05)',
+                }}
+              />
             </div>
           </div>
 
-          <div style={{ marginBottom: '18px' }}>
-            <label style={labelStyle}>Attachments</label>
+          {/* Attachment */}
+          <div style={{ marginBottom: '14px' }}>
+            <label style={labelStyle}>Attachment</label>
             <input ref={fileInputRef} type="file" multiple hidden onChange={onFilesPicked} />
             <button
               type="button"
@@ -240,6 +299,18 @@ export default function ReportBugModal({ projects, stages, defaultStageName, onC
               </div>
             )}
             <div style={{ fontSize: '9.5px', color: '#555', marginTop: '5px' }}>Files up to 2 MB each.</div>
+          </div>
+
+          {/* Row: Start Date + Due Date */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '20px' }}>
+            <div>
+              <label style={labelStyle}>Start date</label>
+              <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} style={inputStyle} />
+            </div>
+            <div>
+              <label style={labelStyle}>Due date</label>
+              <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} style={inputStyle} />
+            </div>
           </div>
 
           <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>

@@ -83,6 +83,20 @@ export async function deleteStage(stageId) {
   })
 }
 
+export async function getWorkspaceMembers(workspaceId) {
+  if (!workspaceId) return []
+  return apiRequest(`/workspaces/${encodeURIComponent(workspaceId)}/members`)
+}
+
+export async function getMilestones(projectId) {
+  if (!projectId) return []
+  return apiRequest(`/milestones?project_id=${encodeURIComponent(projectId)}`)
+}
+
+export async function deleteBug(bugId) {
+  return apiRequest(`/bugs/${bugId}`, { method: 'DELETE' })
+}
+
 export async function reorderStages(order) {
   return apiRequest('/bug-stages/reorder', {
     method: 'PATCH',

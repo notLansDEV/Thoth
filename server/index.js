@@ -521,6 +521,18 @@ app.patch('/api/tasks/:id', auth, async (req, res) => {
   }
 })
 
+app.delete('/api/tasks/:id', auth, async (req, res) => {
+  try {
+    const existing = await taskRepository.findById(req.params.id)
+    if (!existing) return res.status(404).json({ error: 'Task not found' })
+    await taskRepository.deleteById(req.params.id)
+    res.json({ success: true })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
 app.get('/api/projects/:id', auth, async (req, res) => {
   try {
     const project = await projectRepository.findById(req.params.id)
@@ -576,6 +588,7 @@ app.post('/api/bugs', auth, async (req, res) => {
   try {
     const {
       project_id, title, description, priority, kanban_column,
+      assigned_to, milestone_id, start_date, due_date,
       steps_to_reproduce, expected_behavior, actual_behavior,
       attachments, meta,
     } = req.body
@@ -603,6 +616,10 @@ app.post('/api/bugs', auth, async (req, res) => {
       priority: priority || 'medium',
       kanban_column: stage,
       status: stage,
+      assigned_to: assigned_to || null,
+      milestone_id: milestone_id || null,
+      start_date: start_date || null,
+      due_date: due_date || null,
       steps_to_reproduce: steps_to_reproduce || null,
       expected_behavior: expected_behavior || null,
       actual_behavior: actual_behavior || null,
@@ -644,6 +661,7 @@ app.get('/api/bugs', auth, async (req, res) => {
 const BUG_ALLOWED_FIELDS = [
   'title', 'description', 'priority', 'kanban_column', 'status',
   'assigned_to', 'steps_to_reproduce', 'expected_behavior', 'actual_behavior',
+  'milestone_id', 'start_date', 'due_date',
 ]
 
 app.patch('/api/bugs/:id', auth, async (req, res) => {
@@ -652,6 +670,13 @@ app.patch('/api/bugs/:id', auth, async (req, res) => {
     for (const field of BUG_ALLOWED_FIELDS) {
       if (req.body[field] !== undefined) data[field] = req.body[field]
     }
+
+    // The bugs table stores files in `attachments`, not a `meta` column —
+    // translate task-style meta.attachments patches before persisting
+    if (req.body.meta && Array.isArray(req.body.meta.attachments)) {
+      data.attachments = JSON.stringify(req.body.meta.attachments)
+    }
+
     if (Object.keys(data).length === 0) {
       return res.status(400).json({ error: 'No valid fields to update' })
     }
@@ -680,6 +705,18 @@ app.patch('/api/bugs/:id', auth, async (req, res) => {
       )
     }
     res.json(updated)
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
+app.delete('/api/bugs/:id', auth, async (req, res) => {
+  try {
+    const existing = await bugRepository.findById(req.params.id)
+    if (!existing) return res.status(404).json({ error: 'Bug not found' })
+    await bugRepository.deleteById(req.params.id)
+    res.json({ success: true })
   } catch (err) {
     console.error(err)
     res.status(500).json({ error: 'Server error' })

@@ -136,6 +136,9 @@ CREATE TABLE IF NOT EXISTS bugs (
   status VARCHAR(50) DEFAULT 'new',
   assigned_to UUID,
   created_by UUID,
+  milestone_id UUID REFERENCES milestones(id) ON DELETE SET NULL,
+  start_date DATE,
+  due_date DATE,
   steps_to_reproduce TEXT,
   expected_behavior TEXT,
   actual_behavior TEXT,
@@ -150,6 +153,9 @@ ALTER TABLE bugs ADD COLUMN IF NOT EXISTS attachments JSONB DEFAULT '[]';
 ALTER TABLE bugs ADD COLUMN IF NOT EXISTS steps_to_reproduce TEXT;
 ALTER TABLE bugs ADD COLUMN IF NOT EXISTS expected_behavior TEXT;
 ALTER TABLE bugs ADD COLUMN IF NOT EXISTS actual_behavior TEXT;
+ALTER TABLE bugs ADD COLUMN IF NOT EXISTS milestone_id UUID REFERENCES milestones(id) ON DELETE SET NULL;
+ALTER TABLE bugs ADD COLUMN IF NOT EXISTS start_date DATE;
+ALTER TABLE bugs ADD COLUMN IF NOT EXISTS due_date DATE;
 
 -- Bug Comments Table
 CREATE TABLE IF NOT EXISTS bug_comments (

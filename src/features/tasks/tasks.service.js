@@ -94,6 +94,10 @@ export async function deleteStage(stageId) {
   })
 }
 
+export async function deleteTask(taskId) {
+  return apiRequest(`/tasks/${taskId}`, { method: 'DELETE' })
+}
+
 export async function reorderStages(order) {
   return apiRequest('/task-stages/reorder', {
     method: 'PATCH',

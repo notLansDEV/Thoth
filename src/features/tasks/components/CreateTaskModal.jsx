@@ -3,6 +3,7 @@ import {
   TASK_PRIORITIES,
   createTask,
   getWorkspaceMembers,
+  getMilestones,
 } from '../tasks.service.js'
 
 const inputStyle = {
@@ -35,9 +36,11 @@ export default function CreateTaskModal({ projects, workspaceId, stages, default
   const [description, setDescription] = useState('')
   const [priority, setPriority] = useState('medium')
   const [assignee, setAssignee] = useState('')
+  const [milestoneId, setMilestoneId] = useState('')
   const [startDate, setStartDate] = useState('')
   const [dueDate, setDueDate] = useState('')
   const [members, setMembers] = useState([])
+  const [milestones, setMilestones] = useState([])
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
 
@@ -48,6 +51,15 @@ export default function CreateTaskModal({ projects, workspaceId, stages, default
       .catch(() => {})
     return () => { alive = false }
   }, [workspaceId])
+
+  useEffect(() => {
+    if (!projectId) return
+    let alive = true
+    getMilestones(projectId)
+      .then((rows) => { if (alive) setMilestones(Array.isArray(rows) ? rows : []) })
+      .catch(() => { if (alive) setMilestones([]) })
+    return () => { alive = false }
+  }, [projectId])
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -65,6 +77,7 @@ export default function CreateTaskModal({ projects, workspaceId, stages, default
         status: stage,
         priority,
         assigned_to: assignee || null,
+        milestone_id: milestoneId || null,
         start_date: startDate || null,
         due_date: dueDate || null,
       })
@@ -85,7 +98,7 @@ export default function CreateTaskModal({ projects, workspaceId, stages, default
     }}>
       <div onClick={(e) => e.stopPropagation()} style={{
         background: '#151515', border: '1px solid #292929', borderRadius: '6px',
-        padding: '24px', width: '100%', maxWidth: '440px', maxHeight: '90vh',
+        padding: '24px', width: '100%', maxWidth: '520px', maxHeight: '90vh',
         overflowY: 'auto', boxShadow: '0 20px 25px rgba(0,0,0,0.3)',
       }}>
         <div style={{ marginBottom: '16px' }}>
@@ -102,16 +115,29 @@ export default function CreateTaskModal({ projects, workspaceId, stages, default
             }} role="alert">{error}</div>
           )}
 
-          <div style={{ marginBottom: '14px' }}>
-            <label style={labelStyle}>Project</label>
-            <select value={projectId} onChange={(e) => setProjectId(e.target.value)} style={inputStyle}>
-              <option value="">Select a project…</option>
-              {projects.map((p) => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </select>
+          {/* Row: Project + Milestone */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '14px' }}>
+            <div>
+              <label style={labelStyle}>Project</label>
+              <select value={projectId} onChange={(e) => { setProjectId(e.target.value); setMilestoneId('') }} style={inputStyle}>
+                <option value="">Select a project…</option>
+                {projects.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label style={labelStyle}>Milestone</label>
+              <select value={milestoneId} onChange={(e) => setMilestoneId(e.target.value)} style={inputStyle}>
+                <option value="">No milestone</option>
+                {milestones.map((m) => (
+                  <option key={m.id} value={m.id}>{m.name}</option>
+                ))}
+              </select>
+            </div>
           </div>
 
+          {/* Title */}
           <div style={{ marginBottom: '14px' }}>
             <label style={labelStyle}>Title</label>
             <input
@@ -122,6 +148,7 @@ export default function CreateTaskModal({ projects, workspaceId, stages, default
             />
           </div>
 
+          {/* Description */}
           <div style={{ marginBottom: '14px' }}>
             <label style={labelStyle}>Description</label>
             <textarea
@@ -132,29 +159,7 @@ export default function CreateTaskModal({ projects, workspaceId, stages, default
             />
           </div>
 
-          <div style={{ marginBottom: '14px' }}>
-            <label style={labelStyle}>Stage</label>
-            <select value={stage} onChange={(e) => setStage(e.target.value)} style={inputStyle}>
-              {stageOptions.length === 0 && <option value="To Do">To Do</option>}
-              {stageOptions.map((s) => (
-                <option key={s.value} value={s.value}>{s.label}</option>
-              ))}
-            </select>
-          </div>
-
-          <div style={{ marginBottom: '14px' }}>
-            <label style={labelStyle}>Priority</label>
-            <select
-              value={priority}
-              onChange={(e) => setPriority(e.target.value)}
-              style={{ ...inputStyle, borderColor: `${priorityColor}66` }}
-            >
-              {TASK_PRIORITIES.map((p) => (
-                <option key={p.value} value={p.value}>{p.label}</option>
-              ))}
-            </select>
-          </div>
-
+          {/* Assign to */}
           <div style={{ marginBottom: '14px' }}>
             <label style={labelStyle}>Assign to</label>
             <select value={assignee} onChange={(e) => setAssignee(e.target.value)} style={inputStyle}>
@@ -167,6 +172,32 @@ export default function CreateTaskModal({ projects, workspaceId, stages, default
             </select>
           </div>
 
+          {/* Row: Stage + Priority */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '14px' }}>
+            <div>
+              <label style={labelStyle}>Stage</label>
+              <select value={stage} onChange={(e) => setStage(e.target.value)} style={inputStyle}>
+                {stageOptions.length === 0 && <option value="To Do">To Do</option>}
+                {stageOptions.map((s) => (
+                  <option key={s.value} value={s.value}>{s.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label style={labelStyle}>Priority</label>
+              <select
+                value={priority}
+                onChange={(e) => setPriority(e.target.value)}
+                style={{ ...inputStyle, borderColor: `${priorityColor}66` }}
+              >
+                {TASK_PRIORITIES.map((p) => (
+                  <option key={p.value} value={p.value}>{p.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Row: Start Date + Due Date */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '20px' }}>
             <div>
               <label style={labelStyle}>Start date</label>

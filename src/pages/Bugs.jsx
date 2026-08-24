@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
-import { Bug as BugIcon, CircleDot, Columns3, Plus } from 'lucide-react'
+import { Bug as BugIcon, CircleDot, Columns3, Plus, Pencil, Trash2 } from 'lucide-react'
 import {
   BUG_STAGES,
   getBugs,
   getStages,
   createStage,
   updateBug,
+  deleteBug,
   updateStage as updateStageApi,
   deleteStage as deleteStageApi,
   reorderStages,
@@ -30,7 +31,7 @@ function StatCard({ icon, label, value }) {
   )
 }
 
-function BugCard({ bug, projectName, projectColor, onDragStart, onOpen }) {
+function BugCard({ bug, projectName, projectColor, onDragStart, onOpen, onDelete }) {
   return (
     <div
       draggable
@@ -45,7 +46,7 @@ function BugCard({ bug, projectName, projectColor, onDragStart, onOpen }) {
       onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#2a2a2a' }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', alignItems: 'flex-start' }}>
-        <div style={{ fontSize: '12px', color: '#eee', fontWeight: 600 }}>
+        <div style={{ fontSize: '12px', color: '#eee', fontWeight: 600, minWidth: 0 }}>
           {bug.bug_id && (
             <span style={{ fontFamily: 'monospace', fontSize: '9.5px', color: '#ff6b6b', marginRight: '6px' }}>
               {bug.bug_id}
@@ -53,9 +54,27 @@ function BugCard({ bug, projectName, projectColor, onDragStart, onOpen }) {
           )}
           {bug.title}
         </div>
-        <span className="badge" style={{ ...priorityStyle(bug.priority), background: 'transparent', fontSize: '9px', flexShrink: 0 }}>
-          {bug.priority || 'medium'}
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '2px', flexShrink: 0 }}>
+          <span className="badge" style={{ ...priorityStyle(bug.priority), background: 'transparent', fontSize: '9px' }}>
+            {bug.priority || 'medium'}
+          </span>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onOpen(bug) }}
+            title="Edit"
+            style={{ background: 'transparent', border: 0, color: '#555', cursor: 'pointer', padding: '2px', display: 'inline-flex', borderRadius: '3px' }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = '#888'; e.currentTarget.style.background = '#1a1a1a' }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = '#555'; e.currentTarget.style.background = 'transparent' }}
+          ><Pencil size={11} /></button>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onDelete(bug) }}
+            title="Delete"
+            style={{ background: 'transparent', border: 0, color: '#555', cursor: 'pointer', padding: '2px', display: 'inline-flex', borderRadius: '3px' }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = '#ff4040'; e.currentTarget.style.background = '#1a1a1a' }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = '#555'; e.currentTarget.style.background = 'transparent' }}
+          ><Trash2 size={11} /></button>
+        </div>
       </div>
 
       {bug.description && (
@@ -88,6 +107,7 @@ export default function Bugs({ subPage }) {
   const [stages, setStages] = useState([])
   const [loading, setLoading] = useState(true)
   const [confirmDelete, setConfirmDelete] = useState(null)
+  const [confirmDeleteBug, setConfirmDeleteBug] = useState(null)
   const [deleting, setDeleting] = useState(false)
   const [showReport, setShowReport] = useState(false)
   const [preview, setPreview] = useState(null)
@@ -190,6 +210,21 @@ export default function Bugs({ subPage }) {
     }
   }
 
+  async function handleDeleteBug() {
+    if (!confirmDeleteBug) return
+    setDeleting(true)
+    try {
+      await deleteBug(confirmDeleteBug.id)
+      setBugs((cur) => cur.filter((b) => b.id !== confirmDeleteBug.id))
+      setConfirmDeleteBug(null)
+      if (preview?.id === confirmDeleteBug.id) setPreview(null)
+    } catch (err) {
+      window.alert(err.message || 'Could not delete bug')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   const counts = {}
   for (const b of bugs) {
     const key = b.kanban_column || stages[0]?.name || 'New'
@@ -276,6 +311,7 @@ export default function Bugs({ subPage }) {
                         projectColor={projects.find((p) => p.id === bug.project_id)?.color}
                         onDragStart={(e, id) => { dragId.current = id; e.dataTransfer.effectAllowed = 'move' }}
                         onOpen={setPreview}
+                        onDelete={setConfirmDeleteBug}
                       />
                     ))}
 
@@ -317,9 +353,21 @@ export default function Bugs({ subPage }) {
         />
       )}
 
+      {confirmDeleteBug && (
+        <ConfirmModal
+          title={`Delete bug "${confirmDeleteBug.title}"?`}
+          message="Are you sure you want to delete this bug? This action cannot be undone."
+          confirmLabel="Delete"
+          busy={deleting}
+          onConfirm={handleDeleteBug}
+          onCancel={() => setConfirmDeleteBug(null)}
+        />
+      )}
+
       {showReport && (
         <ReportBugModal
           projects={projects}
+          workspaceId={ws?.id}
           stages={stages}
           defaultStageName={defaultStageName}
           onCreated={(bug) => {
@@ -333,7 +381,13 @@ export default function Bugs({ subPage }) {
       {preview && (
         <BugPreviewModal
           bug={bugs.find((b) => b.id === preview.id) || preview}
+          workspaceId={ws?.id}
           projectName={projects.find((p) => p.id === preview.project_id)?.name}
+          stages={stages}
+          onUpdated={(updated) => {
+            setBugs((cur) => cur.map((b) => (b.id === updated.id ? updated : b)))
+            setPreview(updated)
+          }}
           onClose={() => setPreview(null)}
         />
       )}

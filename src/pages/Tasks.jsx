@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import { User, Clock, CircleDot, ListChecks, Columns3 } from 'lucide-react'
+import { User, Clock, CircleDot, ListChecks, Columns3, Pencil, Trash2 } from 'lucide-react'
 import {
   TASK_STAGES,
   priorityStyle,
   getTasks,
   updateTask,
+  deleteTask,
   getStages,
   createStage,
   updateStage as updateStageApi,
@@ -41,7 +42,7 @@ function StatCard({ icon, label, value }) {
   )
 }
 
-function TaskCard({ task, onOpen, onDragStart }) {
+function TaskCard({ task, onOpen, onDelete, onDragStart }) {
   const overdue = isOverdue(task)
   const due = formatDate(task.due_date)
 
@@ -59,7 +60,7 @@ function TaskCard({ task, onOpen, onDragStart }) {
       onMouseLeave={(e) => { e.currentTarget.style.borderColor = overdue ? 'rgba(255,64,64,0.4)' : '#2a2a2a' }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', alignItems: 'flex-start' }}>
-        <div style={{ fontSize: '12px', color: '#eee', fontWeight: 600 }}>
+        <div style={{ fontSize: '12px', color: '#eee', fontWeight: 600, minWidth: 0 }}>
           {task.task_code && (
             <span style={{ fontFamily: 'monospace', fontSize: '9.5px', color: '#6e61ff', marginRight: '6px' }}>
               {task.task_code}
@@ -67,9 +68,27 @@ function TaskCard({ task, onOpen, onDragStart }) {
           )}
           {task.title}
         </div>
-        <span className="badge" style={{ ...priorityStyle(task.priority), background: 'transparent', fontSize: '9px', flexShrink: 0 }}>
-          {task.priority}
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '2px', flexShrink: 0 }}>
+          <span className="badge" style={{ ...priorityStyle(task.priority), background: 'transparent', fontSize: '9px' }}>
+            {task.priority}
+          </span>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onOpen(task) }}
+            title="Edit"
+            style={{ background: 'transparent', border: 0, color: '#555', cursor: 'pointer', padding: '2px', display: 'inline-flex', borderRadius: '3px' }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = '#888'; e.currentTarget.style.background = '#1a1a1a' }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = '#555'; e.currentTarget.style.background = 'transparent' }}
+          ><Pencil size={11} /></button>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onDelete(task) }}
+            title="Delete"
+            style={{ background: 'transparent', border: 0, color: '#555', cursor: 'pointer', padding: '2px', display: 'inline-flex', borderRadius: '3px' }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = '#ff4040'; e.currentTarget.style.background = '#1a1a1a' }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = '#555'; e.currentTarget.style.background = 'transparent' }}
+          ><Trash2 size={11} /></button>
+        </div>
       </div>
 
       {task.description && (
@@ -119,6 +138,7 @@ export default function Tasks({ subPage }) {
   const [showCreate, setShowCreate] = useState(false)
   const [preview, setPreview] = useState(null)
   const [confirmDelete, setConfirmDelete] = useState(null)
+  const [confirmDeleteTask, setConfirmDeleteTask] = useState(null)
   const [deleting, setDeleting] = useState(false)
   const dragId = useRef(null)
 
@@ -234,6 +254,21 @@ export default function Tasks({ subPage }) {
     }
   }
 
+  async function handleDeleteTask() {
+    if (!confirmDeleteTask) return
+    setDeleting(true)
+    try {
+      await deleteTask(confirmDeleteTask.id)
+      setTasks((cur) => cur.filter((t) => t.id !== confirmDeleteTask.id))
+      setConfirmDeleteTask(null)
+      if (preview?.id === confirmDeleteTask.id) setPreview(null)
+    } catch (err) {
+      window.alert(err.message || 'Could not delete task')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   const counts = {}
   for (const t of tasks) {
     const key = t.status || stages[0]?.name || 'To Do'
@@ -317,6 +352,7 @@ export default function Tasks({ subPage }) {
                     key={task.id}
                     task={task}
                     onOpen={setPreview}
+                    onDelete={setConfirmDeleteTask}
                     onDragStart={(e, id) => { dragId.current = id; e.dataTransfer.effectAllowed = 'move' }}
                   />
                 ))}
@@ -375,6 +411,17 @@ export default function Tasks({ subPage }) {
           busy={deleting}
           onConfirm={handleConfirmDelete}
           onCancel={() => setConfirmDelete(null)}
+        />
+      )}
+
+      {confirmDeleteTask && (
+        <ConfirmModal
+          title={`Delete task "${confirmDeleteTask.title}"?`}
+          message="Are you sure you want to delete this task? This action cannot be undone."
+          confirmLabel="Delete"
+          busy={deleting}
+          onConfirm={handleDeleteTask}
+          onCancel={() => setConfirmDeleteTask(null)}
         />
       )}
     </div>
