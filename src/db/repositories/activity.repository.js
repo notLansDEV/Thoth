@@ -26,7 +26,7 @@ export class ActivityRepository extends BaseRepository {
    */
   async getWorkspaceActivity(workspaceId, limit = 50, offset = 0) {
     return getMany(
-      `SELECT a.*, u.username AS actor_name, u.full_name AS actor_full_name
+      `SELECT a.*, u.username AS actor_name, u.full_name AS actor_full_name, u.avatar_url AS actor_avatar_url
        FROM activity_logs a
        LEFT JOIN users u ON a.actor_id = u.id
        WHERE a.workspace_id = $1
@@ -41,7 +41,7 @@ export class ActivityRepository extends BaseRepository {
    */
   async getProjectActivity(projectId, limit = 50, offset = 0) {
     return getMany(
-      `SELECT a.*, u.username AS actor_name, u.full_name AS actor_full_name
+      `SELECT a.*, u.username AS actor_name, u.full_name AS actor_full_name, u.avatar_url AS actor_avatar_url
        FROM activity_logs a
        LEFT JOIN users u ON a.actor_id = u.id
        WHERE a.project_id = $1

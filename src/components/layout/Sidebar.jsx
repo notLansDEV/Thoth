@@ -1,4 +1,9 @@
 ﻿import { useState, useEffect } from 'react'
+import {
+  LayoutDashboard, FolderOpen, ListChecks, Bug as BugIcon,
+  Calendar, BarChart3, FilePen, LayoutGrid, Settings, LogOut,
+  ChevronRight,
+} from 'lucide-react'
 import { setCurrentWorkspace, getCurrentWorkspace } from '../../features/workspaces/workspaces.service.js'
 import { getProjects } from '../../features/projects/projects.service.js'
 
@@ -11,25 +16,25 @@ const STATUS_COLORS = {
 }
 
 const NAV = [
-  { key: 'dashboard', label: 'Dashboard', icon: '◫' },
-  { key: 'projects', label: 'Projects', icon: '📁' },
+  { key: 'dashboard', label: 'Dashboard', Icon: LayoutDashboard },
+  { key: 'projects', label: 'Projects', Icon: FolderOpen },
   {
-    key: 'tasks', label: 'Tasks', icon: '☑',
+    key: 'tasks', label: 'Tasks', Icon: ListChecks,
     children: [
       { sub: 'all', label: 'All Task' },
       { sub: 'stages', label: 'Task Stages' },
     ],
   },
   {
-    key: 'bugs', label: 'Bugs', icon: '🐞',
+    key: 'bugs', label: 'Bugs', Icon: BugIcon,
     children: [
       { sub: 'all', label: 'All Bugs' },
       { sub: 'stages', label: 'Bug Stages' },
     ],
   },
-  { key: 'calendar', label: 'Calendar', icon: '▦' },
-  { key: 'reports', label: 'Reports', icon: '▥' },
-  { key: 'markdown', label: 'Markdown', icon: '✎' },
+  { key: 'calendar', label: 'Calendar', Icon: Calendar },
+  { key: 'reports', label: 'Reports', Icon: BarChart3 },
+  { key: 'markdown', label: 'Markdown', Icon: FilePen },
 ]
 
 function parsePath() {
@@ -104,37 +109,40 @@ export default function Sidebar({ collapsed }) {
   return (
     <aside className={`sidebar${collapsed ? ' collapsed' : ''}`}>
       <nav className="nav">
-        {NAV.map(item => (
-          <div key={item.key}>
-            <a href={`/Thoth/${workspace}/${item.key}`}
-               title={item.label}
-               className={`nav-item ${page === item.key && !item.children ? 'active' : ''} ${page === item.key && item.children ? 'parent-active' : ''}`}
-               onClick={(e) => handleNavClick(e, item)}>
-              <span className="icon">{item.icon}</span>
-              <span className="label">{item.label}</span>
-              {item.children && !collapsed && (
-                <span className="chev" style={{
-                  marginLeft: 'auto', fontSize: '8px', color: '#555',
-                  transform: openKey === item.key ? 'rotate(90deg)' : 'none',
-                  transition: 'transform 0.15s',
-                }}>▶</span>
-              )}
-            </a>
+        {NAV.map(item => {
+          const { Icon } = item
+          return (
+            <div key={item.key}>
+              <a href={`/Thoth/${workspace}/${item.key}`}
+                 title={item.label}
+                 className={`nav-item ${page === item.key && !item.children ? 'active' : ''} ${page === item.key && item.children ? 'parent-active' : ''}`}
+                 onClick={(e) => handleNavClick(e, item)}>
+                <span className="icon"><Icon size={14} /></span>
+                <span className="label">{item.label}</span>
+                {item.children && !collapsed && (
+                  <span className="chev" style={{
+                    marginLeft: 'auto', color: '#555', display: 'inline-flex',
+                    transform: openKey === item.key ? 'rotate(90deg)' : 'none',
+                    transition: 'transform 0.15s',
+                  }}><ChevronRight size={11} /></span>
+                )}
+              </a>
 
-            {item.children && !collapsed && openKey === item.key && (
-              <div className="submenu">
-                {item.children.map(child => (
-                  <a key={child.sub}
-                     href={`/Thoth/${workspace}/${item.key}/${child.sub}`}
-                     className={`submenu-item ${isChildActive(item, child) ? 'active' : ''}`}
-                     onClick={(e) => { e.preventDefault(); navigateTo(workspace, item.key, child.sub) }}>
-                    <span className="label">{child.label}</span>
-                  </a>
-                ))}
-              </div>
-            )}
-          </div>
-        ))}
+              {item.children && !collapsed && openKey === item.key && (
+                <div className="submenu">
+                  {item.children.map(child => (
+                    <a key={child.sub}
+                       href={`/Thoth/${workspace}/${item.key}/${child.sub}`}
+                       className={`submenu-item ${isChildActive(item, child) ? 'active' : ''}`}
+                       onClick={(e) => { e.preventDefault(); navigateTo(workspace, item.key, child.sub) }}>
+                      <span className="label">{child.label}</span>
+                    </a>
+                  ))}
+                </div>
+              )}
+            </div>
+          )
+        })}
       </nav>
 
       {!collapsed && (
@@ -163,8 +171,8 @@ export default function Sidebar({ collapsed }) {
       )}
 
       <div className="bottom">
-        <a href={`/Thoth/${workspace}/workspaces`} title="Workspaces" className={`nav-item ${page === 'workspaces' ? 'active' : ''}`} onClick={(e)=>{e.preventDefault(); navigateTo(workspace,'workspaces')}}><span className="icon">▣</span><span className="label">Workspace</span></a>
-        <a href={`/Thoth/${workspace}/settings`} title="Settings" className={`nav-item ${page === 'settings' ? 'active' : ''}`} onClick={(e)=>{e.preventDefault(); navigateTo(workspace,'settings')}}><span className="icon">⚙</span><span className="label">Settings</span></a>
+        <a href={`/Thoth/${workspace}/workspaces`} title="Workspaces" className={`nav-item ${page === 'workspaces' ? 'active' : ''}`} onClick={(e)=>{e.preventDefault(); navigateTo(workspace,'workspaces')}}><span className="icon"><LayoutGrid size={14} /></span><span className="label">Workspace</span></a>
+        <a href={`/Thoth/${workspace}/settings`} title="Settings" className={`nav-item ${page === 'settings' ? 'active' : ''}`} onClick={(e)=>{e.preventDefault(); navigateTo(workspace,'settings')}}><span className="icon"><Settings size={14} /></span><span className="label">Settings</span></a>
         <a href="/login" title="Log out" className="nav-item" onClick={(e)=>{
           e.preventDefault()
           localStorage.removeItem('token')
@@ -172,7 +180,7 @@ export default function Sidebar({ collapsed }) {
           setCurrentWorkspace(null)
           window.history.pushState({}, '', '/login')
           window.dispatchEvent(new PopStateEvent('popstate'))
-        }}><span className="icon">⏻</span><span className="label">Log out</span></a>
+        }}><span className="icon"><LogOut size={14} /></span><span className="label">Log out</span></a>
         {!collapsed && (
           <div className="status"><span className="status-dot" />PostgreSQL connected</div>
         )}

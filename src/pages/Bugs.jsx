@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { Bug as BugIcon, CircleDot, Columns3, Plus } from 'lucide-react'
 import {
   BUG_STAGES,
   getBugs,
@@ -21,8 +22,8 @@ import BugPreviewModal from '../features/bugs/components/BugPreviewModal.jsx'
 function StatCard({ icon, label, value }) {
   return (
     <div className="card" style={{ padding: '12px' }}>
-      <div style={{ fontSize: '9px', fontWeight: 700, color: '#666', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '6px' }}>
-        {icon} {label}
+      <div style={{ fontSize: '9px', fontWeight: 700, color: '#666', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+        <span style={{ display: 'inline-flex' }}>{icon}</span> {label}
       </div>
       <div style={{ fontSize: '18px', fontWeight: 700, color: '#f1f1f1' }}>{value}</div>
     </div>
@@ -214,16 +215,16 @@ export default function Bugs({ subPage }) {
           <p className="page-subtitle">Track and squash bugs across your projects</p>
         </div>
 
-        <button className="btn primary" onClick={() => setShowReport(true)} style={{ cursor: 'pointer' }}>
-          🐞 Report a Bug
+        <button className="btn primary" onClick={() => setShowReport(true)} style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+          <Plus size={13} /> Report a Bug
         </button>
       </div>
 
       {/* 3 stat cards */}
       <div className="stat-grid">
-        <StatCard icon="◉" label={defaultStageName} value={counts[defaultStageName] || 0} />
-        <StatCard icon="🐞" label="Total bug" value={bugs.length} />
-        <StatCard icon="◈" label="Total stage" value={stages.length} />
+        <StatCard icon={<CircleDot size={12} />} label={defaultStageName} value={counts[defaultStageName] || 0} />
+        <StatCard icon={<BugIcon size={12} />} label="Total bug" value={bugs.length} />
+        <StatCard icon={<Columns3 size={12} />} label="Total stage" value={stages.length} />
       </div>
 
       {loading ? (
@@ -242,7 +243,7 @@ export default function Bugs({ subPage }) {
               priority={priorityFilter} onPriority={setPriorityFilter}
               project={projectFilter} onProject={setProjectFilter}
               projects={projects}
-              placeholder="🔍 Search bugs…"
+              placeholder="Search bugs…"
             />
           )}
 

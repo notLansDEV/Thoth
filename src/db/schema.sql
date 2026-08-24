@@ -145,6 +145,12 @@ CREATE TABLE IF NOT EXISTS bugs (
   UNIQUE(project_id, bug_id)
 );
 
+-- Ensure new columns on existing installs
+ALTER TABLE bugs ADD COLUMN IF NOT EXISTS attachments JSONB DEFAULT '[]';
+ALTER TABLE bugs ADD COLUMN IF NOT EXISTS steps_to_reproduce TEXT;
+ALTER TABLE bugs ADD COLUMN IF NOT EXISTS expected_behavior TEXT;
+ALTER TABLE bugs ADD COLUMN IF NOT EXISTS actual_behavior TEXT;
+
 -- Bug Comments Table
 CREATE TABLE IF NOT EXISTS bug_comments (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

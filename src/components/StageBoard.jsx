@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Pencil, Trash2 } from 'lucide-react'
 
 const PALETTE = [
   '#6e61ff', '#ff7918', '#a14cff', '#20d96b', '#5f74ff',
@@ -156,14 +157,14 @@ export default function StageBoard({ stages, counts = {}, itemLabel = 'tasks', o
                   className="icon-btn"
                   title="Edit stage"
                   onClick={() => setForm(stage)}
-                >✎</button>
+                ><Pencil size={12} /></button>
                 {String(stage.name) !== 'Archived' && (
                   <button
                     className="icon-btn"
                     title="Delete stage"
                     onClick={() => onDelete(stage)}
                     style={{ color: '#ff6b6b' }}
-                  >🗑</button>
+                  ><Trash2 size={12} /></button>
                 )}
               </div>
             </div>

@@ -1,3 +1,4 @@
+import { Eye, Pencil, Trash2, CalendarClock, Clock } from 'lucide-react'
 import { PROJECT_PRIORITIES } from '../projects.service.js'
 
 const STATUS_COLORS = {
@@ -61,13 +62,13 @@ export default function ProjectCard({ project, onView, onEdit, onDelete }) {
           {project.name}
         </div>
         <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }} onClick={(e) => e.stopPropagation()}>
-          <button style={iconBtn} title="View" onClick={() => onView(project)}>👁</button>
-          <button style={iconBtn} title="Edit" onClick={() => onEdit(project)}>✎</button>
+          <button style={iconBtn} title="View" onClick={() => onView(project)}><Eye size={12} /></button>
+          <button style={iconBtn} title="Edit" onClick={() => onEdit(project)}><Pencil size={12} /></button>
           <button
             style={{ ...iconBtn, color: '#ff6b6b' }}
             title="Delete"
             onClick={() => onDelete(project)}
-          >🗑</button>
+          ><Trash2 size={12} /></button>
         </div>
       </div>
 
@@ -94,12 +95,12 @@ export default function ProjectCard({ project, onView, onEdit, onDelete }) {
         <div className="meta" style={{ paddingTop: 0 }}>
           {start && (
             <div className="meta-item">
-              <span className="meta-icon">▶</span> {start}
+              <span className="meta-icon"><CalendarClock size={11} /></span> {start}
             </div>
           )}
           {deadline && (
             <div className="meta-item" style={overdue ? { color: '#ff4040' } : undefined}>
-              <span className="meta-icon">⏰</span> {deadline}{overdue ? ' (overdue)' : ''}
+              <span className="meta-icon"><Clock size={11} /></span> {deadline}{overdue ? ' (overdue)' : ''}
             </div>
           )}
         </div>

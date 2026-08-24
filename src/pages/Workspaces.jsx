@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   getWorkspaces,
   createWorkspace,
@@ -11,6 +11,7 @@ import {
   updateMemberRole,
   removeMember,
 } from '../features/workspaces/workspaces.service.js'
+import { ArrowLeft, Settings, UserPlus, Users, Eye, Trash2, Pencil, Check, X } from 'lucide-react'
 import ConfirmModal from '../components/ConfirmModal.jsx'
 
 function navigate(path) {
@@ -188,7 +189,7 @@ export default function Workspaces() {
     }
   }
 
-  // Full-screen workspace detail view (opened via 👁 preview)
+  // Full-screen workspace detail view (opened via the preview button)
   if (preview) {
     return (
       <div>
@@ -197,8 +198,8 @@ export default function Workspaces() {
           display: 'flex', alignItems: 'center', gap: '10px',
           borderBottom: '1px solid #292929', paddingBottom: '12px', marginBottom: '16px',
         }}>
-          <button className="btn" onClick={() => { setPreview(null); setPanel(null); setPanelError(null) }} style={{ cursor: 'pointer' }}>
-            ← Back
+          <button className="btn" onClick={() => { setPreview(null); setPanel(null); setPanelError(null) }} style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+            <ArrowLeft size={12} /> Back
           </button>
           <span className="dot purple" />
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -211,13 +212,13 @@ export default function Workspaces() {
           <button
             className={`btn${panel === 'settings' ? ' primary' : ''}`}
             onClick={() => setPanel(panel === 'settings' ? null : 'settings')}
-            style={{ cursor: 'pointer' }}
-          >⚙ Settings</button>
+            style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+          ><Settings size={12} /> Settings</button>
           <button
             className={`btn${panel === 'invite' ? ' primary' : ''}`}
             onClick={() => setPanel(panel === 'invite' ? null : 'invite')}
             style={{ cursor: 'pointer' }}
-          >+ Invite members</button>
+          ><UserPlus size={12} /> Invite members</button>
         </div>
 
         <div>
@@ -320,8 +321,8 @@ export default function Workspaces() {
                     <td>
                       {editingRole?.userId === m.id ? (
                         <span style={{ display: 'flex', gap: '4px' }}>
-                          <button className="icon-btn" title="Save role" onClick={handleRoleSave}>✓</button>
-                          <button className="icon-btn" title="Cancel" onClick={() => setEditingRole(null)}>✕</button>
+                          <button className="icon-btn" title="Save role" onClick={handleRoleSave}><Check size={12} /></button>
+                          <button className="icon-btn" title="Cancel" onClick={() => setEditingRole(null)}><X size={12} /></button>
                         </span>
                       ) : (
                         <span style={{ display: 'flex', gap: '4px' }}>
@@ -329,13 +330,13 @@ export default function Workspaces() {
                             className="icon-btn"
                             title="Edit role"
                             onClick={() => setEditingRole({ userId: m.id, role: m.role || 'member' })}
-                          >✎</button>
+                          ><Pencil size={12} /></button>
                           <button
                             className="icon-btn"
                             title="Remove member"
                             style={{ color: '#ff6b6b' }}
                             onClick={() => setConfirmDeleteMember(m)}
-                          >🗑</button>
+                          ><Trash2 size={12} /></button>
                         </span>
                       )}
                     </td>
@@ -395,19 +396,19 @@ export default function Workspaces() {
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '7px', flexWrap: 'wrap' }}>
-                  <span className="badge paused" title="Members">👥 {ws.members_count ?? 1}</span>
+                  <span className="badge paused" title="Members"><Users size={11} /> {ws.members_count ?? 1}</span>
                   {ws.role && <span className="badge">{ws.role}</span>}
                   <span style={{ fontSize: '10px', color: '#555' }}>
                     Created {new Date(ws.created_at).toLocaleDateString()}
                   </span>
                   <span style={{ flex: 1 }} />
-                  <button className="icon-btn" title="Preview workspace" onClick={() => openPreview(ws)}>👁</button>
+                  <button className="icon-btn" title="Preview workspace" onClick={() => openPreview(ws)}><Eye size={12} /></button>
                   <button
                     className="icon-btn"
                     title="Delete workspace"
                     style={{ color: '#ff6b6b' }}
                     onClick={() => setConfirmDeleteWs(ws)}
-                  >🗑</button>
+                  ><Trash2 size={12} /></button>
                 </div>
               </div>
             ))}

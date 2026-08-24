@@ -46,6 +46,17 @@ export async function updateBug(id, data) {
   })
 }
 
+export async function getBugComments(bugId) {
+  return apiRequest(`/bugs/${encodeURIComponent(bugId)}/comments`)
+}
+
+export async function addBugComment(bugId, content) {
+  return apiRequest(`/bugs/${encodeURIComponent(bugId)}/comments`, {
+    method: 'POST',
+    body: JSON.stringify({ content }),
+  })
+}
+
 export async function getStages(workspaceId) {
   if (!workspaceId) return []
   const rows = await apiRequest(`/bug-stages?workspace_id=${encodeURIComponent(workspaceId)}`)

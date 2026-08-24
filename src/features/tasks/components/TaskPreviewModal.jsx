@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import {
+  Check, X, Paperclip, FileImage, FileText, FileArchive, FileType2, FileSpreadsheet,
+} from 'lucide-react'
+import {
   TASK_STAGES,
   TASK_PRIORITIES,
   priorityStyle,
@@ -55,13 +58,13 @@ function formatSize(bytes) {
 
 function fileIcon(name = '') {
   const ext = name.split('.').pop().toLowerCase()
-  if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp'].includes(ext)) return '🖼'
-  if (ext === 'pdf') return '📕'
-  if (['txt', 'md', 'log'].includes(ext)) return '📃'
-  if (['zip', 'rar', '7z'].includes(ext)) return '🗜'
-  if (['doc', 'docx'].includes(ext)) return '📘'
-  if (['xls', 'xlsx', 'csv'].includes(ext)) return '📗'
-  return '📎'
+  if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp'].includes(ext)) return <FileImage size={13} />
+  if (ext === 'pdf') return <FileText size={13} />
+  if (['txt', 'md', 'log'].includes(ext)) return <FileText size={13} />
+  if (['zip', 'rar', '7z'].includes(ext)) return <FileArchive size={13} />
+  if (['doc', 'docx'].includes(ext)) return <FileType2 size={13} />
+  if (['xls', 'xlsx', 'csv'].includes(ext)) return <FileSpreadsheet size={13} />
+  return <Paperclip size={13} />
 }
 
 export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated, onClose }) {
@@ -332,7 +335,7 @@ export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated,
                           display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                         }}
                       >
-                        {item.done ? '✓' : ''}
+                        {item.done && <Check size={9} strokeWidth={3} />}
                       </button>
                       <span style={{
                         flex: 1, fontSize: '11.5px',
@@ -346,9 +349,9 @@ export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated,
                         aria-label="Delete item"
                         style={{
                           background: 'transparent', border: 0, color: '#555', cursor: 'pointer',
-                          fontSize: '11px', lineHeight: 1, padding: '2px 4px', opacity: 0,
+                          padding: '2px 4px', opacity: 0, display: 'inline-flex',
                         }}
-                      >✕</button>
+                      ><X size={11} /></button>
                     </div>
                   ))}
                 </div>
@@ -429,7 +432,7 @@ export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated,
                     marginBottom: '8px',
                   }}
                 >
-                  📎 Click to attach files<br />
+                  <Paperclip size={12} style={{ verticalAlign: '-2px', marginRight: '4px' }} />Click to attach files<br />
                   <span style={{ fontSize: '9px', color: '#444' }}>PNG, JPG, PDF, TXT, DOC, XLS, ZIP…</span>
                 </div>
               ) : (
@@ -450,7 +453,7 @@ export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated,
                           }}
                         />
                       ) : (
-                        <span style={{ fontSize: '13px' }}>{fileIcon(f.name)}</span>
+                        <span style={{ display: 'inline-flex', color: '#888' }}>{fileIcon(f.name)}</span>
                       )}
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: '11px', color: '#ccc', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -467,9 +470,9 @@ export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated,
                         aria-label="Remove file"
                         style={{
                           background: 'transparent', border: 0, color: '#555', cursor: 'pointer',
-                          fontSize: '11px', lineHeight: 1, padding: '2px 4px', opacity: 0,
+                          padding: '2px 4px', opacity: 0, display: 'inline-flex',
                         }}
-                      >✕</button>
+                      ><X size={11} /></button>
                     </div>
                   ))}
                 </div>
@@ -478,9 +481,9 @@ export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated,
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 className="btn"
-                style={{ cursor: 'pointer' }}
+                style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
               >
-                📎 Attach files
+                <Paperclip size={12} /> Attach files
               </button>
             </>
           )}
@@ -498,7 +501,7 @@ export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated,
               cursor: 'pointer', fontSize: '14px', lineHeight: 1, padding: 0,
             }}
             aria-label="Close"
-          >✕</button>
+          ><X size={14} /></button>
 
           <div style={{ marginBottom: '13px' }}>
             <label style={labelStyle}>Stage</label>

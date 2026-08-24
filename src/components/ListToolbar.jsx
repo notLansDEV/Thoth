@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Search, SlidersHorizontal } from 'lucide-react'
 
 /**
  * Search bar + Search button + Filter dropdown used by the Task and Bug boards.
@@ -17,7 +18,7 @@ export default function ListToolbar({
   priority, onPriority,
   project, onProject,
   projects = [],
-  placeholder = '🔍 Search…',
+  placeholder = 'Search…',
   filterValue,
   onFilter,
   options = null,
@@ -38,17 +39,23 @@ export default function ListToolbar({
 
   return (
     <form onSubmit={apply} style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '10px' }}>
-      <input
-        type="text"
-        className="search-input"
-        placeholder={placeholder}
-        value={text}
-        onChange={(e) => { setText(e.target.value); onQuery(e.target.value) }}
-        style={{ width: '50%', minWidth: '180px', maxWidth: '340px' }}
-      />
+      <div style={{ position: 'relative', width: '50%', minWidth: '180px', maxWidth: '340px' }}>
+        <Search size={12} style={{
+          position: 'absolute', left: '9px', top: '50%', transform: 'translateY(-50%)',
+          color: '#666', pointerEvents: 'none',
+        }} />
+        <input
+          type="text"
+          className="search-input"
+          placeholder={placeholder}
+          value={text}
+          onChange={(e) => { setText(e.target.value); onQuery(e.target.value) }}
+          style={{ width: '100%', paddingLeft: '27px' }}
+        />
+      </div>
 
-      <button type="submit" className="btn primary" style={{ cursor: 'pointer', whiteSpace: 'nowrap' }}>
-        🔍 Search
+      <button type="submit" className="btn primary" style={{ cursor: 'pointer', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+        <Search size={11} /> Search
       </button>
 
       <div style={{ position: 'relative' }}>
@@ -56,9 +63,9 @@ export default function ListToolbar({
           type="button"
           className={`btn${active ? ' primary' : ''}`}
           onClick={() => setOpen((o) => !o)}
-          style={{ cursor: 'pointer', whiteSpace: 'nowrap' }}
+          style={{ cursor: 'pointer', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
         >
-          ⚙ Filter{active ? ' •' : ''}
+          <SlidersHorizontal size={11} /> Filter{active ? ' •' : ''}
         </button>
 
         {open && (

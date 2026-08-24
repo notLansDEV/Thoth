@@ -1,4 +1,5 @@
 ﻿import { useEffect, useRef, useState } from 'react'
+import { LogOut, Menu, PanelLeftClose, ChevronDown } from 'lucide-react'
 import {
   getCurrentWorkspace,
   setCurrentWorkspace,
@@ -96,7 +97,7 @@ export default function Topbar({ collapsed, onToggleCollapse }) {
           aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           title={collapsed ? 'Expand' : 'Collapse'}
         >
-          {collapsed ? '☰' : '⇤'}
+          {collapsed ? <Menu size={14} /> : <PanelLeftClose size={14} />}
         </button>
         <span className="breadcrumb">
           {ws ? `${ws.name} / ` : ''}{pageLabel}
@@ -115,7 +116,7 @@ export default function Topbar({ collapsed, onToggleCollapse }) {
           >
             <span className="dot purple" />
             {ws ? ws.name : 'No workspace'}
-            <span style={{ fontSize: '8px', color: '#666' }}>▼</span>
+            <span style={{ fontSize: '8px', color: '#666' }}><ChevronDown size={10} /></span>
           </button>
           {wsOpen && (
             <div className="dropdown-menu" role="menu">
@@ -169,7 +170,7 @@ export default function Topbar({ collapsed, onToggleCollapse }) {
               <div className="dropdown-head">{name}</div>
               {user?.email && <div className="dropdown-email">{user.email}</div>}
               <button className="dropdown-item danger" onClick={logout}>
-                ⏻ Log out
+                <LogOut size={12} style={{ display: 'inline', marginRight: '5px' }} /> Log out
               </button>
             </div>
           )}

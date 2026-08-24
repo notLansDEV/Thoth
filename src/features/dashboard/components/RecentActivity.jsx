@@ -1,4 +1,7 @@
-﻿function relTime(value) {
+﻿import { describeActivity, actorName } from '../../activity/activity.service.js'
+import { FolderPlus, ListChecks, Bug as BugIcon } from 'lucide-react'
+
+function relTime(value) {
   if (!value) return ''
   const diff = Date.now() - new Date(value).getTime()
   if (Number.isNaN(diff)) return ''
@@ -12,41 +15,50 @@
   return new Date(value).toLocaleDateString()
 }
 
-export default function RecentActivity({ projects = [], tasks = [], bugs = [] }) {
-  const feed = [
-    ...projects.map((p) => ({
-      id: `p-${p.id}`, when: p.created_at, icon: '📁',
-      text: `Project created: ${p.name}`,
-    })),
-    ...tasks.map((t) => ({
-      id: `t-${t.id}`, when: t.created_at, icon: '☑',
-      text: `${t.task_code ? `${t.task_code} · ` : ''}Task "${t.title}" in ${t.project_name || 'a project'}`,
-    })),
-    ...bugs.map((b) => ({
-      id: `b-${b.id}`, when: b.created_at, icon: '🐞',
-      text: `Bug reported: "${b.title}"`,
-    })),
-  ]
-    .filter((i) => i.when)
-    .sort((a, b) => new Date(b.when) - new Date(a.when))
-    .slice(0, 6)
+const TYPE_ICONS = {
+  project: FolderPlus,
+  task: ListChecks,
+  bug: BugIcon,
+  milestone: FolderPlus,
+}
 
+export default function RecentActivity({ activities = [] }) {
   return (
     <div className="card">
       <div className="card-head"><div className="name">Recent activity</div></div>
-      {feed.length === 0 ? (
+      {activities.length === 0 ? (
         <div style={{ padding: '12px 0 4px', fontSize: 11, color: '#555' }}>Nothing has happened yet.</div>
       ) : (
         <ul style={{ marginTop: 10, listStyle: 'none', paddingLeft: 0 }}>
-          {feed.map((i) => (
-            <li key={i.id} style={{ padding: 8, borderBottom: '1px solid #232323', display: 'flex', gap: 8 }}>
-              <span style={{ fontSize: 12 }}>{i.icon}</span>
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 12, color: '#ccc' }}>{i.text}</div>
-                <div style={{ fontSize: 10, color: '#666' }}>{relTime(i.when)}</div>
-              </div>
-            </li>
-          ))}
+          {activities.slice(0, 8).map((a) => {
+            const Icon = TYPE_ICONS[a.entity_type] || ListChecks
+            return (
+              <li key={a.id} style={{ padding: 8, borderBottom: '1px solid #232323', display: 'flex', gap: 9, alignItems: 'flex-start' }}>
+                {a.actor_avatar_url ? (
+                  <img
+                    src={a.actor_avatar_url}
+                    alt={actorName(a)}
+                    title={actorName(a)}
+                    style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '1px solid #333' }}
+                  />
+                ) : (
+                  <span className="avatar" title={actorName(a)} style={{ flexShrink: 0 }}>
+                    {actorName(a).slice(0, 2).toUpperCase()}
+                  </span>
+                )}
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div style={{ fontSize: 12, color: '#ccc', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                    <span style={{ fontWeight: 700, color: '#ddd' }}>{actorName(a)}</span>
+                    <span style={{
+                      display: 'inline-flex', color: '#666',
+                    }}><Icon size={11} /></span>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{describeActivity(a)}</span>
+                  </div>
+                  <div style={{ fontSize: 10, color: '#666' }}>{relTime(a.created_at)}</div>
+                </div>
+              </li>
+            )
+          })}
         </ul>
       )}
     </div>

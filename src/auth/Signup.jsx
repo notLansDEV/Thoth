@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Globe } from 'lucide-react'
 import './auth.css'
 import { setCurrentWorkspace, getWorkspaces } from '../features/workspaces/workspaces.service.js'
 
@@ -68,9 +69,9 @@ export default function Signup() {
   return (
     <div className="auth-page">
       <div className="auth-language" aria-label="Language selector">
-        <span className="globe" aria-hidden="true">◎</span>
+        <span className="globe" aria-hidden="true"><Globe size={13} /></span>
         <span>English</span>
-        <span className="flag" aria-hidden="true">🇬🇧</span>
+        <span className="flag" aria-hidden="true"><Globe size={13} /></span>
       </div>
 
       <main className="auth-wrapper">

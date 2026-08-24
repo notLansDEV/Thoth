@@ -9,7 +9,7 @@ dotenv.config()
 // .env.local overrides .env (mirrors Vite precedence); Node/dotenv does not load it by default.
 dotenv.config({ path: '.env.local', override: true })
 
-import { initializeDatabase, initializeSchema } from '../src/db/database.js'
+import { initializeDatabase, initializeSchema, getMany, getOne } from '../src/db/database.js'
 import userRepository from '../src/db/repositories/user.repository.js'
 import projectRepository from '../src/db/repositories/project.repository.js'
 import workspaceRepository from '../src/db/repositories/workspace.repository.js'
@@ -54,7 +54,7 @@ function auth(req, res, next) {
 
 const app = express()
 app.use(cors())
-app.use(express.json())
+app.use(express.json({ limit: '10mb' }))
 
 app.get('/api/health', async (req, res) => {
   res.json({ status: 'ok' })
@@ -371,6 +371,41 @@ app.post('/api/milestones', auth, async (req, res) => {
   }
 })
 
+const MILESTONE_ALLOWED_FIELDS = ['name', 'description', 'start_date', 'due_date', 'status', 'progress', 'meta']
+
+app.patch('/api/milestones/:id', auth, async (req, res) => {
+  try {
+    const data = {}
+    for (const field of MILESTONE_ALLOWED_FIELDS) {
+      if (req.body[field] !== undefined) data[field] = req.body[field]
+    }
+    if (Object.keys(data).length === 0) {
+      return res.status(400).json({ error: 'No valid fields to update' })
+    }
+
+    const existing = await milestoneRepository.findById(req.params.id)
+    if (!existing) return res.status(404).json({ error: 'Milestone not found' })
+
+    const updated = await milestoneRepository.updateById(req.params.id, data)
+    if (!updated) return res.status(404).json({ error: 'Milestone not found' })
+    res.json(updated)
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
+app.delete('/api/milestones/:id', auth, async (req, res) => {
+  try {
+    const deleted = await milestoneRepository.deleteById(req.params.id)
+    if (!deleted) return res.status(404).json({ error: 'Milestone not found' })
+    res.json({ ok: true })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
 app.get('/api/activity', auth, async (req, res) => {
   try {
     const { project_id, workspace_id } = req.query
@@ -539,12 +574,21 @@ app.delete('/api/projects/:id', auth, async (req, res) => {
 
 app.post('/api/bugs', auth, async (req, res) => {
   try {
-    const { project_id, title, description, priority, kanban_column } = req.body
+    const {
+      project_id, title, description, priority, kanban_column,
+      steps_to_reproduce, expected_behavior, actual_behavior,
+      attachments, meta,
+    } = req.body
     if (!project_id || !title || !title.trim()) {
       return res.status(400).json({ error: 'project_id and title are required' })
     }
     const project = await projectRepository.findById(project_id)
     if (!project) return res.status(404).json({ error: 'Project not found' })
+
+    // Client may send files under `meta.attachments` (task-style) or `attachments`
+    const fileAttachments = Array.isArray(attachments)
+      ? attachments
+      : (meta && Array.isArray(meta.attachments) ? meta.attachments : null)
 
     const stage = kanban_column || 'New'
     let bugId = null
@@ -559,6 +603,10 @@ app.post('/api/bugs', auth, async (req, res) => {
       priority: priority || 'medium',
       kanban_column: stage,
       status: stage,
+      steps_to_reproduce: steps_to_reproduce || null,
+      expected_behavior: expected_behavior || null,
+      actual_behavior: actual_behavior || null,
+      ...(fileAttachments ? { attachments: JSON.stringify(fileAttachments) } : {}),
       bug_id: bugId,
     })
 
@@ -632,6 +680,47 @@ app.patch('/api/bugs/:id', auth, async (req, res) => {
       )
     }
     res.json(updated)
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
+app.get('/api/bugs/:id/comments', auth, async (req, res) => {
+  try {
+    const rows = await getMany(
+      `SELECT c.*, u.username AS author_name, u.full_name AS author_full_name
+       FROM bug_comments c
+       LEFT JOIN users u ON c.author_id = u.id
+       WHERE c.bug_id = $1
+       ORDER BY c.created_at ASC`,
+      [req.params.id]
+    )
+    res.json(rows)
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
+app.post('/api/bugs/:id/comments', auth, async (req, res) => {
+  try {
+    const { content } = req.body
+    if (!content || !content.trim()) {
+      return res.status(400).json({ error: 'content is required' })
+    }
+    const bug = await bugRepository.findById(req.params.id)
+    if (!bug) return res.status(404).json({ error: 'Bug not found' })
+
+    const created = await bugRepository.addComment(bug.id, req.user.id, content.trim())
+    const withAuthor = await getOne(
+      `SELECT c.*, u.username AS author_name, u.full_name AS author_full_name
+       FROM bug_comments c
+       LEFT JOIN users u ON c.author_id = u.id
+       WHERE c.id = $1`,
+      [created.id]
+    )
+    res.json(withAuthor)
   } catch (err) {
     console.error(err)
     res.status(500).json({ error: 'Server error' })

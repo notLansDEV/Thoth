@@ -27,3 +27,14 @@ export async function createMilestone(data) {
     body: JSON.stringify(data),
   })
 }
+
+export async function updateMilestone(id, data) {
+  return apiRequest(`/milestones/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function deleteMilestone(id) {
+  return apiRequest(`/milestones/${encodeURIComponent(id)}`, { method: 'DELETE' })
+}

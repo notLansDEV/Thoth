@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Plus, Pencil, Trash2, Users, Clock, CheckCircle2, Bug as BugIcon, ListChecks, CircleDashed, CircleDot, XCircle, ArrowLeft } from 'lucide-react'
 import {
   PROJECT_STATUSES,
   PROJECT_PRIORITIES,
@@ -6,9 +7,11 @@ import {
   getProjectBugs,
 } from '../projects.service.js'
 import { getTasks, TASK_STAGES, getMilestones, getWorkspaceMembers, priorityStyle } from '../../tasks/tasks.service.js'
+import { deleteMilestone } from '../../milestones/milestones.service.js'
 import { getActivity, describeActivity, actorName } from '../../activity/activity.service.js'
 import CreateMilestoneModal from './CreateMilestoneModal.jsx'
 import ListToolbar from '../../../components/ListToolbar.jsx'
+import ConfirmModal from '../../../components/ConfirmModal.jsx'
 
 const TABS = ['Overview', 'Team', 'Milestone', 'Task', 'Bugs', 'Attachments', 'Activity', 'Notes']
 
@@ -31,8 +34,8 @@ function fmtDate(value) {
 function StatCard({ icon, label, value }) {
   return (
     <div className="card" style={{ padding: '12px' }}>
-      <div style={{ fontSize: '9px', fontWeight: 700, color: '#666', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '6px' }}>
-        {icon} {label}
+      <div style={{ fontSize: '9px', fontWeight: 700, color: '#666', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+        <span style={{ display: 'inline-flex' }}>{icon}</span> {label}
       </div>
       <div style={{ fontSize: '18px', fontWeight: 700, color: '#f1f1f1' }}>{value}</div>
     </div>
@@ -48,6 +51,9 @@ export default function ProjectDetail({ projectId, onBack }) {
   const [milestones, setMilestones] = useState([])
   const [activities, setActivities] = useState([])
   const [showNewMilestone, setShowNewMilestone] = useState(false)
+  const [editingMilestone, setEditingMilestone] = useState(null)
+  const [confirmDeleteMs, setConfirmDeleteMs] = useState(null)
+  const [deletingMs, setDeletingMs] = useState(false)
   const [activityQuery, setActivityQuery] = useState('')
   const [activityFilter, setActivityFilter] = useState('all')
   const [reloadKey, setReloadKey] = useState(0)
@@ -111,8 +117,8 @@ export default function ProjectDetail({ projectId, onBack }) {
             onClick={onBack}
             title="Back to projects"
             aria-label="Back to projects"
-            style={{ width: '27px', height: '27px', fontSize: '13px' }}
-          >←</button>
+            style={{ width: '27px', height: '27px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+          ><ArrowLeft size={13} /></button>
           <div>
             <h1 className="page-title">{project.name}</h1>
             <div style={{ display: 'flex', gap: '7px', alignItems: 'center' }}>
@@ -132,10 +138,10 @@ export default function ProjectDetail({ projectId, onBack }) {
 
       {/* 4 stat cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0,1fr))', gap: '9px', marginBottom: '10px' }}>
-        <StatCard icon="👥" label="Team members" value={project.members_count ?? 0} />
-        <StatCard icon="⏰" label="Deadline" value={fmtDate(project.deadline)} />
-        <StatCard icon="✅" label="Task done" value={`${doneTasks}/${totalTasks}`} />
-        <StatCard icon="🐞" label="Bugs" value={Number(stats.total_bugs) || 0} />
+        <StatCard icon={<Users size={12} />} label="Team members" value={project.members_count ?? 0} />
+        <StatCard icon={<Clock size={12} />} label="Deadline" value={fmtDate(project.deadline)} />
+        <StatCard icon={<CheckCircle2 size={12} />} label="Task done" value={`${doneTasks}/${totalTasks}`} />
+        <StatCard icon={<BugIcon size={12} />} label="Bugs" value={Number(stats.total_bugs) || 0} />
       </div>
 
       {/* Overall progress */}
@@ -216,59 +222,127 @@ export default function ProjectDetail({ projectId, onBack }) {
 
       {tab === 'Milestone' && (
         <>
+          <div className="stat-grid">
+            <StatCard icon={<ListChecks size={12} />} label="Total Task" value={tasks.length} />
+            <StatCard icon={<CheckCircle2 size={12} />} label="Total Completed Task" value={tasks.filter((t) => t.status === 'Done').length} />
+            <StatCard icon={<BugIcon size={12} />} label="Open Bugs" value={bugs.filter((b) => !['Fixed', 'Closed', 'Archived'].includes(b.kanban_column)).length} />
+            <StatCard icon={<XCircle size={12} />} label="Close Bugs" value={bugs.filter((b) => ['Fixed', 'Closed', 'Archived'].includes(b.kanban_column)).length} />
+          </div>
+
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '10px' }}>
-            <button className="btn primary" onClick={() => setShowNewMilestone(true)} style={{ cursor: 'pointer' }}>
-              + New Milestone
+            <button className="btn primary" onClick={() => setShowNewMilestone(true)} style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+              <Plus size={11} /> New Milestone
             </button>
           </div>
 
-          {milestones.length === 0 ? <Empty text="No milestones yet. Create the first one." /> : (
-            <div className="card" style={{ padding: 0, overflowX: 'auto' }}>
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Title</th>
-                    <th>Description</th>
-                    <th>Checklist</th>
-                    <th>Start Date</th>
-                    <th>Due Date</th>
-                    <th>Status</th>
-                    <th>Progress</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {milestones.map((ms) => {
-                    const checklist = ms.meta?.checklist || []
-                    const doneCount = checklist.filter((c) => c.done).length
-                    return (
-                      <tr key={ms.id}>
-                        <td style={{ color: '#ddd', fontWeight: 600 }}>{ms.name}</td>
-                        <td style={{ color: '#888', maxWidth: '320px' }}>{ms.description || '—'}</td>
-                        <td style={{ color: '#888', fontSize: '11px' }}>
-                          {checklist.length === 0 ? '—' : `${doneCount}/${checklist.length} done`}
-                        </td>
-                        <td>{fmtDate(ms.start_date)}</td>
-                        <td>{fmtDate(ms.due_date)}</td>
-                        <td><span className="badge paused">{ms.status || 'planned'}</span></td>
-                        <td style={{ minWidth: '110px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
-                            <div className="progress" style={{ flex: 1 }}><span style={{ width: `${Number(ms.progress) || 0}%` }} /></div>
-                            <span style={{ fontSize: '10px', color: '#666' }}>{Number(ms.progress) || 0}%</span>
-                          </div>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+          {milestones.length === 0 ? (
+            <Empty text="No milestones yet. Create the first one." />
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '9px' }}>
+              {milestones.map((ms) => {
+                const checklist = ms.meta?.checklist || []
+                const doneCount = checklist.filter((c) => c.done).length
+                const statusColors = { planned: '#5f74ff', in_progress: '#ff7918', completed: '#20d96b', on_hold: '#ffb018' }
+                const msTasks = tasks.filter((t) => t.milestone_id === ms.id)
+                const msDoneTasks = msTasks.filter((t) => t.status === 'Done').length
+                const openBugsCount = bugs.filter((b) => !['Fixed', 'Closed', 'Archived'].includes(b.kanban_column)).length
+                const closedBugsCount = bugs.filter((b) => ['Fixed', 'Closed', 'Archived'].includes(b.kanban_column)).length
+                return (
+                  <div key={ms.id} className="card" style={{ padding: '13px 14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {/* Title left · status hard right */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span style={{ flex: 1, minWidth: 0, fontSize: '13px', fontWeight: 700, color: '#eee', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {ms.name}
+                      </span>
+                      <button
+                        className="icon-btn"
+                        title="Edit milestone"
+                        onClick={() => setEditingMilestone(ms)}
+                        style={{ display: 'inline-flex', alignItems: 'center' }}
+                      ><Pencil size={12} /></button>
+                      <button
+                        className="icon-btn"
+                        title="Delete milestone"
+                        onClick={() => setConfirmDeleteMs(ms)}
+                        style={{ color: '#ff6b6b', display: 'inline-flex', alignItems: 'center' }}
+                      ><Trash2 size={12} /></button>
+                      <span className="badge" style={{ background: `${statusColors[ms.status] || '#5f74ff'}1a`, color: statusColors[ms.status] || '#5f74ff', fontSize: '9px', textTransform: 'capitalize', minWidth: '74px', textAlign: 'center' }}>
+                        {(ms.status || 'planned').replace('_', ' ')}
+                      </span>
+                    </div>
+
+                    {ms.description && (
+                      <div style={{ fontSize: '11px', color: '#777', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                        {ms.description}
+                      </div>
+                    )}
+
+                    {/* Start / due dates */}
+                    <div style={{ display: 'flex', gap: '14px', fontSize: '10.5px', color: '#666', flexWrap: 'wrap' }}>
+                      <span>Start: <span style={{ color: '#999' }}>{fmtDate(ms.start_date)}</span></span>
+                      <span>Due: <span style={{ color: '#999' }}>{fmtDate(ms.due_date)}</span></span>
+                      {checklist.length > 0 && <span>Checklist: <span style={{ color: '#999' }}>{doneCount}/{checklist.length}</span></span>}
+                    </div>
+
+                    {/* Full-row progress bar */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '9px' }}>
+                      <div className="progress" style={{ width: '100%' }}>
+                        <span style={{ width: `${Number(ms.progress) || 0}%` }} />
+                      </div>
+                      <span style={{ fontSize: '10px', color: '#666', flexShrink: 0 }}>{Number(ms.progress) || 0}%</span>
+                    </div>
+
+                    {/* 4 stat cards */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', marginTop: '4px' }}>
+                      <div style={{ padding: '8px 10px', background: '#101010', border: '1px solid #232323', borderRadius: '4px' }}>
+                        <div style={{ fontSize: '9px', fontWeight: 700, color: '#666', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>Total Task</div>
+                        <div style={{ fontSize: '15px', fontWeight: 700, color: '#f1f1f1' }}>{msTasks.length}</div>
+                      </div>
+                      <div style={{ padding: '8px 10px', background: '#101010', border: '1px solid #232323', borderRadius: '4px' }}>
+                        <div style={{ fontSize: '9px', fontWeight: 700, color: '#666', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>Completed Task</div>
+                        <div style={{ fontSize: '15px', fontWeight: 700, color: '#20d96b' }}>{msDoneTasks}</div>
+                      </div>
+                      <div style={{ padding: '8px 10px', background: '#101010', border: '1px solid #232323', borderRadius: '4px' }}>
+                        <div style={{ fontSize: '9px', fontWeight: 700, color: '#666', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>Open Bugs</div>
+                        <div style={{ fontSize: '15px', fontWeight: 700, color: '#ff7918' }}>{openBugsCount}</div>
+                      </div>
+                      <div style={{ padding: '8px 10px', background: '#101010', border: '1px solid #232323', borderRadius: '4px' }}>
+                        <div style={{ fontSize: '9px', fontWeight: 700, color: '#666', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>Closed Bugs</div>
+                        <div style={{ fontSize: '15px', fontWeight: 700, color: '#777' }}>{closedBugsCount}</div>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           )}
 
-          {showNewMilestone && (
+          {(showNewMilestone || editingMilestone) && (
             <CreateMilestoneModal
               projectId={projectId}
-              onClose={() => setShowNewMilestone(false)}
-              onCreated={() => { setShowNewMilestone(false); setReloadKey((k) => k + 1) }}
+              milestone={editingMilestone}
+              onClose={() => { setShowNewMilestone(false); setEditingMilestone(null) }}
+              onSaved={() => { setShowNewMilestone(false); setEditingMilestone(null); setReloadKey((k) => k + 1) }}
+            />
+          )}
+
+          {confirmDeleteMs && (
+            <ConfirmModal
+              title={`Delete milestone "${confirmDeleteMs.name}"?`}
+              message="Tasks linked to it will keep working, but the milestone itself will be gone."
+              note="* This cannot be undone."
+              confirmLabel="Delete milestone"
+              busy={deletingMs}
+              onConfirm={async () => {
+                setDeletingMs(true)
+                try {
+                  await deleteMilestone(confirmDeleteMs.id)
+                  setConfirmDeleteMs(null)
+                  setReloadKey((k) => k + 1)
+                } catch { /* modal closes anyway */ }
+                setDeletingMs(false)
+              }}
+              onCancel={() => setConfirmDeleteMs(null)}
             />
           )}
         </>
@@ -277,10 +351,10 @@ export default function ProjectDetail({ projectId, onBack }) {
       {tab === 'Task' && (
         <>
           <div className="stat-grid">
-            <StatCard icon="☑" label="Total Current Task" value={tasks.length} />
-            <StatCard icon="◐" label="Total Current In Progress" value={tasks.filter((t) => t.status === 'In Progress').length} />
-            <StatCard icon="○" label="Total Current Pending" value={tasks.filter((t) => !t.status || t.status === 'To Do').length} />
-            <StatCard icon="✔" label="Total Current Done" value={tasks.filter((t) => t.status === 'Done').length} />
+            <StatCard icon={<ListChecks size={12} />} label="Total Current Task" value={tasks.length} />
+            <StatCard icon={<CircleDot size={12} />} label="Total Current In Progress" value={tasks.filter((t) => t.status === 'In Progress').length} />
+            <StatCard icon={<CircleDashed size={12} />} label="Total Current Pending" value={tasks.filter((t) => !t.status || t.status === 'To Do').length} />
+            <StatCard icon={<CheckCircle2 size={12} />} label="Total Current Done" value={tasks.filter((t) => t.status === 'Done').length} />
           </div>
 
           {tasks.length === 0 ? <Empty text="No tasks in this project yet." /> : (
@@ -338,10 +412,10 @@ export default function ProjectDetail({ projectId, onBack }) {
       {tab === 'Bugs' && (
         <>
           <div className="stat-grid">
-            <StatCard icon="🐞" label="Total Current Bugs" value={bugs.length} />
-            <StatCard icon="◐" label="Total Current In Progress" value={bugs.filter((b) => b.kanban_column === 'In Progress').length} />
-            <StatCard icon="○" label="Total Current Pending" value={bugs.filter((b) => !b.kanban_column || b.kanban_column === 'New').length} />
-            <StatCard icon="✔" label="Total Current Done" value={bugs.filter((b) => ['Fixed', 'Closed', 'Archived'].includes(b.kanban_column)).length} />
+            <StatCard icon={<BugIcon size={12} />} label="Total Current Bugs" value={bugs.length} />
+            <StatCard icon={<CircleDot size={12} />} label="Total Current In Progress" value={bugs.filter((b) => b.kanban_column === 'In Progress').length} />
+            <StatCard icon={<CircleDashed size={12} />} label="Total Current Pending" value={bugs.filter((b) => !b.kanban_column || b.kanban_column === 'New').length} />
+            <StatCard icon={<CheckCircle2 size={12} />} label="Total Current Done" value={bugs.filter((b) => ['Fixed', 'Closed', 'Archived'].includes(b.kanban_column)).length} />
           </div>
 
           {bugs.length === 0 ? <Empty text="No bugs reported for this project." /> : (
@@ -393,7 +467,7 @@ export default function ProjectDetail({ projectId, onBack }) {
           <>
             <ListToolbar
               query={activityQuery} onQuery={setActivityQuery}
-              placeholder="🔍 Search activity…"
+              placeholder="Search activity…"
               filterValue={activityFilter}
               onFilter={setActivityFilter}
               options={[

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { User, Clock, CircleDot, ListChecks, Columns3 } from 'lucide-react'
 import {
   TASK_STAGES,
   priorityStyle,
@@ -32,8 +33,8 @@ function formatDate(value) {
 function StatCard({ icon, label, value }) {
   return (
     <div className="card" style={{ padding: '12px' }}>
-      <div style={{ fontSize: '9px', fontWeight: 700, color: '#666', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '6px' }}>
-        {icon} {label}
+      <div style={{ fontSize: '9px', fontWeight: 700, color: '#666', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+        <span style={{ display: 'inline-flex' }}>{icon}</span> {label}
       </div>
       <div style={{ fontSize: '18px', fontWeight: 700, color: '#f1f1f1' }}>{value}</div>
     </div>
@@ -81,8 +82,8 @@ function TaskCard({ task, onOpen, onDragStart }) {
       )}
 
       {task.assignee_name && (
-        <div style={{ fontSize: '10px', color: '#888', marginTop: '7px' }}>
-          👤 {task.assignee_name}
+        <div style={{ fontSize: '10px', color: '#888', marginTop: '7px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <User size={10} /> {task.assignee_name}
         </div>
       )}
 
@@ -98,7 +99,9 @@ function TaskCard({ task, onOpen, onDragStart }) {
                 Overdue
               </span>
             )}
-            <span style={{ color: overdue ? '#ff8080' : '#777' }}>⏰ {due}</span>
+            <span style={{ color: overdue ? '#ff8080' : '#777', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+              <Clock size={10} /> {due}
+            </span>
           </span>
         )}
       </div>
@@ -263,9 +266,9 @@ export default function Tasks({ subPage }) {
 
       {/* 3 stat cards */}
       <div className="stat-grid">
-        <StatCard icon="◉" label={defaultStageName} value={counts[defaultStageName] || 0} />
-        <StatCard icon="☑" label="Total task" value={tasks.length} />
-        <StatCard icon="◈" label="Total stage" value={stages.length} />
+        <StatCard icon={<CircleDot size={12} />} label={defaultStageName} value={counts[defaultStageName] || 0} />
+        <StatCard icon={<ListChecks size={12} />} label="Total task" value={tasks.length} />
+        <StatCard icon={<Columns3 size={12} />} label="Total stage" value={stages.length} />
       </div>
 
       {projects.length === 0 && !loading && (
@@ -282,7 +285,7 @@ export default function Tasks({ subPage }) {
           priority={priorityFilter} onPriority={setPriorityFilter}
           project={projectFilter} onProject={setProjectFilter}
           projects={projects}
-          placeholder="🔍 Search tasks…"
+          placeholder="Search tasks…"
         />
       )}
 

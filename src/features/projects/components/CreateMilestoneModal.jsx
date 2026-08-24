@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { createMilestone } from '../../milestones/milestones.service.js'
+import { createMilestone, updateMilestone } from '../../milestones/milestones.service.js'
+import { X, Circle } from 'lucide-react'
 
 const labelStyle = {
   display: 'block',
@@ -23,18 +24,25 @@ const inputStyle = {
   outline: 'none',
 }
 
-export default function CreateMilestoneModal({ projectId, onCreated, onClose }) {
-  const [name, setName] = useState('')
-  const [description, setDescription] = useState('')
-  const [startDate, setStartDate] = useState('')
-  const [dueDate, setDueDate] = useState('')
-  const [checkItems, setCheckItems] = useState([])
+function toDateInput(value) {
+  if (!value) return ''
+  const d = new Date(value)
+  return Number.isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10)
+}
+
+export default function CreateMilestoneModal({ projectId, milestone = null, onSaved, onClose }) {
+  const [name, setName] = useState(milestone?.name || '')
+  const [description, setDescription] = useState(milestone?.description || '')
+  const [startDate, setStartDate] = useState(toDateInput(milestone?.start_date))
+  const [dueDate, setDueDate] = useState(toDateInput(milestone?.due_date))
+  const [status, setStatus] = useState(milestone?.status || 'planned')
+  const [checkItems, setCheckItems] = useState(milestone?.meta?.checklist || [])
   const [newItem, setNewItem] = useState('')
   const [error, setError] = useState(null)
   const [saving, setSaving] = useState(false)
 
   function addCheckItem(e) {
-    e.preventDefault()
+    if (e) e.preventDefault()
     if (!newItem.trim()) return
     setCheckItems((cur) => [...cur, { text: newItem.trim(), done: false }])
     setNewItem('')
@@ -49,17 +57,19 @@ export default function CreateMilestoneModal({ projectId, onCreated, onClose }) 
     }
     setSaving(true)
     try {
-      const created = await createMilestone({
-        project_id: projectId,
+      const payload = {
         name: name.trim(),
         description: description.trim() || null,
         start_date: startDate || null,
         due_date: dueDate || null,
         meta: { checklist: checkItems },
-      })
-      onCreated(created)
+      }
+      const saved = milestone
+        ? await updateMilestone(milestone.id, { ...payload, status })
+        : await createMilestone({ project_id: projectId, ...payload, status })
+      onSaved(saved)
     } catch (err) {
-      setError(err.message || 'Could not create milestone')
+      setError(err.message || 'Could not save milestone')
       setSaving(false)
     }
   }
@@ -75,7 +85,9 @@ export default function CreateMilestoneModal({ projectId, onCreated, onClose }) 
         padding: '22px', width: '100%', maxWidth: '440px', maxHeight: '88vh', overflowY: 'auto',
         boxShadow: '0 20px 25px rgba(0,0,0,0.4)',
       }}>
-        <h2 style={{ margin: '0 0 14px', fontSize: '15px', fontWeight: 700 }}>New Milestone</h2>
+        <h2 style={{ margin: '0 0 14px', fontSize: '15px', fontWeight: 700 }}>
+          {milestone ? 'Edit Milestone' : 'New Milestone'}
+        </h2>
 
         {error && (
           <div style={{
@@ -92,7 +104,7 @@ export default function CreateMilestoneModal({ projectId, onCreated, onClose }) 
           <label style={labelStyle}>Description</label>
           <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} placeholder="What does this milestone deliver?" style={{ ...inputStyle, marginBottom: '12px', resize: 'vertical' }} />
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginBottom: '12px' }}>
             <div>
               <label style={labelStyle}>Start date</label>
               <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} style={inputStyle} />
@@ -101,22 +113,31 @@ export default function CreateMilestoneModal({ projectId, onCreated, onClose }) 
               <label style={labelStyle}>Due date</label>
               <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} style={inputStyle} />
             </div>
+            <div>
+              <label style={labelStyle}>Status</label>
+              <select value={status} onChange={(e) => setStatus(e.target.value)} style={inputStyle}>
+                <option value="planned">Planned</option>
+                <option value="in_progress">In Progress</option>
+                <option value="completed">Completed</option>
+                <option value="on_hold">On Hold</option>
+              </select>
+            </div>
           </div>
 
           <label style={labelStyle}>Checklist</label>
           {checkItems.length > 0 && (
             <div style={{ marginBottom: '8px' }}>
               {checkItems.map((item, i) => (
-                <div key={i} className="check-row" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 8px', borderRadius: '4px', fontSize: '11.5px', color: '#ccc' }}>
-                  <span>○</span>
+                <div key={`${item.text}-${i}`} className="check-row" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 8px', borderRadius: '4px', fontSize: '11.5px', color: '#ccc' }}>
+                  <Circle size={12} style={{ color: '#666', flexShrink: 0 }} />
                   <span style={{ flex: 1 }}>{item.text}</span>
                   <button
                     type="button"
                     className="row-delete"
                     onClick={() => setCheckItems((cur) => cur.filter((_, x) => x !== i))}
                     aria-label="Remove item"
-                    style={{ background: 'transparent', border: 0, color: '#555', cursor: 'pointer', fontSize: '11px', lineHeight: 1, padding: '2px 4px', opacity: 0 }}
-                  >✕</button>
+                    style={{ background: 'transparent', border: 0, color: '#555', cursor: 'pointer', lineHeight: 1, padding: '2px 4px', display: 'inline-flex' }}
+                  ><X size={11} /></button>
                 </div>
               ))}
             </div>
@@ -130,13 +151,13 @@ export default function CreateMilestoneModal({ projectId, onCreated, onClose }) 
               placeholder="+ Add checklist item"
               style={{ ...inputStyle, flex: 1 }}
             />
-            <button type="button" className="btn" onClick={addCheckItem} style={{ cursor: 'pointer' }}>Add</button>
+            <button type="button" className="btn" onClick={() => addCheckItem()} style={{ cursor: 'pointer' }}>Add</button>
           </div>
 
           <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
             <button type="button" className="btn" onClick={onClose} style={{ cursor: 'pointer' }}>Cancel</button>
             <button type="submit" className="btn primary" disabled={saving} style={{ cursor: 'pointer' }}>
-              {saving ? 'Creating…' : 'Create milestone'}
+              {saving ? 'Saving…' : milestone ? 'Save changes' : 'Create milestone'}
             </button>
           </div>
         </form>

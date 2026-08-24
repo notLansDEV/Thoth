@@ -1,4 +1,5 @@
 ﻿import { useEffect, useState } from 'react'
+import { FolderKanban, CircleDot, CircleCheckBig, PauseCircle, TriangleAlert, Eye, Pencil, ArrowLeft } from 'lucide-react'
 import {
   getProjects,
   PROJECT_STATUSES,
@@ -22,8 +23,8 @@ function fmtDate(value) {
 function StatBlock({ icon, label, value, color = '#f1f1f1' }) {
   return (
     <div style={{ flex: '1 1 120px', textAlign: 'center', padding: '4px 8px', borderRight: '1px solid #242424', minWidth: '110px' }}>
-      <div style={{ fontSize: '9px', fontWeight: 700, color: '#666', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '5px' }}>
-        {icon} {label}
+      <div style={{ fontSize: '9px', fontWeight: 700, color: '#666', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '5px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
+        <span style={{ display: 'inline-flex' }}>{icon}</span> {label}
       </div>
       <div style={{ fontSize: '20px', fontWeight: 700, color }}>{value}</div>
     </div>
@@ -175,18 +176,18 @@ export default function Reports() {
 
       {/* Summary card */}
       <div className="card" style={{ display: 'flex', flexWrap: 'wrap', marginBottom: '10px', padding: '12px 6px' }}>
-        <StatBlock icon="▦" label="Total projects" value={projects.length} />
-        <StatBlock icon="●" label="Active" value={statusCount('active')} color="#20d96b" />
-        <StatBlock icon="✔" label="Completed" value={statusCount('completed')} color="#7165ff" />
-        <StatBlock icon="⏸" label="On hold" value={statusCount('on_hold')} color="#ff7918" />
-        <StatBlock icon="▲" label="High priority" value={highPriority} color="#ff4040" style={{ borderRight: 0 }} />
+        <StatBlock icon={<FolderKanban size={12} />} label="Total projects" value={projects.length} />
+        <StatBlock icon={<CircleDot size={12} />} label="Active" value={statusCount('active')} color="#20d96b" />
+        <StatBlock icon={<CircleCheckBig size={12} />} label="Completed" value={statusCount('completed')} color="#7165ff" />
+        <StatBlock icon={<PauseCircle size={12} />} label="On hold" value={statusCount('on_hold')} color="#ff7918" />
+        <StatBlock icon={<TriangleAlert size={12} />} label="High priority" value={highPriority} color="#ff4040" style={{ borderRight: 0 }} />
       </div>
 
       {/* Search */}
       <input
         type="text"
         className="search-input"
-        placeholder="🔍 Search projects…"
+        placeholder="Search projects…"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         style={{ marginBottom: '10px' }}
@@ -265,8 +266,8 @@ export default function Reports() {
                       </span>
                     </td>
                     <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                      <button className="icon-btn" title="View report" onClick={() => setSelected(project.id)}>👁</button>{' '}
-                      <button className="icon-btn" title="Edit project" onClick={() => setEditing(project)} style={{ marginLeft: '4px' }}>✎</button>
+                      <button className="icon-btn" title="View report" onClick={() => setSelected(project.id)}><Eye size={12} /></button>{' '}
+                      <button className="icon-btn" title="Edit project" onClick={() => setEditing(project)} style={{ marginLeft: '4px' }}><Pencil size={12} /></button>
                     </td>
                   </tr>
                 )
@@ -358,7 +359,7 @@ function ReportDetail({ project, tasksAll, membersCount, onBack }) {
     <div>
       <div className="page-head">
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <button className="collapse-btn" onClick={onBack} title="Back to reports" style={{ width: '27px', height: '27px', fontSize: '13px' }}>←</button>
+          <button className="collapse-btn" onClick={onBack} title="Back to reports" style={{ width: '27px', height: '27px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><ArrowLeft size={13} /></button>
           <div>
             <h1 className="page-title">{project.name} — Report</h1>
             <span className={`badge${project.status === 'active' ? '' : ' paused'}`}>
