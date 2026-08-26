@@ -408,3 +408,23 @@ button,input{font:inherit}
   font-size:10.5px;font-weight:700;border-radius:999px;padding:5px 13px;cursor:pointer;
 }
 .j-send-btn:disabled{opacity:.35;cursor:default}
+
+/* 7-day week row */
+.j-day{
+  display:flex;flex-direction:column;align-items:center;gap:2px;
+  background:#121212;border:1px solid #262626;border-radius:6px;
+  padding:7px 2px 8px;cursor:pointer;font-family:inherit;
+  transition:border-color .12s,background .12s;position:relative;
+}
+.j-day:hover{border-color:#3a3a3a}
+.j-day.active{border-color:#5b8dff;background:rgba(91,141,255,.10)}
+.j-day.today .j-day-num{color:#5b8dff}
+.j-day-letter{font-size:9px;font-weight:700;letter-spacing:.05em;color:#666;text-transform:uppercase}
+.j-day.active .j-day-letter{color:#7ea6ff}
+.j-day-num{font-size:14px;font-weight:800;color:#cfcfcf}
+.j-day.active .j-day-num{color:#fff}
+.j-day-dot{
+  position:absolute;top:5px;right:5px;width:4px;height:4px;
+  border-radius:50%;background:#5b8dff;
+}
+.j-day.active .j-day-dot{background:#fff}

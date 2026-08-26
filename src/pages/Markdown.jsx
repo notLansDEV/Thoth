@@ -373,9 +373,6 @@ export default function Markdown({ subPage }) {
               </>
             )}
           </div>
-          <button className="btn primary" onClick={() => { setShowNewPage(true); setShowRecents(false) }} style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-            <Plus size={12} /> New Page
-          </button>
         </div>
       </div>
 
@@ -393,7 +390,7 @@ export default function Markdown({ subPage }) {
       ) : (
         <>
           {/* compact date pager + composer + feed */}
-          <DatePager jDate={jDate} onShift={setJDate} />
+          <DatePager jDate={jDate} onShift={setJDate} pages={pages} />
           {openPage ? (
             <PageEditor
               page={openPage}
@@ -416,7 +413,7 @@ export default function Markdown({ subPage }) {
           {!openPage && !focusMode && (
             <JournalFeed
               entries={pages
-                .filter((p) => p.page_type === 'journal' && p.page_date === jDate && !p.archived)
+                .filter((p) => p.page_type === 'journal' && toLocalDate(p.page_date) === jDate && !p.archived)
                 .sort((a, b) => (b.pinned - a.pinned) || (new Date(b.created_at) - new Date(a.created_at)))}
               loaded={loaded}
               authors={authors}
@@ -445,26 +442,63 @@ export default function Markdown({ subPage }) {
   )
 }
 
-function DatePager({ jDate, onShift }) {
+function DatePager({ jDate, onShift, pages }) {
   const todayStr = fmtLocalDate(new Date())
   const dt = new Date(`${jDate}T12:00:00`)
   const label = dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+
+  const weekDays = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(startOfWeek(jDate))
+    d.setDate(d.getDate() + i)
+    return fmtLocalDate(d)
+  })
+  const journalDates = new Set(
+    (pages || [])
+      .filter((p) => p.page_type === 'journal')
+      .map((p) => toLocalDate(p.page_date))
+  )
+
   return (
-    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', marginBottom: '12px' }}>
-      <button className="icon-btn" title="Previous day" onClick={() => onShift(shiftDate(jDate, -1))}><ChevronLeft size={14} /></button>
-      <label className="md-date-pill" title="Pick a date">
-        <CalendarDays size={12} style={{ color: '#5b8dff', flexShrink: 0 }} />
-        <span>{label}</span>
-        <input
-          type="date" value={jDate}
-          onChange={(e) => e.target.value && onShift(e.target.value)}
-          style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }}
-        />
-      </label>
-      <button className="icon-btn" title="Next day" onClick={() => onShift(shiftDate(jDate, 1))}><ChevronRight size={14} /></button>
-      {jDate !== todayStr && (
-        <button className="btn" onClick={() => onShift(todayStr)} style={{ cursor: 'pointer', fontSize: '10px', padding: '3px 9px' }}>Today</button>
-      )}
+    <div style={{ marginBottom: '10px' }}>
+      {/* compact date label row */}
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+        <button className="icon-btn" title="Previous day" onClick={() => onShift(shiftDate(jDate, -1))}><ChevronLeft size={14} /></button>
+        <label className="md-date-pill" title="Pick a date">
+          <CalendarDays size={12} style={{ color: '#5b8dff', flexShrink: 0 }} />
+          <span>{label}</span>
+          <input
+            type="date" value={jDate}
+            onChange={(e) => e.target.value && onShift(e.target.value)}
+            style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }}
+          />
+        </label>
+        <button className="icon-btn" title="Next day" onClick={() => onShift(shiftDate(jDate, 1))}><ChevronRight size={14} /></button>
+        {jDate !== todayStr && (
+          <button className="btn" onClick={() => onShift(todayStr)} style={{ cursor: 'pointer', fontSize: '10px', padding: '3px 9px' }}>Today</button>
+        )}
+      </div>
+
+      {/* 7-day week row */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0,1fr))', gap: '5px' }}>
+        {weekDays.map((d, i) => {
+          const active = d === jDate
+          const isToday = d === todayStr
+          const hasEntry = journalDates.has(d)
+          const dayNum = new Date(`${d}T12:00:00`).getDate()
+          return (
+            <button
+              key={d}
+              onClick={() => onShift(d)}
+              title={prettyDate(d)}
+              className={`j-day${active ? ' active' : ''}${isToday && !active ? ' today' : ''}`}
+            >
+              <span className="j-day-letter">{DAY_LETTERS[i]}</span>
+              <span className="j-day-num">{dayNum}</span>
+              {hasEntry && !active && <span className="j-day-dot" />}
+            </button>
+          )
+        })}
+      </div>
     </div>
   )
 }
@@ -476,6 +510,22 @@ function shortDate(dateStr) {
     return dateStr
   }
 }
+
+function toLocalDate(d) {
+  if (!d) return ''
+  const dt = d instanceof Date ? d : new Date(d)
+  if (isNaN(dt.getTime())) return typeof d === 'string' ? d.slice(0, 10) : ''
+  const p = (n) => String(n).padStart(2, '0')
+  return `${dt.getFullYear()}-${p(dt.getMonth() + 1)}-${p(dt.getDate())}`
+}
+
+function startOfWeek(dateStr) {
+  const d = new Date(`${dateStr}T12:00:00`)
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7))
+  return d
+}
+
+const DAY_LETTERS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
 function AllPagesGrid({ pages, loaded, onOpen, onDelete }) {
   const [q, setQ] = useState('')
@@ -1003,7 +1053,7 @@ function Composer({ dateStr, wsId, focusMode, showToolbar, onToggleFocus, onTogg
           {menuOpen && (
             <>
               <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setMenuOpen(false)} />
-              <div className="j-menu" role="menu">
+              <div className="j-menu" role="menu" style={{ right: 'auto', left: '0' }}>
                 <button className="j-menu-item" onClick={() => { setMenuOpen(false); attFileRef.current?.click() }}><Paperclip size={11} /> Add attachment</button>
                 <button className="j-menu-item" onClick={() => { setMenuOpen(false); imgFileRef.current?.click() }}><ImagePlus size={11} /> Insert image</button>
                 <div className="j-menu-sep" />
