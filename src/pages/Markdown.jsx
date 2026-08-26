@@ -467,32 +467,84 @@ function DatePager({ jDate, onShift, pages }) {
   const todayStr = fmtLocalDate(new Date())
   const dt = new Date(`${jDate}T12:00:00`)
   const label = dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+  const [calOpen, setCalOpen] = useState(false)
+  const [calMonth, setCalMonth] = useState(() => new Date(dt.getFullYear(), dt.getMonth(), 1))
 
-  const weekDays = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(startOfWeek(jDate))
-    d.setDate(d.getDate() + i)
-    return fmtLocalDate(d)
-  })
   const journalDates = new Set(
     (pages || [])
       .filter((p) => p.page_type === 'journal')
       .map((p) => toLocalDate(p.page_date))
   )
 
+  const calYear = calMonth.getFullYear()
+  const calMon = calMonth.getMonth()
+  const calLabel = calMonth.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
+  const firstDay = new Date(calYear, calMon, 1).getDay()
+  const daysInMonth = new Date(calYear, calMon + 1, 0).getDate()
+
+  const calDays = []
+  for (let i = 0; i < firstDay; i++) calDays.push(null)
+  for (let d = 1; d <= daysInMonth; d++) calDays.push(d)
+
+  function pickCalDay(day) {
+    if (!day) return
+    const picked = fmtLocalDate(new Date(calYear, calMon, day))
+    onShift(picked)
+    setCalOpen(false)
+  }
+
+  const weekDays = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(startOfWeek(jDate))
+    d.setDate(d.getDate() + i)
+    return fmtLocalDate(d)
+  })
+
   return (
     <div style={{ marginBottom: '10px' }}>
       {/* compact date label row */}
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
         <button className="icon-btn" title="Previous day" onClick={() => onShift(shiftDate(jDate, -1))}><ChevronLeft size={14} /></button>
-        <label className="md-date-pill" title="Pick a date">
-          <CalendarDays size={12} style={{ color: '#5b8dff', flexShrink: 0 }} />
-          <span>{label}</span>
-          <input
-            type="date" value={jDate}
-            onChange={(e) => e.target.value && onShift(e.target.value)}
-            style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }}
-          />
-        </label>
+        <div style={{ position: 'relative' }}>
+          <button className="md-date-pill" title="Pick a date" onClick={() => setCalOpen((v) => !v)} type="button">
+            <CalendarDays size={12} style={{ color: '#5b8dff', flexShrink: 0 }} />
+            <span>{label}</span>
+          </button>
+          {calOpen && (
+            <>
+              <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setCalOpen(false)} />
+              <div className="md-cal">
+                <div className="md-cal-head">
+                  <button className="icon-btn" onClick={() => setCalMonth(new Date(calYear, calMon - 1, 1))}><ChevronLeft size={12} /></button>
+                  <span className="md-cal-title">{calLabel}</span>
+                  <button className="icon-btn" onClick={() => setCalMonth(new Date(calYear, calMon + 1, 1))}><ChevronRight size={12} /></button>
+                </div>
+                <div className="md-cal-week">
+                  {['Su','Mo','Tu','We','Th','Fr','Sa'].map((d) => <span key={d}>{d}</span>)}
+                </div>
+                <div className="md-cal-grid">
+                  {calDays.map((day, i) => {
+                    if (day === null) return <span key={`e${i}`} />
+                    const ds = fmtLocalDate(new Date(calYear, calMon, day))
+                    const active = ds === jDate
+                    const isToday = ds === todayStr
+                    const hasEntry = journalDates.has(ds)
+                    return (
+                      <button
+                        key={ds}
+                        className={`md-cal-day${active ? ' active' : ''}${isToday && !active ? ' today' : ''}`}
+                        onClick={() => pickCalDay(day)}
+                        type="button"
+                      >
+                        {day}
+                        {hasEntry && <span className="md-cal-dot" />}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
         <button className="icon-btn" title="Next day" onClick={() => onShift(shiftDate(jDate, 1))}><ChevronRight size={14} /></button>
         {jDate !== todayStr && (
           <button className="btn" onClick={() => onShift(todayStr)} style={{ cursor: 'pointer', fontSize: '10px', padding: '3px 9px' }}>Today</button>

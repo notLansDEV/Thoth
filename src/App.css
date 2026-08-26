@@ -469,3 +469,33 @@ button,input{font:inherit}
   border-radius:50%;background:#5b8dff;
 }
 .j-day.active .j-day-dot{background:#fff}
+
+/* mini calendar dropdown */
+.md-cal{
+  position:absolute;top:calc(100% + 6px);left:50%;transform:translateX(-50%);
+  z-index:50;width:240px;padding:10px;
+  background:#161616;border:1px solid #2c2c2c;border-radius:10px;
+  box-shadow:0 10px 24px rgba(0,0,0,.5);
+}
+.md-cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.md-cal-title{font-size:12px;font-weight:700;color:#e0e0e0}
+.md-cal-week{
+  display:grid;grid-template-columns:repeat(7,1fr);text-align:center;
+  margin-bottom:4px;
+}
+.md-cal-week span{font-size:9px;font-weight:700;color:#555;text-transform:uppercase}
+.md-cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+.md-cal-day{
+  position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  background:none;border:0;border-radius:5px;padding:5px 0;
+  color:#aaa;font-size:11px;font-weight:600;font-family:inherit;cursor:pointer;
+  transition:background .1s;
+}
+.md-cal-day:hover{background:#1f1f1f;color:#fff}
+.md-cal-day.active{background:rgba(91,141,255,.15);color:#5b8dff}
+.md-cal-day.today{color:#5b8dff}
+.md-cal-dot{
+  width:3px;height:3px;border-radius:50%;
+  background:#5b8dff;margin-top:1px;
+}
+.md-cal-day.active .md-cal-dot{background:#fff}
