@@ -3,6 +3,7 @@ import {
   ChevronLeft, ChevronRight, ChevronDown, CalendarDays, FileText, Plus, Trash2, Clock,
   Heading1, Heading2, Bold, Italic, Code, FileCode2, Minus, List, ListTodo,
   PencilLine, Eye, Columns2, ArrowLeft, MoreHorizontal, Smile,
+  Paperclip, ImagePlus, Check, ListFilter, Pin, Copy, Archive,
 } from 'lucide-react'
 import { getPages, createPage, updatePage, deletePage } from '../features/markdown/markdown.service.js'
 import { getCurrentWorkspace } from '../features/workspaces/workspaces.service.js'
@@ -89,6 +90,55 @@ function toggleReaction(reactions, emoji, userId) {
   if (arr.length) rx[emoji] = arr
   else delete rx[emoji]
   return rx
+}
+
+function getMe() {
+  try { return JSON.parse(localStorage.getItem('thoth_user') || 'null') || {} } catch { return {} }
+}
+
+// shared markdown insertion for toolbars
+function mdInsert(ta, tool) {
+  if (!ta) return null
+  const { selectionStart: s, selectionEnd: e, value } = ta
+  const sel = value.slice(s, e)
+  let next = value
+  let caret = e
+  const lineStart = value.lastIndexOf('\n', s - 1) + 1
+  switch (tool) {
+    case 'h1':
+    case 'h2': {
+      const prefix = tool === 'h1' ? '# ' : '## '
+      if (value.slice(lineStart, s).startsWith(prefix)) {
+        next = value.slice(0, lineStart) + value.slice(lineStart + prefix.length)
+        caret = e - prefix.length
+      } else {
+        next = value.slice(0, lineStart) + prefix + value.slice(lineStart)
+        caret = e + prefix.length
+      }
+      break
+    }
+    case 'bold': next = `${value.slice(0, s)}**${sel || 'bold text'}**${value.slice(e)}`; caret = s + 2 + (sel || 'bold text').length + 2; break
+    case 'italic': next = `${value.slice(0, s)}*${sel || 'italic text'}*${value.slice(e)}`; caret = s + 1 + (sel || 'italic text').length + 1; break
+    case 'code': next = `${value.slice(0, s)}\`${sel || 'code'}\`${value.slice(e)}`; caret = s + 1 + (sel || 'code').length + 1; break
+    case 'fence': next = `${value.slice(0, s)}\`\`\`\n${sel}\n\`\`\`${value.slice(e)}`; caret = s + 4 + sel.length; break
+    case 'hr': next = `${value.slice(0, s)}\n\n---\n\n${value.slice(e)}`; caret = s + 6; break
+    case 'ul': next = `${value.slice(0, lineStart)}- ${value.slice(lineStart)}`; caret = e + 2; break
+    case 'todo': next = `${value.slice(0, lineStart)}- [ ] ${value.slice(lineStart)}`; caret = e + 6; break
+    case 'img': next = `${value.slice(0, s)}![${sel || 'image'}](${''})${value.slice(e)}`; caret = s + (sel ? 7 : 8) + sel.length; break
+    default: break
+  }
+  return { next, caret }
+}
+
+const MAX_FILE_BYTES = 2 * 1024 * 1024
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolve) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result))
+    reader.onerror = () => resolve(null)
+    reader.readAsDataURL(file)
+  })
 }
 
 // ---------- tiny markdown renderer ----------
@@ -218,8 +268,9 @@ export default function Markdown({ subPage }) {
     return () => { alive = false }
   }, [wsId])
 
-  let myId = null
-  try { myId = JSON.parse(localStorage.getItem('thoth_user') || 'null')?.id || null } catch { myId = null }
+  const me = getMe()
+  const myId = me.id || null
+  const myName = me.full_name || me.username || 'Unknown'
 
   function handlePagePatch(pageId, patch) {
     setPages((prev) => prev.map((p) => (p.id === pageId ? { ...p, ...patch } : p)))
@@ -228,33 +279,14 @@ export default function Markdown({ subPage }) {
       .catch(() => {})
   }
 
-  function handleReact(page, emoji) {
-    handlePagePatch(page.id, { reactions: toggleReaction(page.reactions, emoji, myId) })
-  }
-
   const recents = useMemo(
     () => [...pages].sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at)).slice(0, 8),
     [pages]
   )
 
-  async function handleNewNote() {
-    if (!wsId) {
-      window.alert('No workspace selected — please pick a workspace first.')
-      return
-    }
-    try {
-      const page = await createPage(wsId, {
-        title: prettyDate(jDate),
-        page_type: 'journal',
-        page_date: jDate,
-        content: '',
-      })
-      setPages((prev) => [page, ...prev])
-      setOpenPage(page)
-    } catch (err) {
-      window.alert(err.message || 'Could not create note')
-    }
-  }
+  // composer options
+  const [focusMode, setFocusMode] = useState(false)
+  const [showToolbar, setShowToolbar] = useState(true)
 
   // switching submodule resets the open editor
   useEffect(() => { setOpenPage(null); setShowRecents(false) }, [view])
@@ -360,7 +392,7 @@ export default function Markdown({ subPage }) {
         )
       ) : (
         <>
-          {/* compact date pager above the feed */}
+          {/* compact date pager + composer + feed */}
           <DatePager jDate={jDate} onShift={setJDate} />
           {openPage ? (
             <PageEditor
@@ -369,17 +401,30 @@ export default function Markdown({ subPage }) {
               onDelete={() => setConfirmDelete(openPage)}
             />
           ) : (
+            <div className={focusMode ? 'j-focus-wrap' : undefined}>
+              <Composer
+                dateStr={jDate}
+                wsId={wsId}
+                focusMode={focusMode}
+                showToolbar={showToolbar}
+                onToggleFocus={() => setFocusMode((v) => !v)}
+                onToggleToolbar={() => setShowToolbar((v) => !v)}
+                onCreated={(page) => setPages((prev) => [page, ...prev])}
+              />
+            </div>
+          )}
+          {!openPage && !focusMode && (
             <JournalFeed
               entries={pages
-                .filter((p) => p.page_type === 'journal' && p.page_date === jDate)
-                .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))}
+                .filter((p) => p.page_type === 'journal' && p.page_date === jDate && !p.archived)
+                .sort((a, b) => (b.pinned - a.pinned) || (new Date(b.created_at) - new Date(a.created_at)))}
               loaded={loaded}
               authors={authors}
               myId={myId}
+              myName={myName}
+              patchPage={(page, patch) => handlePagePatch(page.id, patch)}
               onEdit={setOpenPage}
-              onDelete={setConfirmDelete}
-              onCreate={handleNewNote}
-              onReact={handleReact}
+              onDeleteConfirm={setConfirmDelete}
             />
           )}
         </>
@@ -433,41 +478,88 @@ function shortDate(dateStr) {
 }
 
 function AllPagesGrid({ pages, loaded, onOpen, onDelete }) {
-  if (!loaded) return <div style={{ textAlign: 'center', padding: '48px', color: '#666', fontSize: '12px' }}>Loading pages…</div>
-  if (pages.length === 0) {
-    return (
-      <div style={{ textAlign: 'center', padding: '48px 20px', color: '#666' }}>
-        <div style={{ fontSize: '13px', marginBottom: '8px' }}>No pages yet</div>
-        <div style={{ fontSize: '11px', color: '#555' }}>Create your first page with “New Page”</div>
-      </div>
-    )
-  }
+  const [q, setQ] = useState('')
+  const [typeFilter, setTypeFilter] = useState('all')
+  const [filterOpen, setFilterOpen] = useState(false)
+
+  const filtered = pages
+    .filter((p) => (typeFilter === 'archived' ? p.archived : !p.archived && (typeFilter === 'all' || p.page_type === typeFilter)))
+    .filter((p) => {
+      if (!q.trim()) return true
+      const needle = q.toLowerCase()
+      return (p.title || '').toLowerCase().includes(needle) || (p.content || '').toLowerCase().includes(needle)
+    })
+
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))', gap: '10px' }}>
-      {pages.map((p) => (
-        <div key={p.id}
-          onClick={() => onOpen(p)}
-          style={{ background: '#121212', border: '1px solid #292929', borderRadius: '5px', padding: '12px', cursor: 'pointer', transition: 'border-color 0.15s' }}
-          onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#6e61ff' }}
-          onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#292929' }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '7px', marginBottom: '6px' }}>
-            {p.page_type === 'journal'
-              ? <CalendarDays size={12} style={{ color: '#8b7ff5', flexShrink: 0 }} />
-              : <FileText size={12} style={{ color: '#777', flexShrink: 0 }} />}
-            <span style={{ fontSize: '12px', fontWeight: 700, color: '#eee', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{p.title || 'Untitled'}</span>
-            <button
-              className="icon-btn" title="Delete"
-              onClick={(e) => { e.stopPropagation(); onDelete(p) }}
-              style={{ color: '#ff6b6b' }}
-            ><Trash2 size={11} /></button>
-          </div>
-          <div style={{ fontSize: '10.5px', color: '#777', lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', minHeight: '31px' }}>
-            {(p.content || '').replace(/[#*`>\-[\]]/g, '').trim().slice(0, 120) || 'Empty page'}
-          </div>
-          <div style={{ fontSize: '9.5px', color: '#555', marginTop: '7px' }}>Edited {relTime(p.updated_at)}</div>
+    <div>
+      {/* search + filter bar */}
+      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '12px' }}>
+        <input
+          className="search" style={{ width: '240px' }}
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Search notes…"
+        />
+        <div style={{ position: 'relative' }}>
+          <button className="btn" onClick={() => setFilterOpen((v) => !v)} style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+            <ListFilter size={12} /> Filter
+          </button>
+          {filterOpen && (
+            <>
+              <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setFilterOpen(false)} />
+              <div className="j-menu" style={{ left: 0, right: 'auto' }} role="menu">
+                {[
+                  ['all', 'All'],
+                  ['page', 'Pages only'],
+                  ['journal', 'Journal entries'],
+                  ['archived', 'Archived'],
+                ].map(([val, label]) => (
+                  <button key={val} className="j-menu-item" onClick={() => { setTypeFilter(val); setFilterOpen(false) }}>
+                    <span className="j-check">{typeFilter === val && <Check size={11} />}</span> {label}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
         </div>
-      ))}
+        <span style={{ fontSize: '10.5px', color: '#666' }}>{filtered.length} of {pages.length}</span>
+      </div>
+
+      {!loaded ? (
+        <div style={{ textAlign: 'center', padding: '48px', color: '#666', fontSize: '12px' }}>Loading pages…</div>
+      ) : filtered.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '48px 20px', color: '#666' }}>
+          <div style={{ fontSize: '13px', marginBottom: '8px' }}>No pages found</div>
+          <div style={{ fontSize: '11px', color: '#555' }}>{q ? `Nothing matches “${q}”` : 'Create your first page with "New Page"'}</div>
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))', gap: '10px' }}>
+          {filtered.map((p) => (
+            <div key={p.id}
+              onClick={() => onOpen(p)}
+              style={{ background: '#121212', border: '1px solid #292929', borderRadius: '5px', padding: '12px', cursor: 'pointer', transition: 'border-color 0.15s' }}
+              onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#6e61ff' }}
+              onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#292929' }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '7px', marginBottom: '6px' }}>
+                {p.page_type === 'journal'
+                  ? <CalendarDays size={12} style={{ color: '#8b7ff5', flexShrink: 0 }} />
+                  : <FileText size={12} style={{ color: '#777', flexShrink: 0 }} />}
+                <span style={{ fontSize: '12px', fontWeight: 700, color: '#eee', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{p.title || 'Untitled'}</span>
+                <button
+                  className="icon-btn" title="Delete"
+                  onClick={(e) => { e.stopPropagation(); onDelete(p) }}
+                  style={{ color: '#ff6b6b' }}
+                ><Trash2 size={11} /></button>
+              </div>
+              <div style={{ fontSize: '10.5px', color: '#777', lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', minHeight: '31px' }}>
+                {(p.content || '').replace(/[#*`>\-[\]]/g, '').trim().slice(0, 120) || 'Empty page'}
+              </div>
+              <div style={{ fontSize: '9.5px', color: '#555', marginTop: '7px' }}>Edited {relTime(p.updated_at)}</div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -638,111 +730,344 @@ function SegBtn({ active, onClick, Icon, title }) {
 // ---------- journal feed (social-style) ----------
 const LONG_CHARS = 420
 const LONG_LINES = 12
+const NEW_WINDOW_MS = 30 * 60 * 1000
 
-function JournalFeed({ entries, loaded, authors, myId, onEdit, onDelete, onCreate, onReact }) {
+function JournalFeed({ entries, loaded, authors, myId, myName, patchPage, onEdit, onDeleteConfirm }) {
   if (!loaded) return <div style={{ textAlign: 'center', padding: '40px', color: '#666', fontSize: '12px' }}>Loading notes…</div>
   return (
-    <div className="j-feed">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '9px' }}>
-        <span style={{ fontSize: '10.5px', color: '#777' }}>
-          {entries.length === 0 ? 'No notes for this day yet.' : `${entries.length} note${entries.length === 1 ? '' : 's'} · ${shortDate(entries[0].page_date || '')}`}
-        </span>
-        <button className="j-link-btn" onClick={onCreate}><Plus size={11} /> New note</button>
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '9px' }}>
-        {entries.map((p) => (
-          <NoteCard
-            key={p.id}
-            page={p}
-            authorName={authors[p.created_by] || 'Unknown'}
-            myId={myId}
-            onEdit={() => onEdit(p)}
-            onDelete={() => onDelete(p)}
-            onReact={(emoji) => onReact(p, emoji)}
-          />
-        ))}
-      </div>
+    <div className="j-feed" style={{ marginTop: '10px' }}>
+      {entries.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '26px 12px', color: '#555', fontSize: '11px', border: '1px dashed #2a2a2a', borderRadius: '8px' }}>
+          Nothing here yet — write the first note above.
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '9px' }}>
+          {entries.map((p) => (
+            <NoteCard
+              key={p.id}
+              page={p}
+              authorName={authors[p.created_by] || 'Unknown'}
+              myId={myId}
+              myName={myName}
+              patchPage={patchPage}
+              onEdit={() => onEdit(p)}
+              onDeleteConfirm={() => onDeleteConfirm(p)}
+            />
+          ))}
+        </div>
+      )}
     </div>
   )
 }
 
-function NoteCard({ page, authorName, myId, onEdit, onDelete, onReact }) {
+function NoteCard({ page, authorName, myId, myName, patchPage, onEdit, onDeleteConfirm }) {
   const [expanded, setExpanded] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [reactOpen, setReactOpen] = useState(false)
+  const [cText, setCText] = useState('')
+  const [copied, setCopied] = useState(null)
   const html = useMemo(() => renderMarkdown(page.content), [page.content])
   const isLong = (page.content || '').length > LONG_CHARS || (page.content || '').split('\n').length > LONG_LINES
   const reactions = page.reactions || {}
-  const tint = avatarTint(authorName)
-  const initials = (authorName || '?').split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase()
+  const comments = page.comments || []
+  const attachments = page.attachments || []
+  const isNew = page.created_at && (Date.now() - new Date(page.created_at).getTime()) < NEW_WINDOW_MS
+  const myTint = avatarTint(myName)
+  const myInitials = (myName || '?').split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase()
+
+  async function copyText(label, text) {
+    try { await navigator.clipboard.writeText(text) } catch { /* clipboard unavailable */ }
+    setMenuOpen(false)
+    setCopied(label)
+    setTimeout(() => setCopied(null), 1200)
+  }
+
+  function postComment(e) {
+    e.preventDefault()
+    const text = cText.trim()
+    if (!text) return
+    patchPage(page, { comments: [...comments, { text, author: myName, at: new Date().toISOString() }] })
+    setCText('')
+  }
 
   return (
     <article className="j-card">
-      {/* header */}
+      {/* header: time · NEW · pin · menu */}
       <header className="j-head">
-        <span className="avatar" style={{ background: tint.bg, color: tint.fg, width: '26px', height: '26px', fontSize: '10px', flexShrink: 0 }}>{initials}</span>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div className="j-author">{authorName}</div>
-          <div className="j-time">{feedTime(page.created_at)}{page.updated_at && page.created_at && (new Date(page.updated_at) - new Date(page.created_at)) > 60000 ? ` · edited` : ''}</div>
-        </div>
+        <span className="j-time-strong">{feedTime(page.created_at)}</span>
+        {isNew && <span className="j-new-badge">NEW</span>}
+        {page.pinned && <Pin size={11} style={{ color: '#5b8dff' }} aria-label="Pinned" />}
+        <div style={{ flex: 1 }} />
         <div style={{ position: 'relative' }}>
           <button className="icon-btn" title="More" onClick={() => { setMenuOpen((v) => !v); setReactOpen(false) }}><MoreHorizontal size={14} /></button>
           {menuOpen && (
             <>
               <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setMenuOpen(false)} />
               <div className="j-menu" role="menu">
+                {copied && <div className="j-copied">✓ Copied</div>}
+                <button className="j-menu-item" onClick={() => { setMenuOpen(false); patchPage(page, { pinned: !page.pinned }) }}>
+                  <Pin size={11} /> {page.pinned ? 'Unpin' : 'Pin'}
+                </button>
                 <button className="j-menu-item" onClick={() => { setMenuOpen(false); onEdit() }}><PencilLine size={11} /> Edit</button>
-                <button className="j-menu-item danger" onClick={() => { setMenuOpen(false); onDelete() }}><Trash2 size={11} /> Delete</button>
+                <button className="j-menu-item" onClick={() => copyText('link', `${window.location.href.split('#')[0]}#${page.id}`)}>🔗 Copy link</button>
+                <button className="j-menu-item" onClick={() => copyText('content', page.content || '')}><Copy size={11} /> Copy content</button>
+                <div className="j-menu-sep" />
+                <button className="j-menu-item" onClick={() => { setMenuOpen(false); patchPage(page, { archived: true }) }}>
+                  <Archive size={11} /> Archive
+                </button>
+                <button className="j-menu-item danger" onClick={() => { setMenuOpen(false); onDeleteConfirm() }}>
+                  <Trash2 size={11} /> Delete
+                </button>
               </div>
             </>
           )}
         </div>
       </header>
 
-      {/* title */}
-      {page.title && page.title !== 'Untitled' && (
-        <h3 className="j-title">{page.title}</h3>
-      )}
-
       {/* body preview */}
       <div
         className={`md-preview j-body${expanded ? '' : ' j-clamp'}`}
         dangerouslySetInnerHTML={{ __html: html }}
       />
+      {!page.content && attachments.length === 0 && (
+        <div className="md-blank" style={{ fontSize: '11px' }}>Empty note</div>
+      )}
+
+      {/* attachments */}
+      {attachments.length > 0 && (
+        <div className="j-att-row">
+          {attachments.map((a) => (
+            a.dataUrl && (a.type || '').startsWith('image/') ? (
+              <a key={a.id || a.name} className="j-thumb" href={a.dataUrl} target="_blank" rel="noreferrer" title={`${a.name}${a.size ? ` · ${formatBytes(a.size)}` : ''}`}>
+                <img src={a.dataUrl} alt={a.name} />
+              </a>
+            ) : (
+              <span key={a.id || a.name} className="j-att-chip" title={a.name}>
+                <Paperclip size={10} /> {a.name}{a.size ? ` · ${formatBytes(a.size)}` : ''}
+              </span>
+            )
+          ))}
+        </div>
+      )}
 
       {/* expand toggle */}
-      {isLong && (
+      {(isLong || attachments.length > 0) && (
         <button type="button" className="j-more" onClick={() => setExpanded((v) => !v)}>
           {expanded ? <>Show less <ChevronDown size={11} style={{ transform: 'rotate(180deg)' }} /></> : <>Show more <ChevronDown size={11} /></>}
         </button>
       )}
 
-      {/* reactions */}
-      <footer className="j-react-row">
+      {/* existing comments */}
+      {comments.length > 0 && (
+        <div className="j-cmts">
+          {comments.map((c, i) => (
+            <div key={i} className="j-cmt">
+              <span className="avatar" style={{ ...avatarTint(c.author || '?'), width: '18px', height: '18px', fontSize: '8px' }}>
+                {(c.author || '?').slice(0, 2).toUpperCase()}
+              </span>
+              <div style={{ minWidth: 0 }}>
+                <span style={{ fontWeight: 700, color: '#ccc', marginRight: '6px', fontSize: '10.5px' }}>{c.author}</span>
+                <span style={{ color: '#b5b5b5', fontSize: '11px', whiteSpace: 'pre-wrap' }}>{c.text}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* comment bar */}
+      <form className="j-cmt-row" onSubmit={postComment}>
+        <span className="avatar" style={{ background: myTint.bg, color: myTint.fg, width: '22px', height: '22px', fontSize: '9px', flexShrink: 0 }}>{myInitials}</span>
+        <input
+          className="j-cmt-input"
+          value={cText}
+          onChange={(e) => setCText(e.target.value)}
+          placeholder="Add a comment…"
+        />
         <div style={{ position: 'relative' }}>
-          <button className="j-react-add" title="Add reaction" onClick={() => { setReactOpen((v) => !v); setMenuOpen(false) }}><Smile size={12} /></button>
+          <button type="button" className="j-react-add" title="React" onClick={() => { setReactOpen((v) => !v); setMenuOpen(false) }}><Smile size={13} /></button>
           {reactOpen && (
             <>
               <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setReactOpen(false)} />
-              <div className="j-emoji-pop" role="menu">
-                {EMOJIS.map((e) => (
-                  <button key={e} className="j-emoji" onClick={() => { setReactOpen(false); onReact(e) }}>{e}</button>
+              <div className="j-emoji-pop up" role="menu">
+                {EMOJIS.map((em) => (
+                  <button key={em} type="button" className="j-emoji" onClick={() => { setReactOpen(false); patchPage(page, { reactions: toggleReaction(reactions, em, myId) }) }}>{em}</button>
                 ))}
               </div>
             </>
           )}
         </div>
-        {Object.entries(reactions).map(([emoji, users]) => {
-          const count = Array.isArray(users) ? users.length : 0
-          if (!count) return null
-          const mine = Array.isArray(users) && myId && users.includes(myId)
-          return (
-            <button key={emoji} className={`j-chip${mine ? ' mine' : ''}`} title={`${count} reaction${count === 1 ? '' : 's'}`} onClick={() => onReact(emoji)}>
-              <span>{emoji}</span><span>{count}</span>
-            </button>
-          )
-        })}
-      </footer>
+        <button type="submit" className="j-send-btn" disabled={!cText.trim()}>Send</button>
+      </form>
+
+      {/* reactions summary */}
+      {Object.keys(reactions).length > 0 && (
+        <footer className="j-react-row">
+          {Object.entries(reactions).map(([emoji, users]) => {
+            const count = Array.isArray(users) ? users.length : 0
+            if (!count) return null
+            const mine = Array.isArray(users) && myId && users.includes(myId)
+            return (
+              <button key={emoji} type="button" className={`j-chip${mine ? ' mine' : ''}`} title={`${count} reaction${count === 1 ? '' : 's'}`} onClick={() => patchPage(page, { reactions: toggleReaction(reactions, emoji, myId) })}>
+                <span>{emoji}</span><span>{count}</span>
+              </button>
+            )
+          })}
+        </footer>
+      )}
     </article>
+  )
+}
+
+function formatBytes(bytes) {
+  if (bytes == null) return ''
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+// ---------- composer ----------
+function Composer({ dateStr, wsId, focusMode, showToolbar, onToggleFocus, onToggleToolbar, onCreated }) {
+  const [text, setText] = useState('')
+  const [atts, setAtts] = useState([])
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState(null)
+  const taRef = useRef(null)
+  const attFileRef = useRef(null)
+  const imgFileRef = useRef(null)
+
+  function applyTool(tool) {
+    const res = mdInsert(taRef.current, tool)
+    if (!res) return
+    setText(res.next)
+    requestAnimationFrame(() => {
+      taRef.current?.focus()
+      taRef.current?.setSelectionRange(res.caret, res.caret)
+    })
+  }
+
+  async function pickAttachment(e) {
+    const f = e.target.files?.[0]
+    e.target.value = ''
+    if (!f) return
+    if (f.size > MAX_FILE_BYTES) return setError('File is too large (max 2 MB).')
+    setError(null)
+    let dataUrl = null
+    if ((f.type || '').startsWith('image/')) dataUrl = await readFileAsDataUrl(f)
+    setAtts((prev) => [...prev, { id: crypto.randomUUID(), name: f.name, size: f.size, type: f.type, dataUrl }])
+  }
+
+  async function pickImage(e) {
+    const f = e.target.files?.[0]
+    e.target.value = ''
+    if (!f) return
+    if (f.size > MAX_FILE_BYTES) return setError('Image is too large (max 2 MB).')
+    const dataUrl = await readFileAsDataUrl(f)
+    if (!dataUrl) return setError('Could not read image.')
+    setError(null)
+    const res = mdInsert(taRef.current, 'img')
+    if (res) setText(res.next.replace(/!\[(.*)\]\(\)$/, `![$1](${dataUrl})`))
+  }
+
+  async function save() {
+    if (!wsId) return setError('No workspace selected.')
+    const body = text.trim() || (atts.length ? '' : null)
+    if (body === null) return setError('Write something first.')
+    setSaving(true)
+    setError(null)
+    try {
+      const firstLine = text.split('\n').find((l) => l.trim()) || ''
+      const title = firstLine.replace(/[#*`>\-[\]]/g, '').trim().slice(0, 60) || prettyDate(dateStr)
+      const page = await createPage(wsId, {
+        title,
+        content: text,
+        page_type: 'journal',
+        page_date: dateStr,
+        ...(atts.length ? { attachments: atts } : {}),
+      })
+      setAtts([])
+      setText('')
+      onCreated(page)
+    } catch (err) {
+      setError(err.message || 'Could not save note')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className={`card j-composer${focusMode ? ' focus' : ''}`}>
+      <div className="j-composer-top">
+        <div style={{ position: 'relative' }}>
+          <button className="icon-btn" title="Options" onClick={() => setMenuOpen((v) => !v)}><Plus size={14} /></button>
+          {menuOpen && (
+            <>
+              <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setMenuOpen(false)} />
+              <div className="j-menu" role="menu">
+                <button className="j-menu-item" onClick={() => { setMenuOpen(false); attFileRef.current?.click() }}><Paperclip size={11} /> Add attachment</button>
+                <button className="j-menu-item" onClick={() => { setMenuOpen(false); imgFileRef.current?.click() }}><ImagePlus size={11} /> Insert image</button>
+                <div className="j-menu-sep" />
+                <button className="j-menu-item" onClick={() => { setMenuOpen(false); onToggleFocus() }}>
+                  <Columns2 size={11} /> Focus mode <span className="j-check">{focusMode && <Check size={11} />}</span>
+                </button>
+                <button className="j-menu-item" onClick={() => { setMenuOpen(false); onToggleToolbar() }}>
+                  <Bold size={11} /> Formatting toolbar <span className="j-check">{showToolbar && <Check size={11} />}</span>
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+        <textarea
+          ref={taRef}
+          className="j-composer-input"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); save() } }}
+          placeholder="Any thoughts…"
+          rows={focusMode ? 14 : 3}
+          spellCheck={false}
+        />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', alignItems: 'flex-end', alignSelf: 'flex-start' }}>
+          <button className="btn primary j-save-btn" onClick={save} disabled={saving || (!text.trim() && atts.length === 0)}>
+            {saving ? 'Saving…' : 'Save'}
+          </button>
+        </div>
+      </div>
+
+      {showToolbar && (
+        <div className="j-composer-tools">
+          <ToolBtn label="H1" title="Heading 1" Icon={Heading1} onClick={() => applyTool('h1')} />
+          <ToolBtn label="H2" title="Heading 2" Icon={Heading2} onClick={() => applyTool('h2')} />
+          <span className="md-tsep" />
+          <ToolBtn label="B" title="Bold" Icon={Bold} onClick={() => applyTool('bold')} b />
+          <ToolBtn label="I" title="Italic" Icon={Italic} onClick={() => applyTool('italic')} i />
+          <ToolBtn label="`" title="Inline code" Icon={Code} mono onClick={() => applyTool('code')} />
+          <ToolBtn label="```" title="Code block" Icon={FileCode2} mono onClick={() => applyTool('fence')} />
+          <span className="md-tsep" />
+          <ToolBtn label="—" title="Divider" Icon={Minus} onClick={() => applyTool('hr')} />
+          <ToolBtn label="-" title="Bullet list" Icon={List} onClick={() => applyTool('ul')} />
+          <ToolBtn label="[ ]" title="Checkbox" Icon={ListTodo} onClick={() => applyTool('todo')} />
+        </div>
+      )}
+
+      {error && <div className="j-composer-error">{error}</div>}
+
+      {atts.length > 0 && (
+        <div className="j-att-row" style={{ paddingTop: '8px' }}>
+          {atts.map((a) => (
+            <span key={a.id} className="j-att-chip">
+              {a.dataUrl && (a.type || '').startsWith('image/')
+                ? <img src={a.dataUrl} alt="" style={{ width: '16px', height: '16px', objectFit: 'cover', borderRadius: '3px' }} />
+                : <Paperclip size={10} />}
+              {a.name}
+              <button type="button" className="j-att-x" title="Remove" onClick={() => setAtts((prev) => prev.filter((x) => x.id !== a.id))}>✕</button>
+            </span>
+          ))}
+        </div>
+      )}
+
+      <input ref={attFileRef} type="file" onChange={pickAttachment} style={{ display: 'none' }} />
+      <input ref={imgFileRef} type="file" accept="image/*" onChange={pickImage} style={{ display: 'none' }} />
+    </div>
   )
 }
