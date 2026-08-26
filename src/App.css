@@ -426,7 +426,7 @@ button,input{font:inherit}
   padding:8px 10px;outline:0;min-height:80px;resize:vertical;
 }
 .j-edit-body:focus{border-color:#3a3a3a}
-.j-edit-foot{display:flex;gap:6px;justify-content:flex-end;margin-top:8px}
+.j-edit-foot{display:flex;align-items:center;justify-content:space-between;margin-top:8px}
 
 /* 7-day week row */
 .j-day{

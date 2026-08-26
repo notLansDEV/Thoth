@@ -413,6 +413,10 @@ export default function Markdown({ subPage }) {
               myName={myName}
               patchPage={(page, patch) => handlePagePatch(page.id, patch)}
               onDeleteConfirm={setConfirmDelete}
+              focusMode={focusMode}
+              showToolbar={showToolbar}
+              onToggleFocus={() => setFocusMode((v) => !v)}
+              onToggleToolbar={() => setShowToolbar((v) => !v)}
             />
           )}
         </>
@@ -773,7 +777,7 @@ const LONG_CHARS = 420
 const LONG_LINES = 12
 const NEW_WINDOW_MS = 30 * 60 * 1000
 
-function JournalFeed({ entries, loaded, authors, myId, myName, patchPage, onDeleteConfirm }) {
+function JournalFeed({ entries, loaded, authors, myId, myName, patchPage, onDeleteConfirm, focusMode, showToolbar, onToggleFocus, onToggleToolbar }) {
   if (!loaded) return <div style={{ textAlign: 'center', padding: '40px', color: '#666', fontSize: '12px' }}>Loading notes…</div>
   return (
     <div className="j-feed" style={{ marginTop: '10px' }}>
@@ -792,6 +796,10 @@ function JournalFeed({ entries, loaded, authors, myId, myName, patchPage, onDele
               myName={myName}
               patchPage={patchPage}
               onDeleteConfirm={() => onDeleteConfirm(p)}
+              focusMode={focusMode}
+              showToolbar={showToolbar}
+              onToggleFocus={onToggleFocus}
+              onToggleToolbar={onToggleToolbar}
             />
           ))}
         </div>
@@ -800,7 +808,7 @@ function JournalFeed({ entries, loaded, authors, myId, myName, patchPage, onDele
   )
 }
 
-function NoteCard({ page, authorName, myId, myName, patchPage, onDeleteConfirm }) {
+function NoteCard({ page, authorName, myId, myName, patchPage, onDeleteConfirm, focusMode, showToolbar, onToggleFocus, onToggleToolbar }) {
   const [expanded, setExpanded] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [reactOpen, setReactOpen] = useState(false)
@@ -809,6 +817,10 @@ function NoteCard({ page, authorName, myId, myName, patchPage, onDeleteConfirm }
   const [editing, setEditing] = useState(false)
   const [editTitle, setEditTitle] = useState(page.title || '')
   const [editContent, setEditContent] = useState(page.content || '')
+  const [editMenuOpen, setEditMenuOpen] = useState(false)
+  const [editAtts, setEditAtts] = useState([])
+  const editAttRef = useRef(null)
+  const editImgRef = useRef(null)
   const html = useMemo(() => renderMarkdown(page.content), [page.content])
   const isLong = (page.content || '').length > LONG_CHARS || (page.content || '').split('\n').length > LONG_LINES
   const reactions = page.reactions || {}
@@ -826,8 +838,25 @@ function NoteCard({ page, authorName, myId, myName, patchPage, onDeleteConfirm }
   }
 
   function saveEdit() {
-    patchPage(page, { title: editTitle.trim() || 'Untitled', content: editContent })
+    const mergedAtts = [...(page.attachments || []), ...editAtts]
+    patchPage(page, { title: editTitle.trim() || 'Untitled', content: editContent, ...(mergedAtts.length ? { attachments: mergedAtts } : { attachments: [] }) })
     setEditing(false)
+    setEditAtts([])
+  }
+
+  async function pickEditAtt(e) {
+    const f = e.target.files?.[0]; e.target.value = ''
+    if (!f || f.size > MAX_FILE_BYTES) return
+    let dataUrl = null
+    if ((f.type || '').startsWith('image/')) dataUrl = await readFileAsDataUrl(f)
+    setEditAtts((prev) => [...prev, { id: crypto.randomUUID(), name: f.name, size: f.size, type: f.type, dataUrl }])
+  }
+
+  async function pickEditImg(e) {
+    const f = e.target.files?.[0]; e.target.value = ''
+    if (!f || f.size > MAX_FILE_BYTES) return
+    const dataUrl = await readFileAsDataUrl(f)
+    if (dataUrl) setEditAtts((prev) => [...prev, { id: crypto.randomUUID(), name: f.name, size: f.size, type: f.type, dataUrl }])
   }
 
   function postComment(e) {
@@ -875,12 +904,62 @@ function NoteCard({ page, authorName, myId, myName, patchPage, onDeleteConfirm }
       {/* body — edit mode or preview */}
       {editing ? (
         <div className="j-edit-wrap">
-          <input className="j-edit-title" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} placeholder="Title" autoFocus onKeyDown={(e) => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); saveEdit() } }} />
-          <textarea className="j-edit-body" value={editContent} onChange={(e) => setEditContent(e.target.value)} placeholder="Write something…" rows={Math.max(4, editContent.split('\n').length)} onKeyDown={(e) => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); saveEdit() } }} />
-          <div className="j-edit-foot">
-            <button className="btn" onClick={() => setEditing(false)} style={{ cursor: 'pointer', fontSize: '11px' }}>Cancel</button>
-            <button className="btn primary" onClick={saveEdit} style={{ cursor: 'pointer', fontSize: '11px' }}>Save</button>
+          <div style={{ marginBottom: '6px' }}>
+            <input className="j-edit-title" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} placeholder="Title" autoFocus onKeyDown={(e) => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); saveEdit() } }} />
           </div>
+          <textarea className="j-edit-body" value={editContent} onChange={(e) => setEditContent(e.target.value)} placeholder="Write something…" rows={Math.max(4, editContent.split('\n').length)} onKeyDown={(e) => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); saveEdit() } }} />
+
+          {/* existing + new attachments */}
+          {(page.attachments?.length > 0 || editAtts.length > 0) && (
+            <div className="j-att-row" style={{ marginTop: '6px' }}>
+              {(page.attachments || []).map((a) => (
+                <span key={a.id || a.name} className="j-att-chip">
+                  {a.dataUrl && (a.type || '').startsWith('image/')
+                    ? <img src={a.dataUrl} alt="" style={{ width: '14px', height: '14px', objectFit: 'cover', borderRadius: '3px' }} />
+                    : <Paperclip size={9} />}
+                  {a.name}
+                </span>
+              ))}
+              {editAtts.map((a) => (
+                <span key={a.id} className="j-att-chip" style={{ borderStyle: 'dashed' }}>
+                  {a.dataUrl && (a.type || '').startsWith('image/')
+                    ? <img src={a.dataUrl} alt="" style={{ width: '14px', height: '14px', objectFit: 'cover', borderRadius: '3px' }} />
+                    : <Paperclip size={9} />}
+                  {a.name}
+                  <button type="button" onClick={() => setEditAtts((prev) => prev.filter((x) => x.id !== a.id))} style={{ background: 'none', border: 0, color: '#888', cursor: 'pointer', padding: 0, marginLeft: 2, lineHeight: 1 }}>✕</button>
+                </span>
+              ))}
+            </div>
+          )}
+
+          <div className="j-edit-foot">
+            <div style={{ position: 'relative' }}>
+              <button className="icon-btn" title="Options" onClick={() => setEditMenuOpen((v) => !v)}><Plus size={14} /></button>
+              {editMenuOpen && (
+                <>
+                  <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setEditMenuOpen(false)} />
+                  <div className="j-menu" role="menu" style={{ top: 'auto', bottom: 'calc(100% + 4px)' }}>
+                    <button className="j-menu-item" onClick={() => { setEditMenuOpen(false); editAttRef.current?.click() }}><Paperclip size={11} /> Add attachment</button>
+                    <button className="j-menu-item" onClick={() => { setEditMenuOpen(false); editImgRef.current?.click() }}><ImagePlus size={11} /> Insert image</button>
+                    <div className="j-menu-sep" />
+                    <button className="j-menu-item" onClick={() => { setEditMenuOpen(false); onToggleFocus() }}>
+                      <Columns2 size={11} /> Focus mode <span className="j-check">{focusMode && <Check size={11} />}</span>
+                    </button>
+                    <button className="j-menu-item" onClick={() => { setEditMenuOpen(false); onToggleToolbar() }}>
+                      <Bold size={11} /> Formatting toolbar <span className="j-check">{showToolbar && <Check size={11} />}</span>
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: '6px' }}>
+              <button className="btn" onClick={() => { setEditing(false); setEditAtts([]) }} style={{ cursor: 'pointer', fontSize: '11px' }}>Cancel</button>
+              <button className="btn primary" onClick={saveEdit} style={{ cursor: 'pointer', fontSize: '11px' }}>Save</button>
+            </div>
+          </div>
+
+          <input ref={editAttRef} type="file" onChange={pickEditAtt} style={{ display: 'none' }} />
+          <input ref={editImgRef} type="file" accept="image/*" onChange={pickEditImg} style={{ display: 'none' }} />
         </div>
       ) : (
         <>
