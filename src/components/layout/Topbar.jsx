@@ -22,6 +22,7 @@ const PAGE_LABELS = {
 const SUB_LABELS = {
   tasks: { all: 'All Task', stages: 'Task Stages' },
   bugs: { all: 'All Bugs', stages: 'Bug Stages' },
+  markdown: { journal: 'Journal', pages: 'All Pages' },
 }
 
 function navigate(path) {
@@ -106,6 +107,13 @@ export default function Topbar({ collapsed, onToggleCollapse }) {
   } else if (subSeg && SUB_LABELS[pageKey]?.[subSeg]) {
     crumbTail = SUB_LABELS[pageKey][subSeg]
   }
+  const tailIsSub = Boolean(subSeg && SUB_LABELS[pageKey]?.[subSeg])
+
+  const go = (segments) => (e) => {
+    e.preventDefault()
+    const path = ['/Thoth', ws?.slug, ...segments].filter(Boolean).join('/')
+    navigate(path)
+  }
 
   const name = user?.full_name || user?.username || 'Guest'
   const initials = name
@@ -127,13 +135,21 @@ export default function Topbar({ collapsed, onToggleCollapse }) {
           {collapsed ? <Menu size={14} /> : <PanelLeftClose size={14} />}
         </button>
         <span className="breadcrumb">
-          <span className="crumb-ws">{ws ? ws.name : 'No workspace'}</span>
+          {ws ? (
+            <button className="crumb-link crumb-ws" onClick={go(['dashboard'])}>{ws.name}</button>
+          ) : (
+            <span className="crumb-ws">No workspace</span>
+          )}
           <span className="crumb-sep">/</span>
-          <span className="crumb-here">{pageLabel}</span>
+          <button className="crumb-link crumb-here" onClick={go([pageKey])}>{pageLabel}</button>
           {crumbTail && (
             <>
               <span className="crumb-sep">&gt;</span>
-              <span>{crumbTail}</span>
+              {tailIsSub ? (
+                <button className="crumb-link" onClick={go([pageKey, subSeg])}>{crumbTail}</button>
+              ) : (
+                <span>{crumbTail}</span>
+              )}
             </>
           )}
         </span>

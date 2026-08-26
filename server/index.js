@@ -9,7 +9,7 @@ dotenv.config()
 // .env.local overrides .env (mirrors Vite precedence); Node/dotenv does not load it by default.
 dotenv.config({ path: '.env.local', override: true })
 
-import { initializeDatabase, initializeSchema, getMany, getOne } from '../src/db/database.js'
+import { initializeDatabase, initializeSchema, getMany, getOne, query } from '../src/db/database.js'
 import userRepository from '../src/db/repositories/user.repository.js'
 import projectRepository from '../src/db/repositories/project.repository.js'
 import workspaceRepository from '../src/db/repositories/workspace.repository.js'
@@ -406,6 +406,88 @@ app.delete('/api/milestones/:id', auth, async (req, res) => {
   }
 })
 
+// ---- Markdown pages (Logseq-style journal + pages) ----
+
+app.get('/api/md-pages', auth, async (req, res) => {
+  try {
+    const { workspace_id, type, page_date } = req.query
+    if (!workspace_id) return res.status(400).json({ error: 'workspace_id is required' })
+    let sql = 'SELECT * FROM md_pages WHERE workspace_id = $1'
+    const params = [workspace_id]
+    if (type) {
+      params.push(type)
+      sql += ` AND page_type = $${params.length}`
+    }
+    if (page_date) {
+      params.push(page_date)
+      sql += ` AND page_date = $${params.length}`
+    }
+    sql += ' ORDER BY updated_at DESC'
+    const rows = await getMany(sql, params)
+    res.json(rows)
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
+app.post('/api/md-pages', auth, async (req, res) => {
+  try {
+    const { workspace_id, title, content, page_type, page_date } = req.body
+    if (!workspace_id) return res.status(400).json({ error: 'workspace_id is required' })
+    const created = await getOne(
+      `INSERT INTO md_pages (workspace_id, title, content, page_type, page_date, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING *`,
+      [
+        workspace_id,
+        title?.trim() || 'Untitled',
+        content || '',
+        page_type || 'page',
+        page_date || null,
+        req.user.id,
+      ]
+    )
+    res.status(201).json(created)
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
+app.patch('/api/md-pages/:id', auth, async (req, res) => {
+  try {
+    const data = {}
+    for (const field of ['title', 'content']) {
+      if (req.body[field] !== undefined) data[field] = req.body[field]
+    }
+    if (Object.keys(data).length === 0) {
+      return res.status(400).json({ error: 'No valid fields to update' })
+    }
+    const updated = await getOne(
+      `UPDATE md_pages SET title = COALESCE($1, title), content = COALESCE($2, content), updated_at = CURRENT_TIMESTAMP
+       WHERE id = $3 RETURNING *`,
+      [data.title ?? null, data.content ?? null, req.params.id]
+    )
+    if (!updated) return res.status(404).json({ error: 'Page not found' })
+    res.json(updated)
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
+app.delete('/api/md-pages/:id', auth, async (req, res) => {
+  try {
+    const result = await query('DELETE FROM md_pages WHERE id = $1', [req.params.id])
+    if (result.rowCount === 0) return res.status(404).json({ error: 'Page not found' })
+    res.json({ ok: true })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
 app.get('/api/activity', auth, async (req, res) => {
   try {
     const { project_id, workspace_id } = req.query
@@ -552,7 +634,7 @@ app.get('/api/projects/:id', auth, async (req, res) => {
 })
 
 const PROJECT_ALLOWED_FIELDS = [
-  'name', 'description', 'status', 'priority', 'start_date', 'deadline', 'color', 'archived',
+  'name', 'description', 'status', 'priority', 'start_date', 'deadline', 'color', 'archived', 'meta',
 ]
 
 app.patch('/api/projects/:id', auth, async (req, res) => {
@@ -564,7 +646,20 @@ app.patch('/api/projects/:id', auth, async (req, res) => {
     if (Object.keys(data).length === 0) {
       return res.status(400).json({ error: 'No valid fields to update' })
     }
-    const updated = await projectRepository.updateById(req.params.id, data)
+
+    const existing = await projectRepository.findById(req.params.id)
+    if (!existing) return res.status(404).json({ error: 'Project not found' })
+
+    // Merge meta instead of overwriting so attachments persist independently
+    let toUpdate = data
+    if (data.meta) {
+      toUpdate = {
+        ...data,
+        meta: { ...(existing.meta || {}), ...data.meta },
+      }
+    }
+
+    const updated = await projectRepository.updateById(req.params.id, toUpdate)
     if (!updated) return res.status(404).json({ error: 'Project not found' })
     res.json(updated)
   } catch (err) {

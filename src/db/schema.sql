@@ -40,6 +40,22 @@ CREATE TABLE IF NOT EXISTS projects (
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS start_date TIMESTAMP;
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS deadline TIMESTAMP;
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS priority VARCHAR(50) DEFAULT 'medium';
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS meta JSONB DEFAULT '{}';
+
+-- Markdown Pages Table (Logseq-style journal + pages)
+CREATE TABLE IF NOT EXISTS md_pages (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  title VARCHAR(255) NOT NULL DEFAULT 'Untitled',
+  content TEXT DEFAULT '',
+  page_type VARCHAR(20) DEFAULT 'page',
+  page_date DATE,
+  created_by UUID,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_md_pages_workspace ON md_pages(workspace_id);
+CREATE INDEX IF NOT EXISTS idx_md_pages_updated ON md_pages(updated_at DESC);
 
 -- Milestones Table
 CREATE TABLE IF NOT EXISTS milestones (

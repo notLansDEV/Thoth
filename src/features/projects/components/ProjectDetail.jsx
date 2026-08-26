@@ -10,6 +10,7 @@ import { getTasks, TASK_STAGES, getMilestones, getWorkspaceMembers, priorityStyl
 import { deleteMilestone } from '../../milestones/milestones.service.js'
 import { getActivity, describeActivity, actorName } from '../../activity/activity.service.js'
 import CreateMilestoneModal from './CreateMilestoneModal.jsx'
+import AttachmentsTab from './AttachmentsTab.jsx'
 import ListToolbar from '../../../components/ListToolbar.jsx'
 import ConfirmModal from '../../../components/ConfirmModal.jsx'
 
@@ -451,7 +452,7 @@ export default function ProjectDetail({ projectId, onBack }) {
         </>
       )}
 
-      {tab === 'Attachments' && <Empty text="File attachments coming soon." />}
+      {tab === 'Attachments' && <AttachmentsTab project={project} onUpdateProject={setProject} />}
       {tab === 'Activity' && (() => {
         const q = activityQuery.trim().toLowerCase()
         const filtered = activities.filter((a) => {

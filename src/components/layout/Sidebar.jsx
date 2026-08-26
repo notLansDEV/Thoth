@@ -34,7 +34,13 @@ const NAV = [
   },
   { key: 'calendar', label: 'Calendar', Icon: Calendar },
   { key: 'reports', label: 'Reports', Icon: BarChart3 },
-  { key: 'markdown', label: 'Markdown', Icon: FilePen },
+  {
+    key: 'markdown', label: 'Markdown', Icon: FilePen,
+    children: [
+      { sub: 'journal', label: 'Journal' },
+      { sub: 'pages', label: 'All Pages' },
+    ],
+  },
 ]
 
 function parsePath() {
