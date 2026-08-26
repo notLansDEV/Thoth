@@ -286,6 +286,7 @@ export default function Markdown({ subPage }) {
 
   // composer options
   const [focusMode, setFocusMode] = useState(false)
+  const [focusPage, setFocusPage] = useState(null) // null | 'new' | page object
   const [showToolbar, setShowToolbar] = useState(true)
 
   // switching submodule resets the open editor
@@ -391,17 +392,19 @@ export default function Markdown({ subPage }) {
         <>
           {/* compact date pager + composer + feed */}
           <DatePager jDate={jDate} onShift={setJDate} pages={pages} />
-          <div className={focusMode ? 'j-focus-wrap' : undefined}>
-            <Composer
-              dateStr={jDate}
-              wsId={wsId}
-              focusMode={focusMode}
-              showToolbar={showToolbar}
-              onToggleFocus={() => setFocusMode((v) => !v)}
-              onToggleToolbar={() => setShowToolbar((v) => !v)}
-              onCreated={(page) => setPages((prev) => [page, ...prev])}
-            />
-          </div>
+          {!focusPage && (
+            <div className={focusMode ? 'j-focus-wrap' : undefined}>
+              <Composer
+                dateStr={jDate}
+                wsId={wsId}
+                focusMode={focusMode}
+                showToolbar={showToolbar}
+                onToggleFocus={() => { setFocusPage('new'); setFocusMode(true) }}
+                onToggleToolbar={() => setShowToolbar((v) => !v)}
+                onCreated={(page) => setPages((prev) => [page, ...prev])}
+              />
+            </div>
+          )}
           {!focusMode && (
             <JournalFeed
               entries={pages
@@ -417,6 +420,7 @@ export default function Markdown({ subPage }) {
               showToolbar={showToolbar}
               onToggleFocus={() => setFocusMode((v) => !v)}
               onToggleToolbar={() => setShowToolbar((v) => !v)}
+              onFocusPage={(page) => { setFocusPage(page); setFocusMode(true) }}
             />
           )}
         </>
@@ -432,6 +436,28 @@ export default function Markdown({ subPage }) {
           onConfirm={handleDelete}
           onCancel={() => setConfirmDelete(null)}
         />
+      )}
+
+      {/* focus mode overlay */}
+      {focusPage && (
+        <div className="j-focus-overlay">
+          <button className="j-focus-close" onClick={() => { setFocusPage(null); setFocusMode(false) }}>
+            <ArrowLeft size={13} /> Exit focus
+          </button>
+          <Composer
+            key={focusPage === 'new' ? 'focus-new' : `focus-${focusPage.id}`}
+            dateStr={jDate}
+            wsId={wsId}
+            focusMode={true}
+            showToolbar={showToolbar}
+            onToggleFocus={() => {}}
+            onToggleToolbar={() => setShowToolbar((v) => !v)}
+            onCreated={(page) => { setPages((prev) => [page, ...prev]); setFocusPage(null); setFocusMode(false) }}
+            editPage={focusPage === 'new' ? null : focusPage}
+            onExitFocus={() => { setFocusPage(null); setFocusMode(false) }}
+            onPatchPage={(id, patch) => handlePagePatch(id, patch)}
+          />
+        </div>
       )}
     </div>
   )
@@ -777,7 +803,7 @@ const LONG_CHARS = 420
 const LONG_LINES = 12
 const NEW_WINDOW_MS = 30 * 60 * 1000
 
-function JournalFeed({ entries, loaded, authors, myId, myName, patchPage, onDeleteConfirm, focusMode, showToolbar, onToggleFocus, onToggleToolbar }) {
+function JournalFeed({ entries, loaded, authors, myId, myName, patchPage, onDeleteConfirm, focusMode, showToolbar, onToggleFocus, onToggleToolbar, onFocusPage }) {
   if (!loaded) return <div style={{ textAlign: 'center', padding: '40px', color: '#666', fontSize: '12px' }}>Loading notes…</div>
   return (
     <div className="j-feed" style={{ marginTop: '10px' }}>
@@ -800,6 +826,7 @@ function JournalFeed({ entries, loaded, authors, myId, myName, patchPage, onDele
               showToolbar={showToolbar}
               onToggleFocus={onToggleFocus}
               onToggleToolbar={onToggleToolbar}
+              onFocusPage={onFocusPage}
             />
           ))}
         </div>
@@ -808,7 +835,7 @@ function JournalFeed({ entries, loaded, authors, myId, myName, patchPage, onDele
   )
 }
 
-function NoteCard({ page, authorName, myId, myName, patchPage, onDeleteConfirm, focusMode, showToolbar, onToggleFocus, onToggleToolbar }) {
+function NoteCard({ page, authorName, myId, myName, patchPage, onDeleteConfirm, focusMode, showToolbar, onToggleFocus, onToggleToolbar, onFocusPage }) {
   const [expanded, setExpanded] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [reactOpen, setReactOpen] = useState(false)
@@ -886,6 +913,7 @@ function NoteCard({ page, authorName, myId, myName, patchPage, onDeleteConfirm, 
                   <Pin size={11} /> {page.pinned ? 'Unpin' : 'Pin'}
                 </button>
                 <button className="j-menu-item" onClick={() => { setMenuOpen(false); setEditTitle(page.title || ''); setEditContent(page.content || ''); setEditing(true) }}><PencilLine size={11} /> Edit</button>
+                <button className="j-menu-item" onClick={() => { setMenuOpen(false); onFocusPage(page) }}><Columns2 size={11} /> Focus</button>
                 <button className="j-menu-item" onClick={() => copyText('link', `${window.location.href.split('#')[0]}#${page.id}`)}>🔗 Copy link</button>
                 <button className="j-menu-item" onClick={() => copyText('content', page.content || '')}><Copy size={11} /> Copy content</button>
                 <div className="j-menu-sep" />
@@ -942,8 +970,8 @@ function NoteCard({ page, authorName, myId, myName, patchPage, onDeleteConfirm, 
                     <button className="j-menu-item" onClick={() => { setEditMenuOpen(false); editAttRef.current?.click() }}><Paperclip size={11} /> Add attachment</button>
                     <button className="j-menu-item" onClick={() => { setEditMenuOpen(false); editImgRef.current?.click() }}><ImagePlus size={11} /> Insert image</button>
                     <div className="j-menu-sep" />
-                    <button className="j-menu-item" onClick={() => { setEditMenuOpen(false); onToggleFocus() }}>
-                      <Columns2 size={11} /> Focus mode <span className="j-check">{focusMode && <Check size={11} />}</span>
+                    <button className="j-menu-item" onClick={() => { setEditMenuOpen(false); onFocusPage(page) }}>
+                      <Columns2 size={11} /> Focus mode
                     </button>
                     <button className="j-menu-item" onClick={() => { setEditMenuOpen(false); onToggleToolbar() }}>
                       <Bold size={11} /> Formatting toolbar <span className="j-check">{showToolbar && <Check size={11} />}</span>
@@ -1066,8 +1094,8 @@ function formatBytes(bytes) {
 }
 
 // ---------- composer ----------
-function Composer({ dateStr, wsId, focusMode, showToolbar, onToggleFocus, onToggleToolbar, onCreated }) {
-  const [text, setText] = useState('')
+function Composer({ dateStr, wsId, focusMode, showToolbar, onToggleFocus, onToggleToolbar, onCreated, editPage, onExitFocus, onPatchPage }) {
+  const [text, setText] = useState(editPage?.content || '')
   const [atts, setAtts] = useState([])
   const [menuOpen, setMenuOpen] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -1075,6 +1103,13 @@ function Composer({ dateStr, wsId, focusMode, showToolbar, onToggleFocus, onTogg
   const taRef = useRef(null)
   const attFileRef = useRef(null)
   const imgFileRef = useRef(null)
+
+  useEffect(() => {
+    if (editPage) {
+      setText(editPage.content || '')
+      setAtts([])
+    }
+  }, [editPage?.id])
 
   function autoGrow(el) {
     if (!el) return
@@ -1116,7 +1151,7 @@ function Composer({ dateStr, wsId, focusMode, showToolbar, onToggleFocus, onTogg
   }
 
   async function save() {
-    if (!wsId) return setError('No workspace selected.')
+    if (!wsId && !editPage) return setError('No workspace selected.')
     const body = text.trim() || (atts.length ? '' : null)
     if (body === null) return setError('Write something first.')
     setSaving(true)
@@ -1124,16 +1159,24 @@ function Composer({ dateStr, wsId, focusMode, showToolbar, onToggleFocus, onTogg
     try {
       const firstLine = text.split('\n').find((l) => l.trim()) || ''
       const title = firstLine.replace(/[#*`>\-[\]]/g, '').trim().slice(0, 60) || prettyDate(dateStr)
-      const page = await createPage(wsId, {
-        title,
-        content: text,
-        page_type: 'journal',
-        page_date: dateStr,
-        ...(atts.length ? { attachments: atts } : {}),
-      })
-      setAtts([])
-      setText('')
-      onCreated(page)
+      if (editPage) {
+        const mergedAtts = [...(editPage.attachments || []), ...atts]
+        await onPatchPage(editPage.id, { title, content: text, ...(mergedAtts.length ? { attachments: mergedAtts } : { attachments: [] }) })
+        setText('')
+        setAtts([])
+        onExitFocus()
+      } else {
+        const page = await createPage(wsId, {
+          title,
+          content: text,
+          page_type: 'journal',
+          page_date: dateStr,
+          ...(atts.length ? { attachments: atts } : {}),
+        })
+        setAtts([])
+        setText('')
+        onCreated(page)
+      }
     } catch (err) {
       setError(err.message || 'Could not save note')
     } finally {
@@ -1184,7 +1227,7 @@ function Composer({ dateStr, wsId, focusMode, showToolbar, onToggleFocus, onTogg
                 <button className="j-menu-item" onClick={() => { setMenuOpen(false); imgFileRef.current?.click() }}><ImagePlus size={11} /> Insert image</button>
                 <div className="j-menu-sep" />
                 <button className="j-menu-item" onClick={() => { setMenuOpen(false); onToggleFocus() }}>
-                  <Columns2 size={11} /> Focus mode <span className="j-check">{focusMode && <Check size={11} />}</span>
+                  <Columns2 size={11} /> Focus mode
                 </button>
                 <button className="j-menu-item" onClick={() => { setMenuOpen(false); onToggleToolbar() }}>
                   <Bold size={11} /> Formatting toolbar <span className="j-check">{showToolbar && <Check size={11} />}</span>
