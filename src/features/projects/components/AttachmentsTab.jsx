@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import {
   Paperclip, FileImage, FileText, FileArchive, FileType2, FileSpreadsheet,
   MessageSquare, Trash2, Upload,
@@ -176,12 +176,14 @@ export default function AttachmentsTab({ project, onUpdateProject }) {
       {showUpload && (
         <UploadAttachmentModal
           onClose={() => setShowUpload(false)}
-          onSubmit={async ({ title, description }) => {
+          onSubmit={async ({ title, description, fileMeta, dataUrl }) => {
             setShowUpload(false)
             await persist([...attachments, {
               id: crypto.randomUUID(),
               title,
               description,
+              ...(fileMeta || {}),
+              ...(dataUrl ? { dataUrl } : {}),
               uploaded_at: new Date().toISOString(),
               uploaded_by: currentUser(),
               comments: [],
@@ -192,7 +194,7 @@ export default function AttachmentsTab({ project, onUpdateProject }) {
 
       {previewAtt && (
         <AttachmentPreviewModal
-          att={previewAtt}
+          att={attachments.find((a) => a.id === previewAtt.id) || previewAtt}
           onAddComment={(text) => handleAddComment(previewAtt.id, text)}
           onDelete={() => setConfirmDelete(previewAtt)}
           onClose={() => setPreviewAtt(null)}
@@ -219,6 +221,7 @@ function UploadAttachmentModal({ onSubmit, onClose }) {
   const [description, setDescription] = useState('')
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
+  const fileRef = useRef(null)
 
   function pickFile(e) {
     const f = e.target.files?.[0]
@@ -283,9 +286,15 @@ function UploadAttachmentModal({ onSubmit, onClose }) {
 
           <div style={{ marginBottom: '14px' }}>
             <label style={labelStyle}>File</label>
-            <input type="file" onChange={pickFile} style={{ fontSize: '11px', color: '#999', width: '100%' }} />
+            <input ref={fileRef} type="file" onChange={pickFile} style={{ display: 'none' }} />
+            <button
+              type="button" className="btn" onClick={() => fileRef.current?.click()}
+              style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+            >
+              <Paperclip size={12} /> Choose file
+            </button>
             {file && (
-              <div style={{ fontSize: '10px', color: '#666', marginTop: '5px' }}>
+              <div style={{ fontSize: '10.5px', color: '#888', marginTop: '6px' }}>
                 {file.name} · {formatSize(file.size)}
               </div>
             )}

@@ -33,7 +33,7 @@ export async function getPageByDate(workspaceId, date) {
 export async function createPage(workspaceId, { title, content, page_type, page_date }) {
   return apiRequest('/md-pages', {
     method: 'POST',
-    body: JSON.stringify({ workspace_id, title, content, page_type, page_date }),
+    body: JSON.stringify({ workspace_id: workspaceId, title, content, page_type, page_date }),
   })
 }
 
