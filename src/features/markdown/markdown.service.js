@@ -30,10 +30,10 @@ export async function getPageByDate(workspaceId, date) {
   return Array.isArray(rows) && rows.length > 0 ? rows[0] : null
 }
 
-export async function createPage(workspaceId, { title, content, page_type, page_date }) {
+export async function createPage(workspaceId, { title, content, page_type, page_date, attachments }) {
   return apiRequest('/md-pages', {
     method: 'POST',
-    body: JSON.stringify({ workspace_id: workspaceId, title, content, page_type, page_date }),
+    body: JSON.stringify({ workspace_id: workspaceId, title, content, page_type, page_date, attachments }),
   })
 }
 

@@ -433,11 +433,11 @@ app.get('/api/md-pages', auth, async (req, res) => {
 
 app.post('/api/md-pages', auth, async (req, res) => {
   try {
-    const { workspace_id, title, content, page_type, page_date } = req.body
+    const { workspace_id, title, content, page_type, page_date, attachments } = req.body
     if (!workspace_id) return res.status(400).json({ error: 'workspace_id is required' })
     const created = await getOne(
-      `INSERT INTO md_pages (workspace_id, title, content, page_type, page_date, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO md_pages (workspace_id, title, content, page_type, page_date, attachments, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING *`,
       [
         workspace_id,
@@ -445,6 +445,7 @@ app.post('/api/md-pages', auth, async (req, res) => {
         content || '',
         page_type || 'page',
         page_date || null,
+        attachments ? JSON.stringify(attachments) : '[]',
         req.user.id,
       ]
     )

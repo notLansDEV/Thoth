@@ -79,7 +79,7 @@ function avatarTint(name) {
   return AVATAR_TINTS[sum % AVATAR_TINTS.length]
 }
 
-const EMOJIS = ['💡', '🔥', '✅', '🐛', '❤️', '😂', '😮', '🎉', '🚀', '👀', '☕', '🧠', '📌', '👍', '⚡', '➕']
+const EMOJIS = ['💡', '🔥', '✅', '🦖', '❤️', '😂', '😮', '🎉', '🚀', '👀', '☕', '🧠', '📌', '👍', '⚡', '😎']
 
 function toggleReaction(reactions, emoji, userId) {
   const rx = { ...(reactions || {}) }
