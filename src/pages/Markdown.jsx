@@ -391,26 +391,18 @@ export default function Markdown({ subPage }) {
         <>
           {/* compact date pager + composer + feed */}
           <DatePager jDate={jDate} onShift={setJDate} pages={pages} />
-          {openPage ? (
-            <PageEditor
-              page={openPage}
-              onChange={(patch) => handlePagePatch(openPage.id, patch)}
-              onDelete={() => setConfirmDelete(openPage)}
+          <div className={focusMode ? 'j-focus-wrap' : undefined}>
+            <Composer
+              dateStr={jDate}
+              wsId={wsId}
+              focusMode={focusMode}
+              showToolbar={showToolbar}
+              onToggleFocus={() => setFocusMode((v) => !v)}
+              onToggleToolbar={() => setShowToolbar((v) => !v)}
+              onCreated={(page) => setPages((prev) => [page, ...prev])}
             />
-          ) : (
-            <div className={focusMode ? 'j-focus-wrap' : undefined}>
-              <Composer
-                dateStr={jDate}
-                wsId={wsId}
-                focusMode={focusMode}
-                showToolbar={showToolbar}
-                onToggleFocus={() => setFocusMode((v) => !v)}
-                onToggleToolbar={() => setShowToolbar((v) => !v)}
-                onCreated={(page) => setPages((prev) => [page, ...prev])}
-              />
-            </div>
-          )}
-          {!openPage && !focusMode && (
+          </div>
+          {!focusMode && (
             <JournalFeed
               entries={pages
                 .filter((p) => p.page_type === 'journal' && toLocalDate(p.page_date) === jDate && !p.archived)
@@ -420,7 +412,6 @@ export default function Markdown({ subPage }) {
               myId={myId}
               myName={myName}
               patchPage={(page, patch) => handlePagePatch(page.id, patch)}
-              onEdit={setOpenPage}
               onDeleteConfirm={setConfirmDelete}
             />
           )}
@@ -782,7 +773,7 @@ const LONG_CHARS = 420
 const LONG_LINES = 12
 const NEW_WINDOW_MS = 30 * 60 * 1000
 
-function JournalFeed({ entries, loaded, authors, myId, myName, patchPage, onEdit, onDeleteConfirm }) {
+function JournalFeed({ entries, loaded, authors, myId, myName, patchPage, onDeleteConfirm }) {
   if (!loaded) return <div style={{ textAlign: 'center', padding: '40px', color: '#666', fontSize: '12px' }}>Loading notes…</div>
   return (
     <div className="j-feed" style={{ marginTop: '10px' }}>
@@ -800,7 +791,6 @@ function JournalFeed({ entries, loaded, authors, myId, myName, patchPage, onEdit
               myId={myId}
               myName={myName}
               patchPage={patchPage}
-              onEdit={() => onEdit(p)}
               onDeleteConfirm={() => onDeleteConfirm(p)}
             />
           ))}
@@ -810,12 +800,15 @@ function JournalFeed({ entries, loaded, authors, myId, myName, patchPage, onEdit
   )
 }
 
-function NoteCard({ page, authorName, myId, myName, patchPage, onEdit, onDeleteConfirm }) {
+function NoteCard({ page, authorName, myId, myName, patchPage, onDeleteConfirm }) {
   const [expanded, setExpanded] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [reactOpen, setReactOpen] = useState(false)
   const [cText, setCText] = useState('')
   const [copied, setCopied] = useState(null)
+  const [editing, setEditing] = useState(false)
+  const [editTitle, setEditTitle] = useState(page.title || '')
+  const [editContent, setEditContent] = useState(page.content || '')
   const html = useMemo(() => renderMarkdown(page.content), [page.content])
   const isLong = (page.content || '').length > LONG_CHARS || (page.content || '').split('\n').length > LONG_LINES
   const reactions = page.reactions || {}
@@ -830,6 +823,11 @@ function NoteCard({ page, authorName, myId, myName, patchPage, onEdit, onDeleteC
     setMenuOpen(false)
     setCopied(label)
     setTimeout(() => setCopied(null), 1200)
+  }
+
+  function saveEdit() {
+    patchPage(page, { title: editTitle.trim() || 'Untitled', content: editContent })
+    setEditing(false)
   }
 
   function postComment(e) {
@@ -858,7 +856,7 @@ function NoteCard({ page, authorName, myId, myName, patchPage, onEdit, onDeleteC
                 <button className="j-menu-item" onClick={() => { setMenuOpen(false); patchPage(page, { pinned: !page.pinned }) }}>
                   <Pin size={11} /> {page.pinned ? 'Unpin' : 'Pin'}
                 </button>
-                <button className="j-menu-item" onClick={() => { setMenuOpen(false); onEdit() }}><PencilLine size={11} /> Edit</button>
+                <button className="j-menu-item" onClick={() => { setMenuOpen(false); setEditTitle(page.title || ''); setEditContent(page.content || ''); setEditing(true) }}><PencilLine size={11} /> Edit</button>
                 <button className="j-menu-item" onClick={() => copyText('link', `${window.location.href.split('#')[0]}#${page.id}`)}>🔗 Copy link</button>
                 <button className="j-menu-item" onClick={() => copyText('content', page.content || '')}><Copy size={11} /> Copy content</button>
                 <div className="j-menu-sep" />
@@ -874,37 +872,50 @@ function NoteCard({ page, authorName, myId, myName, patchPage, onEdit, onDeleteC
         </div>
       </header>
 
-      {/* body preview */}
-      <div
-        className={`md-preview j-body${expanded ? '' : ' j-clamp'}`}
-        dangerouslySetInnerHTML={{ __html: html }}
-      />
-      {!page.content && attachments.length === 0 && (
-        <div className="md-blank" style={{ fontSize: '11px' }}>Empty note</div>
-      )}
-
-      {/* attachments */}
-      {attachments.length > 0 && (
-        <div className="j-att-row">
-          {attachments.map((a) => (
-            a.dataUrl && (a.type || '').startsWith('image/') ? (
-              <a key={a.id || a.name} className="j-thumb" href={a.dataUrl} target="_blank" rel="noreferrer" title={`${a.name}${a.size ? ` · ${formatBytes(a.size)}` : ''}`}>
-                <img src={a.dataUrl} alt={a.name} />
-              </a>
-            ) : (
-              <span key={a.id || a.name} className="j-att-chip" title={a.name}>
-                <Paperclip size={10} /> {a.name}{a.size ? ` · ${formatBytes(a.size)}` : ''}
-              </span>
-            )
-          ))}
+      {/* body — edit mode or preview */}
+      {editing ? (
+        <div className="j-edit-wrap">
+          <input className="j-edit-title" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} placeholder="Title" autoFocus onKeyDown={(e) => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); saveEdit() } }} />
+          <textarea className="j-edit-body" value={editContent} onChange={(e) => setEditContent(e.target.value)} placeholder="Write something…" rows={Math.max(4, editContent.split('\n').length)} onKeyDown={(e) => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); saveEdit() } }} />
+          <div className="j-edit-foot">
+            <button className="btn" onClick={() => setEditing(false)} style={{ cursor: 'pointer', fontSize: '11px' }}>Cancel</button>
+            <button className="btn primary" onClick={saveEdit} style={{ cursor: 'pointer', fontSize: '11px' }}>Save</button>
+          </div>
         </div>
-      )}
+      ) : (
+        <>
+          <div
+            className={`md-preview j-body${expanded ? '' : ' j-clamp'}`}
+            dangerouslySetInnerHTML={{ __html: html }}
+          />
+          {!page.content && attachments.length === 0 && (
+            <div className="md-blank" style={{ fontSize: '11px' }}>Empty note</div>
+          )}
 
-      {/* expand toggle */}
-      {(isLong || attachments.length > 0) && (
-        <button type="button" className="j-more" onClick={() => setExpanded((v) => !v)}>
-          {expanded ? <>Show less <ChevronDown size={11} style={{ transform: 'rotate(180deg)' }} /></> : <>Show more <ChevronDown size={11} /></>}
-        </button>
+          {/* attachments */}
+          {attachments.length > 0 && (
+            <div className="j-att-row">
+              {attachments.map((a) => (
+                a.dataUrl && (a.type || '').startsWith('image/') ? (
+                  <a key={a.id || a.name} className="j-thumb" href={a.dataUrl} target="_blank" rel="noreferrer" title={`${a.name}${a.size ? ` · ${formatBytes(a.size)}` : ''}`}>
+                    <img src={a.dataUrl} alt={a.name} />
+                  </a>
+                ) : (
+                  <span key={a.id || a.name} className="j-att-chip" title={a.name}>
+                    <Paperclip size={10} /> {a.name}{a.size ? ` · ${formatBytes(a.size)}` : ''}
+                  </span>
+                )
+              ))}
+            </div>
+          )}
+
+          {/* expand toggle */}
+          {(isLong || attachments.length > 0) && (
+            <button type="button" className="j-more" onClick={() => setExpanded((v) => !v)}>
+              {expanded ? <>Show less <ChevronDown size={11} style={{ transform: 'rotate(180deg)' }} /></> : <>Show more <ChevronDown size={11} /></>}
+            </button>
+          )}
+        </>
       )}
 
       {/* existing comments */}
@@ -986,6 +997,12 @@ function Composer({ dateStr, wsId, focusMode, showToolbar, onToggleFocus, onTogg
   const attFileRef = useRef(null)
   const imgFileRef = useRef(null)
 
+  function autoGrow(el) {
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = el.scrollHeight + 'px'
+  }
+
   function applyTool(tool) {
     const res = mdInsert(taRef.current, tool)
     if (!res) return
@@ -1046,44 +1063,8 @@ function Composer({ dateStr, wsId, focusMode, showToolbar, onToggleFocus, onTogg
   }
 
   return (
-    <div className={`card j-composer${focusMode ? ' focus' : ''}`}>
-      <div className="j-composer-top">
-        <div style={{ position: 'relative' }}>
-          <button className="icon-btn" title="Options" onClick={() => setMenuOpen((v) => !v)}><Plus size={14} /></button>
-          {menuOpen && (
-            <>
-              <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setMenuOpen(false)} />
-              <div className="j-menu" role="menu" style={{ right: 'auto', left: '0' }}>
-                <button className="j-menu-item" onClick={() => { setMenuOpen(false); attFileRef.current?.click() }}><Paperclip size={11} /> Add attachment</button>
-                <button className="j-menu-item" onClick={() => { setMenuOpen(false); imgFileRef.current?.click() }}><ImagePlus size={11} /> Insert image</button>
-                <div className="j-menu-sep" />
-                <button className="j-menu-item" onClick={() => { setMenuOpen(false); onToggleFocus() }}>
-                  <Columns2 size={11} /> Focus mode <span className="j-check">{focusMode && <Check size={11} />}</span>
-                </button>
-                <button className="j-menu-item" onClick={() => { setMenuOpen(false); onToggleToolbar() }}>
-                  <Bold size={11} /> Formatting toolbar <span className="j-check">{showToolbar && <Check size={11} />}</span>
-                </button>
-              </div>
-            </>
-          )}
-        </div>
-        <textarea
-          ref={taRef}
-          className="j-composer-input"
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); save() } }}
-          placeholder="Any thoughts…"
-          rows={focusMode ? 14 : 3}
-          spellCheck={false}
-        />
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', alignItems: 'flex-end', alignSelf: 'flex-start' }}>
-          <button className="btn primary j-save-btn" onClick={save} disabled={saving || (!text.trim() && atts.length === 0)}>
-            {saving ? 'Saving…' : 'Save'}
-          </button>
-        </div>
-      </div>
-
+    <div className={`j-card j-composer${focusMode ? ' focus' : ''}`}>
+      {/* toolbar at top */}
       {showToolbar && (
         <div className="j-composer-tools">
           <ToolBtn label="H1" title="Heading 1" Icon={Heading1} onClick={() => applyTool('h1')} />
@@ -1100,10 +1081,47 @@ function Composer({ dateStr, wsId, focusMode, showToolbar, onToggleFocus, onTogg
         </div>
       )}
 
-      {error && <div className="j-composer-error">{error}</div>}
+      {/* textarea */}
+      <textarea
+        ref={(el) => { taRef.current = el; if (el) autoGrow(el) }}
+        className="j-composer-input"
+        value={text}
+        onChange={(e) => { setText(e.target.value); autoGrow(e.target) }}
+        onKeyDown={(e) => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); save() } }}
+        placeholder="Any thoughts…"
+        rows={1}
+        spellCheck={false}
+      />
 
+      {/* bottom row: [+] left, [Save] right */}
+      <div className="j-composer-bottom">
+        <div style={{ position: 'relative' }}>
+          <button className="icon-btn" title="Options" onClick={() => setMenuOpen((v) => !v)}><Plus size={14} /></button>
+          {menuOpen && (
+            <>
+              <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setMenuOpen(false)} />
+              <div className="j-menu" role="menu" style={{ top: 'auto', bottom: 'calc(100% + 4px)' }}>
+                <button className="j-menu-item" onClick={() => { setMenuOpen(false); attFileRef.current?.click() }}><Paperclip size={11} /> Add attachment</button>
+                <button className="j-menu-item" onClick={() => { setMenuOpen(false); imgFileRef.current?.click() }}><ImagePlus size={11} /> Insert image</button>
+                <div className="j-menu-sep" />
+                <button className="j-menu-item" onClick={() => { setMenuOpen(false); onToggleFocus() }}>
+                  <Columns2 size={11} /> Focus mode <span className="j-check">{focusMode && <Check size={11} />}</span>
+                </button>
+                <button className="j-menu-item" onClick={() => { setMenuOpen(false); onToggleToolbar() }}>
+                  <Bold size={11} /> Formatting toolbar <span className="j-check">{showToolbar && <Check size={11} />}</span>
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+        <button className="btn primary j-save-btn" onClick={save} disabled={saving || (!text.trim() && atts.length === 0)}>
+          {saving ? 'Saving…' : 'Save'}
+        </button>
+      </div>
+
+      {/* attachments */}
       {atts.length > 0 && (
-        <div className="j-att-row" style={{ paddingTop: '8px' }}>
+        <div className="j-att-row">
           {atts.map((a) => (
             <span key={a.id} className="j-att-chip">
               {a.dataUrl && (a.type || '').startsWith('image/')
@@ -1115,6 +1133,8 @@ function Composer({ dateStr, wsId, focusMode, showToolbar, onToggleFocus, onTogg
           ))}
         </div>
       )}
+
+      {error && <div className="j-composer-error">{error}</div>}
 
       <input ref={attFileRef} type="file" onChange={pickAttachment} style={{ display: 'none' }} />
       <input ref={imgFileRef} type="file" accept="image/*" onChange={pickImage} style={{ display: 'none' }} />

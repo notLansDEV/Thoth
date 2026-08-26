@@ -355,21 +355,25 @@ button,input{font:inherit}
 
 /* journal composer */
 .j-focus-wrap{max-width:820px;margin:0 auto;width:100%}
-.j-composer{padding:10px 12px;margin-bottom:12px}
+.j-composer{padding:12px 14px;margin:0 auto 12px;max-width:680px}
 .j-composer.focus{max-width:100%;margin-bottom:0}
-.j-composer-top{display:flex;gap:9px;align-items:flex-start}
 .j-composer-input{
-  flex:1;background:transparent;border:0;outline:0;resize:vertical;
-  color:#ddd;font-family:inherit;font-size:12.5px;line-height:1.6;
-  padding:5px 2px;min-height:52px;
+  width:100%;background:transparent;border:0;outline:0;resize:none;
+  color:#b9b9b9;font-family:inherit;font-size:12.5px;line-height:1.6;
+  padding:0;min-height:100px;overflow:hidden;
 }
 .j-composer-input::placeholder{color:#555}
-.j-save-btn{font-size:11px;padding:6px 15px}
-.j-composer-tools{
-  display:flex;align-items:center;gap:3px;flex-wrap:wrap;
-  border-top:1px solid #222;margin-top:8px;padding-top:7px;
+.j-composer-bottom{
+  display:flex;align-items:center;justify-content:space-between;
+  border-top:1px solid #222;margin-top:8px;padding-top:8px;
+  margin-top:6px;
 }
-.j-composer-error{color:#ff8a8a;font-size:10.5px;padding-top:7px}
+.j-save-btn{font-size:11px;padding:5px 14px}
+.j-composer-tools{
+  display:flex;align-items:center;gap:2px;flex-wrap:wrap;
+  border-bottom:1px solid #222;margin-bottom:8px;padding-bottom:6px;
+}
+.j-composer-error{color:#ff8a8a;font-size:10.5px;padding-top:4px}
 .j-menu-sep{height:1px;background:#262626;margin:5px 0}
 .j-check{margin-left:auto;display:inline-flex;color:#5b8dff;width:14px;justify-content:flex-end}
 .j-copied{padding:7px 11px;font-size:10.5px;color:#20d86b;border-bottom:1px solid #262626}
@@ -408,6 +412,21 @@ button,input{font:inherit}
   font-size:10.5px;font-weight:700;border-radius:999px;padding:5px 13px;cursor:pointer;
 }
 .j-send-btn:disabled{opacity:.35;cursor:default}
+
+/* note card inline edit */
+.j-edit-title{
+  width:100%;background:transparent;border:0;border-bottom:1px solid #262626;
+  color:#f0f0f0;font-size:13.5px;font-weight:800;font-family:inherit;
+  padding:0 0 5px;outline:0;margin-bottom:6px;
+}
+.j-edit-title::placeholder{color:#555}
+.j-edit-body{
+  width:100%;background:transparent;border:1px solid #262626;border-radius:5px;
+  color:#c9c9c9;font-size:12.5px;line-height:1.6;font-family:inherit;
+  padding:8px 10px;outline:0;min-height:80px;resize:vertical;
+}
+.j-edit-body:focus{border-color:#3a3a3a}
+.j-edit-foot{display:flex;gap:6px;justify-content:flex-end;margin-top:8px}
 
 /* 7-day week row */
 .j-day{
