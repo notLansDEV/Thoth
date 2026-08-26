@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  ChevronLeft, ChevronRight, CalendarDays, FileText, Plus, Trash2, Clock,
+  ChevronLeft, ChevronRight, ChevronDown, CalendarDays, FileText, Plus, Trash2, Clock,
   Heading1, Heading2, Bold, Italic, Code, FileCode2, Minus, List, ListTodo,
-  PencilLine, Eye, Columns2, ArrowLeft,
+  PencilLine, Eye, Columns2, ArrowLeft, MoreHorizontal, Smile,
 } from 'lucide-react'
-import { getPages, getPageByDate, createPage, updatePage, deletePage } from '../features/markdown/markdown.service.js'
+import { getPages, createPage, updatePage, deletePage } from '../features/markdown/markdown.service.js'
+import { getCurrentWorkspace } from '../features/workspaces/workspaces.service.js'
+import { getWorkspaceMembers } from '../features/tasks/tasks.service.js'
 import ConfirmModal from '../components/ConfirmModal.jsx'
 
 function fmtLocalDate(d) {
@@ -39,6 +41,54 @@ function relTime(iso) {
   const d = Math.floor(h / 24)
   if (d < 30) return `${d}d ago`
   return new Date(iso).toLocaleDateString()
+}
+
+function localDateStr(d) {
+  const p = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
+}
+
+function feedTime(iso) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  const diff = Date.now() - d.getTime()
+  if (diff < 60000) return 'Just now'
+  const m = Math.floor(diff / 60000)
+  if (m < 60) return `${m} min${m === 1 ? '' : 's'} ago`
+  const h = Math.floor(m / 60)
+  if (h < 24) return `${h} hour${h === 1 ? '' : 's'} ago`
+  const yesterday = new Date()
+  yesterday.setDate(yesterday.getDate() - 1)
+  if (localDateStr(d) === localDateStr(yesterday)) return 'Yesterday'
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+const AVATAR_TINTS = [
+  { bg: 'rgba(91,141,255,0.16)', fg: '#7ea6ff' },
+  { bg: 'rgba(139,127,245,0.16)', fg: '#a99dff' },
+  { bg: 'rgba(32,216,107,0.14)', fg: '#5ad48c' },
+  { bg: 'rgba(255,170,64,0.15)', fg: '#ffb86b' },
+  { bg: 'rgba(255,107,157,0.15)', fg: '#ff8ab5' },
+  { bg: 'rgba(64,206,255,0.14)', fg: '#6fd3ff' },
+]
+
+function avatarTint(name) {
+  let sum = 0
+  for (let i = 0; i < name.length; i++) sum += name.charCodeAt(i)
+  return AVATAR_TINTS[sum % AVATAR_TINTS.length]
+}
+
+const EMOJIS = ['💡', '🔥', '✅', '🐛', '❤️', '😂', '😮', '🎉', '🚀', '👀', '☕', '🧠', '📌', '👍', '⚡', '➕']
+
+function toggleReaction(reactions, emoji, userId) {
+  const rx = { ...(reactions || {}) }
+  const arr = [...(rx[emoji] || [])]
+  const i = arr.indexOf(userId)
+  if (i >= 0) arr.splice(i, 1)
+  else arr.push(userId)
+  if (arr.length) rx[emoji] = arr
+  else delete rx[emoji]
+  return rx
 }
 
 // ---------- tiny markdown renderer ----------
@@ -123,8 +173,9 @@ export function renderMarkdown(src) {
 }
 
 // ---------- main module ----------
-export default function Markdown({ workspace, subPage }) {
-  const wsId = workspace?.id
+export default function Markdown({ subPage }) {
+  const ws = getCurrentWorkspace()
+  const wsId = ws?.id
   const view = subPage === 'pages' ? 'pages' : 'journal'
 
   const [pages, setPages] = useState([])
@@ -149,50 +200,74 @@ export default function Markdown({ workspace, subPage }) {
 
   useEffect(() => { refresh() }, [wsId])
 
+  // author lookup for feed cards
+  const [authors, setAuthors] = useState({})
+  useEffect(() => {
+    let alive = true
+    if (!wsId) return undefined
+    getWorkspaceMembers(wsId)
+      .then((rows) => {
+        if (!alive) return
+        const map = {}
+        for (const m of Array.isArray(rows) ? rows : []) {
+          map[m.id] = m.full_name || m.username || 'Unknown'
+        }
+        setAuthors(map)
+      })
+      .catch(() => {})
+    return () => { alive = false }
+  }, [wsId])
+
+  let myId = null
+  try { myId = JSON.parse(localStorage.getItem('thoth_user') || 'null')?.id || null } catch { myId = null }
+
+  function handlePagePatch(pageId, patch) {
+    setPages((prev) => prev.map((p) => (p.id === pageId ? { ...p, ...patch } : p)))
+    updatePage(pageId, patch)
+      .then((upd) => upd && setPages((prev) => prev.map((p) => (p.id === pageId ? { ...p, ...upd } : p))))
+      .catch(() => {})
+  }
+
+  function handleReact(page, emoji) {
+    handlePagePatch(page.id, { reactions: toggleReaction(page.reactions, emoji, myId) })
+  }
+
   const recents = useMemo(
     () => [...pages].sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at)).slice(0, 8),
     [pages]
   )
 
-  const journalBusy = useRef(false)
-
-  async function openOrCreateJournal(dateStr) {
-    if (!wsId || journalBusy.current) return
-    journalBusy.current = true
-    setJDate(dateStr)
+  async function handleNewNote() {
+    if (!wsId) {
+      window.alert('No workspace selected — please pick a workspace first.')
+      return
+    }
     try {
-      let page = await getPageByDate(wsId, dateStr)
-      if (!page) {
-        page = await createPage(wsId, {
-          title: prettyDate(dateStr),
-          page_type: 'journal',
-          page_date: dateStr,
-          content: '',
-        })
-        setPages((prev) => [page, ...prev])
-      }
+      const page = await createPage(wsId, {
+        title: prettyDate(jDate),
+        page_type: 'journal',
+        page_date: jDate,
+        content: '',
+      })
+      setPages((prev) => [page, ...prev])
       setOpenPage(page)
     } catch (err) {
-      window.alert(err.message || 'Could not open journal')
-    } finally {
-      journalBusy.current = false
+      window.alert(err.message || 'Could not create note')
     }
   }
 
   // switching submodule resets the open editor
   useEffect(() => { setOpenPage(null); setShowRecents(false) }, [view])
 
-  // journal view always shows an entry for the selected date (fetch-or-create)
-  useEffect(() => {
-    if (!loaded || view !== 'journal') return
-    if (openPage && openPage.page_type === 'journal') return
-    openOrCreateJournal(jDate)
-  }, [loaded, view, jDate, openPage])
-
   // leaving the module clears the open editor
   useEffect(() => () => setOpenPage(null), [])
 
   async function handleNewPage(title) {
+    if (!wsId) {
+      window.alert('No workspace selected — please pick a workspace first.')
+      setShowNewPage(false)
+      return
+    }
     try {
       const page = await createPage(wsId, { title: title || 'Untitled', page_type: 'page', content: '' })
       setPages((prev) => [page, ...prev])
@@ -215,11 +290,6 @@ export default function Markdown({ workspace, subPage }) {
     }
   }
 
-  function patchLocal(next) {
-    setPages((prev) => prev.map((p) => (p.id === next.id ? { ...p, ...next } : p)))
-    if (openPage?.id === next.id) setOpenPage((cur) => ({ ...cur, ...next }))
-  }
-
   return (
     <div>
       {/* Module head */}
@@ -229,9 +299,9 @@ export default function Markdown({ workspace, subPage }) {
             <button className="icon-btn" title="Back" onClick={() => setOpenPage(null)}><ArrowLeft size={14} /></button>
           )}
           <h1 style={{ margin: 0, fontSize: '17px', fontWeight: 800 }}>
-            {openPage ? (openPage.title || 'Untitled') : (view === 'pages' ? 'All Pages' : 'Journal')}
+            {view === 'pages' ? (openPage ? (openPage.title || 'Untitled') : 'All Pages') : 'Journal'}
           </h1>
-          {openPage?.page_type === 'journal' && (
+          {view === 'journal' && (
             <span style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.05em', color: '#8b7ff5', background: 'rgba(105,93,240,0.12)', border: '1px solid rgba(105,93,240,0.35)', padding: '3px 7px', borderRadius: '999px' }}>JOURNAL</span>
           )}
         </div>
@@ -278,12 +348,41 @@ export default function Markdown({ workspace, subPage }) {
       </div>
 
       {/* Content */}
-      {openPage ? (
-        <PageEditor page={openPage} onChange={(patch) => { patchLocal(patch); updatePage(openPage.id, patch).then((upd) => upd && patchLocal(upd)).catch(() => {}) }} onDelete={() => setConfirmDelete(openPage)} />
-      ) : view === 'pages' ? (
-        <AllPagesGrid pages={pages} loaded={loaded} onOpen={setOpenPage} onDelete={setConfirmDelete} />
+      {view === 'pages' ? (
+        openPage ? (
+          <PageEditor
+            page={openPage}
+            onChange={(patch) => handlePagePatch(openPage.id, patch)}
+            onDelete={() => setConfirmDelete(openPage)}
+          />
+        ) : (
+          <AllPagesGrid pages={pages} loaded={loaded} onOpen={setOpenPage} onDelete={setConfirmDelete} />
+        )
       ) : (
-        <JournalShell jDate={jDate} onShift={setJDate} />
+        <>
+          {/* compact date pager above the feed */}
+          <DatePager jDate={jDate} onShift={setJDate} />
+          {openPage ? (
+            <PageEditor
+              page={openPage}
+              onChange={(patch) => handlePagePatch(openPage.id, patch)}
+              onDelete={() => setConfirmDelete(openPage)}
+            />
+          ) : (
+            <JournalFeed
+              entries={pages
+                .filter((p) => p.page_type === 'journal' && p.page_date === jDate)
+                .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))}
+              loaded={loaded}
+              authors={authors}
+              myId={myId}
+              onEdit={setOpenPage}
+              onDelete={setConfirmDelete}
+              onCreate={handleNewNote}
+              onReact={handleReact}
+            />
+          )}
+        </>
       )}
 
       {showNewPage && <NewPageModal onSubmit={handleNewPage} onClose={() => setShowNewPage(false)} />}
@@ -301,23 +400,36 @@ export default function Markdown({ workspace, subPage }) {
   )
 }
 
-function JournalShell({ jDate, onShift }) {
-  const isToday = jDate === fmtLocalDate(new Date())
+function DatePager({ jDate, onShift }) {
+  const todayStr = fmtLocalDate(new Date())
+  const dt = new Date(`${jDate}T12:00:00`)
+  const label = dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
   return (
-    <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', alignItems: 'center', marginBottom: '12px' }}>
+    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', marginBottom: '12px' }}>
       <button className="icon-btn" title="Previous day" onClick={() => onShift(shiftDate(jDate, -1))}><ChevronLeft size={14} /></button>
-      <label style={{ display: 'flex', alignItems: 'center', gap: '7px', fontSize: '12px', color: '#ccc', cursor: 'pointer' }}>
-        <CalendarDays size={13} style={{ color: '#8b7ff5' }} />
-        <span>{prettyDate(jDate)}</span>
-        <input type="date" value={jDate} onChange={(e) => e.target.value && onShift(e.target.value)}
-          style={{ background: 'transparent', border: 0, color: 'transparent', width: '16px', cursor: 'pointer', padding: 0 }} title="Pick a date" />
+      <label className="md-date-pill" title="Pick a date">
+        <CalendarDays size={12} style={{ color: '#5b8dff', flexShrink: 0 }} />
+        <span>{label}</span>
+        <input
+          type="date" value={jDate}
+          onChange={(e) => e.target.value && onShift(e.target.value)}
+          style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }}
+        />
       </label>
-      {!isToday && (
-        <button className="btn" onClick={() => onShift(fmtLocalDate(new Date()))} style={{ cursor: 'pointer', fontSize: '10px', padding: '4px 9px' }}>Today</button>
-      )}
       <button className="icon-btn" title="Next day" onClick={() => onShift(shiftDate(jDate, 1))}><ChevronRight size={14} /></button>
+      {jDate !== todayStr && (
+        <button className="btn" onClick={() => onShift(todayStr)} style={{ cursor: 'pointer', fontSize: '10px', padding: '3px 9px' }}>Today</button>
+      )}
     </div>
   )
+}
+
+function shortDate(dateStr) {
+  try {
+    return new Date(`${dateStr}T12:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+  } catch {
+    return dateStr
+  }
 }
 
 function AllPagesGrid({ pages, loaded, onOpen, onDelete }) {
@@ -520,5 +632,117 @@ function SegBtn({ active, onClick, Icon, title }) {
     <button type="button" title={title} onClick={onClick} className={`md-seg-btn${active ? ' active' : ''}`}>
       <Icon size={12} />
     </button>
+  )
+}
+
+// ---------- journal feed (social-style) ----------
+const LONG_CHARS = 420
+const LONG_LINES = 12
+
+function JournalFeed({ entries, loaded, authors, myId, onEdit, onDelete, onCreate, onReact }) {
+  if (!loaded) return <div style={{ textAlign: 'center', padding: '40px', color: '#666', fontSize: '12px' }}>Loading notes…</div>
+  return (
+    <div className="j-feed">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '9px' }}>
+        <span style={{ fontSize: '10.5px', color: '#777' }}>
+          {entries.length === 0 ? 'No notes for this day yet.' : `${entries.length} note${entries.length === 1 ? '' : 's'} · ${shortDate(entries[0].page_date || '')}`}
+        </span>
+        <button className="j-link-btn" onClick={onCreate}><Plus size={11} /> New note</button>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '9px' }}>
+        {entries.map((p) => (
+          <NoteCard
+            key={p.id}
+            page={p}
+            authorName={authors[p.created_by] || 'Unknown'}
+            myId={myId}
+            onEdit={() => onEdit(p)}
+            onDelete={() => onDelete(p)}
+            onReact={(emoji) => onReact(p, emoji)}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function NoteCard({ page, authorName, myId, onEdit, onDelete, onReact }) {
+  const [expanded, setExpanded] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [reactOpen, setReactOpen] = useState(false)
+  const html = useMemo(() => renderMarkdown(page.content), [page.content])
+  const isLong = (page.content || '').length > LONG_CHARS || (page.content || '').split('\n').length > LONG_LINES
+  const reactions = page.reactions || {}
+  const tint = avatarTint(authorName)
+  const initials = (authorName || '?').split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase()
+
+  return (
+    <article className="j-card">
+      {/* header */}
+      <header className="j-head">
+        <span className="avatar" style={{ background: tint.bg, color: tint.fg, width: '26px', height: '26px', fontSize: '10px', flexShrink: 0 }}>{initials}</span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div className="j-author">{authorName}</div>
+          <div className="j-time">{feedTime(page.created_at)}{page.updated_at && page.created_at && (new Date(page.updated_at) - new Date(page.created_at)) > 60000 ? ` · edited` : ''}</div>
+        </div>
+        <div style={{ position: 'relative' }}>
+          <button className="icon-btn" title="More" onClick={() => { setMenuOpen((v) => !v); setReactOpen(false) }}><MoreHorizontal size={14} /></button>
+          {menuOpen && (
+            <>
+              <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setMenuOpen(false)} />
+              <div className="j-menu" role="menu">
+                <button className="j-menu-item" onClick={() => { setMenuOpen(false); onEdit() }}><PencilLine size={11} /> Edit</button>
+                <button className="j-menu-item danger" onClick={() => { setMenuOpen(false); onDelete() }}><Trash2 size={11} /> Delete</button>
+              </div>
+            </>
+          )}
+        </div>
+      </header>
+
+      {/* title */}
+      {page.title && page.title !== 'Untitled' && (
+        <h3 className="j-title">{page.title}</h3>
+      )}
+
+      {/* body preview */}
+      <div
+        className={`md-preview j-body${expanded ? '' : ' j-clamp'}`}
+        dangerouslySetInnerHTML={{ __html: html }}
+      />
+
+      {/* expand toggle */}
+      {isLong && (
+        <button type="button" className="j-more" onClick={() => setExpanded((v) => !v)}>
+          {expanded ? <>Show less <ChevronDown size={11} style={{ transform: 'rotate(180deg)' }} /></> : <>Show more <ChevronDown size={11} /></>}
+        </button>
+      )}
+
+      {/* reactions */}
+      <footer className="j-react-row">
+        <div style={{ position: 'relative' }}>
+          <button className="j-react-add" title="Add reaction" onClick={() => { setReactOpen((v) => !v); setMenuOpen(false) }}><Smile size={12} /></button>
+          {reactOpen && (
+            <>
+              <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setReactOpen(false)} />
+              <div className="j-emoji-pop" role="menu">
+                {EMOJIS.map((e) => (
+                  <button key={e} className="j-emoji" onClick={() => { setReactOpen(false); onReact(e) }}>{e}</button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+        {Object.entries(reactions).map(([emoji, users]) => {
+          const count = Array.isArray(users) ? users.length : 0
+          if (!count) return null
+          const mine = Array.isArray(users) && myId && users.includes(myId)
+          return (
+            <button key={emoji} className={`j-chip${mine ? ' mine' : ''}`} title={`${count} reaction${count === 1 ? '' : 's'}`} onClick={() => onReact(emoji)}>
+              <span>{emoji}</span><span>{count}</span>
+            </button>
+          )
+        })}
+      </footer>
+    </article>
   )
 }

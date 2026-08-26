@@ -458,16 +458,16 @@ app.post('/api/md-pages', auth, async (req, res) => {
 app.patch('/api/md-pages/:id', auth, async (req, res) => {
   try {
     const data = {}
-    for (const field of ['title', 'content']) {
+    for (const field of ['title', 'content', 'reactions']) {
       if (req.body[field] !== undefined) data[field] = req.body[field]
     }
     if (Object.keys(data).length === 0) {
       return res.status(400).json({ error: 'No valid fields to update' })
     }
     const updated = await getOne(
-      `UPDATE md_pages SET title = COALESCE($1, title), content = COALESCE($2, content), updated_at = CURRENT_TIMESTAMP
-       WHERE id = $3 RETURNING *`,
-      [data.title ?? null, data.content ?? null, req.params.id]
+      `UPDATE md_pages SET title = COALESCE($1, title), content = COALESCE($2, content), reactions = COALESCE($3, reactions), updated_at = CURRENT_TIMESTAMP
+       WHERE id = $4 RETURNING *`,
+      [data.title ?? null, data.content ?? null, data.reactions ? JSON.stringify(data.reactions) : null, req.params.id]
     )
     if (!updated) return res.status(404).json({ error: 'Page not found' })
     res.json(updated)

@@ -50,10 +50,12 @@ CREATE TABLE IF NOT EXISTS md_pages (
   content TEXT DEFAULT '',
   page_type VARCHAR(20) DEFAULT 'page',
   page_date DATE,
+  reactions JSONB DEFAULT '{}',
   created_by UUID,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+ALTER TABLE md_pages ADD COLUMN IF NOT EXISTS reactions JSONB DEFAULT '{}';
 CREATE INDEX IF NOT EXISTS idx_md_pages_workspace ON md_pages(workspace_id);
 CREATE INDEX IF NOT EXISTS idx_md_pages_updated ON md_pages(updated_at DESC);
 

@@ -79,7 +79,7 @@ export default function AppRouter(){
     case 'bugs': return render(<Bugs workspace={workspace} subPage={routeId} />)
     case 'calendar': return render(<Calendar workspace={workspace} />)
     case 'reports': return render(<Reports workspace={workspace} />)
-    case 'markdown': return render(<Markdown workspace={workspace} subPage={routeId} />)
+    case 'markdown': return render(<Markdown subPage={routeId} />)
     case 'workspaces': return render(<Workspaces workspace={workspace} />)
     case 'settings': return render(<Settings workspace={workspace} />)
     default: return render(<Dashboard workspace={workspace} />)
