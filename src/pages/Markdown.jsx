@@ -892,6 +892,7 @@ function NoteCard({ page, authorName, myId, myName, patchPage, onDeleteConfirm, 
   const [menuOpen, setMenuOpen] = useState(false)
   const [reactOpen, setReactOpen] = useState(false)
   const [cText, setCText] = useState('')
+  const [replyTo, setReplyTo] = useState(null)
   const [copied, setCopied] = useState(null)
   const [editing, setEditing] = useState(false)
   const [editTitle, setEditTitle] = useState(page.title || '')
@@ -942,8 +943,11 @@ function NoteCard({ page, authorName, myId, myName, patchPage, onDeleteConfirm, 
     e.preventDefault()
     const text = cText.trim()
     if (!text) return
-    patchPage(page, { comments: [...comments, { text, author: myName, at: new Date().toISOString() }] })
+    const comment = { text, author: myName, at: new Date().toISOString() }
+    if (replyTo) comment.replyTo = replyTo
+    patchPage(page, { comments: [...comments, comment] })
     setCText('')
+    setReplyTo(null)
   }
 
   return (
@@ -1080,44 +1084,88 @@ function NoteCard({ page, authorName, myId, myName, patchPage, onDeleteConfirm, 
       {/* existing comments */}
       {comments.length > 0 && (
         <div className="j-cmts">
-          {comments.map((c, i) => (
-            <div key={i} className="j-cmt">
-              <span className="avatar" style={{ ...avatarTint(c.author || '?'), width: '18px', height: '18px', fontSize: '8px' }}>
-                {(c.author || '?').slice(0, 2).toUpperCase()}
-              </span>
-              <div style={{ minWidth: 0 }}>
-                <span style={{ fontWeight: 700, color: '#ccc', marginRight: '6px', fontSize: '10.5px' }}>{c.author}</span>
-                <span style={{ color: '#b5b5b5', fontSize: '11px', whiteSpace: 'pre-wrap' }}>{c.text}</span>
+          {comments.map((c, i) => {
+            const replyAuthor = c.replyTo != null && comments[c.replyTo] ? comments[c.replyTo].author : null
+            const isReply = c.replyTo != null
+            const indent = isReply
+            return (
+              <div key={i} style={indent ? { marginLeft: '26px', paddingLeft: '10px', borderLeft: '2px solid #262626' } : undefined}>
+                <div className="j-cmt">
+                  <span className="avatar" style={{ ...avatarTint(c.author || '?'), width: '18px', height: '18px', fontSize: '8px' }}>
+                    {(c.author || '?').slice(0, 2).toUpperCase()}
+                  </span>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <span style={{ fontWeight: 700, color: '#ccc', marginRight: '6px', fontSize: '10.5px' }}>{c.author}</span>
+                    {replyAuthor && <span style={{ color: '#666', fontSize: '9.5px', marginRight: '4px' }}>replying to {replyAuthor}</span>}
+                    <span style={{ color: '#b5b5b5', fontSize: '11px', whiteSpace: 'pre-wrap' }}>{c.text}</span>
+                    <div className="j-cmt-actions">
+                      {c.emoji ? (
+                        <button type="button" className="j-cmt-action j-cmt-emoji-active" onClick={() => { setReactOpen(i); setReplyTo(null) }}>
+                          {c.emoji}
+                        </button>
+                      ) : (
+                        <button type="button" className="j-cmt-action" onClick={() => { setReactOpen(i); setReplyTo(null) }}>
+                          <Smile size={10} /> Emoji
+                        </button>
+                      )}
+                      <button type="button" className="j-cmt-action" onClick={() => { setReplyTo(i); setCText(''); setReactOpen(false) }}>
+                        Reply
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* inline emoji picker for this comment */}
+                {reactOpen === i && (
+                  <div className="j-cmt-emoji-row">
+                    <div className="j-emoji-pop up" role="menu" style={{ position: 'static', boxShadow: 'none', background: 'transparent', border: 0, padding: 0, display: 'inline-flex' }}>
+                      {EMOJIS.map((em) => (
+                        <button key={em} type="button" className="j-emoji" onClick={() => {
+                          const updated = [...comments]
+                          updated[i] = { ...updated[i], emoji: em }
+                          patchPage(page, { comments: updated })
+                          setReactOpen(false)
+                        }}>{em}</button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* inline reply form */}
+                {replyTo === i && (
+                  <div className="j-cmt-reply-form">
+                    <span className="avatar" style={{ background: myTint.bg, color: myTint.fg, width: '18px', height: '18px', fontSize: '8px', flexShrink: 0 }}>{myInitials}</span>
+                    <input
+                      className="j-cmt-input"
+                      value={cText}
+                      onChange={(e) => setCText(e.target.value)}
+                      placeholder={`Reply to ${c.author}…`}
+                      autoFocus
+                      onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); postComment(e) } }}
+                    />
+                    <button type="submit" className="j-send-btn" disabled={!cText.trim()} onClick={(e) => postComment(e)}>Send</button>
+                    <button type="button" className="icon-btn" onClick={() => setReplyTo(null)} style={{ fontSize: '10px', padding: '2px' }}>✕</button>
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
 
-      {/* comment bar */}
-      <form className="j-cmt-row" onSubmit={postComment}>
-        <span className="avatar" style={{ background: myTint.bg, color: myTint.fg, width: '22px', height: '22px', fontSize: '9px', flexShrink: 0 }}>{myInitials}</span>
-        <input
-          className="j-cmt-input"
-          value={cText}
-          onChange={(e) => setCText(e.target.value)}
-          placeholder="Add a comment…"
-        />
-        <div style={{ position: 'relative' }}>
-          <button type="button" className="j-react-add" title="React" onClick={() => { setReactOpen((v) => !v); setMenuOpen(false) }}><Smile size={13} /></button>
-          {reactOpen && (
-            <>
-              <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setReactOpen(false)} />
-              <div className="j-emoji-pop up" role="menu">
-                {EMOJIS.map((em) => (
-                  <button key={em} type="button" className="j-emoji" onClick={() => { setReactOpen(false); patchPage(page, { reactions: toggleReaction(reactions, em, myId) }) }}>{em}</button>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-        <button type="submit" className="j-send-btn" disabled={!cText.trim()}>Send</button>
-      </form>
+      {/* main comment bar — only when not replying */}
+      {replyTo == null && (
+        <form className="j-cmt-row" onSubmit={postComment}>
+          <span className="avatar" style={{ background: myTint.bg, color: myTint.fg, width: '22px', height: '22px', fontSize: '9px', flexShrink: 0 }}>{myInitials}</span>
+          <input
+            className="j-cmt-input"
+            value={cText}
+            onChange={(e) => setCText(e.target.value)}
+            placeholder="Add a comment…"
+          />
+          <button type="submit" className="j-send-btn" disabled={!cText.trim()}>Send</button>
+        </form>
+      )}
 
       {/* reactions summary */}
       {Object.keys(reactions).length > 0 && (

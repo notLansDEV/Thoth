@@ -420,8 +420,32 @@ button,input{font:inherit}
 .j-cmts{display:flex;flex-direction:column;gap:6px;margin-top:9px;padding-top:8px;border-top:1px solid #222}
 .j-cmt{display:flex;gap:7px;align-items:flex-start;line-height:1.45}
 .j-cmt .avatar{width:18px;height:18px;font-size:8px;flex-shrink:0}
+.j-reply-btn{
+  display:inline-block;background:none;border:0;padding:0;margin-left:6px;
+  color:#555;font-size:10px;font-weight:700;font-family:inherit;cursor:pointer;
+}
+.j-reply-btn:hover{color:#5b8dff}
+.j-reply-indicator{
+  display:flex;align-items:center;gap:6px;padding:4px 8px;
+  background:rgba(91,141,255,.08);border-radius:5px;font-size:10px;color:#7ea6ff;
+  flex-basis:100%;
+}
+.j-cmt-actions{display:flex;gap:10px;margin-top:3px}
+.j-cmt-action{
+  display:inline-flex;align-items:center;gap:3px;background:none;border:0;
+  color:#555;font-size:10px;font-weight:600;font-family:inherit;cursor:pointer;padding:0;
+}
+.j-cmt-action:hover{color:#5b8dff}
+.j-cmt-emoji-active{
+  font-size:13px;padding:0 2px;
+}
+.j-cmt-emoji-row{padding-left:25px;margin-top:2px}
+.j-cmt-reply-form{
+  display:flex;align-items:center;gap:6px;padding:4px 0 4px 25px;
+  border-top:1px solid #1e1e1e;margin-top:4px;
+}
 .j-cmt-row{
-  display:flex;align-items:center;gap:7px;margin-top:9px;padding-top:8px;
+  display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin-top:9px;padding-top:8px;
   border-top:1px solid #222;
 }
 .j-cmt-input{
