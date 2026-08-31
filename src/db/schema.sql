@@ -323,3 +323,5 @@ CREATE INDEX idx_reports_project_id ON reports(project_id);
 CREATE INDEX idx_reports_report_date ON reports(report_date);
 CREATE INDEX idx_activity_logs_workspace_id ON activity_logs(workspace_id);
 CREATE INDEX idx_activity_logs_created_at ON activity_logs(created_at);
+
+
