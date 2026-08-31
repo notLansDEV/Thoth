@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import {
-  Check, X, Paperclip, FileImage, FileText, FileArchive, FileType2, FileSpreadsheet,
+  Check, X, Pencil, Paperclip, FileImage, FileText, FileArchive, FileType2, FileSpreadsheet,
 } from 'lucide-react'
 import {
   TASK_STAGES,
@@ -90,6 +90,8 @@ export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated,
   const [tab, setTab] = useState('description')
   const [newComment, setNewComment] = useState('')
   const [newCheckItem, setNewCheckItem] = useState('')
+  const [editCheckIndex, setEditCheckIndex] = useState(null)
+  const [editCheckText, setEditCheckText] = useState('')
   const fileInputRef = useRef(null)
 
   useEffect(() => {
@@ -151,6 +153,29 @@ export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated,
 
   async function removeCheckItem(index) {
     const next = checklist.filter((_, i) => i !== index)
+    setChecklist(next)
+    const updated = await patch({ meta: { checklist: next } })
+    if (!updated) setChecklist(checklist)
+  }
+
+  function startEditCheck(index) {
+    setEditCheckIndex(index)
+    setEditCheckText(checklist[index].text)
+  }
+
+  function cancelEditCheck() {
+    setEditCheckIndex(null)
+    setEditCheckText('')
+  }
+
+  async function saveEditCheck() {
+    const text = editCheckText.trim()
+    if (!text || editCheckIndex == null) { cancelEditCheck(); return }
+    const next = checklist.map((item, i) =>
+      i === editCheckIndex ? { ...item, text } : item
+    )
+    setEditCheckIndex(null)
+    setEditCheckText('')
     setChecklist(next)
     const updated = await patch({ meta: { checklist: next } })
     if (!updated) setChecklist(checklist)
@@ -337,11 +362,39 @@ export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated,
                       >
                         {item.done && <Check size={9} strokeWidth={3} />}
                       </button>
-                      <span style={{
-                        flex: 1, fontSize: '11.5px',
-                        color: item.done ? '#555' : '#ccc',
-                        textDecoration: item.done ? 'line-through' : 'none',
-                      }}>{item.text}</span>
+                      {editCheckIndex === i ? (
+                        <input
+                          autoFocus
+                          value={editCheckText}
+                          onChange={(e) => setEditCheckText(e.target.value)}
+                          onBlur={saveEditCheck}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') { e.preventDefault(); saveEditCheck() }
+                            if (e.key === 'Escape') cancelEditCheck()
+                          }}
+                          style={{
+                            flex: 1, background: '#181818', border: '1px solid #3a3a3a',
+                            borderRadius: '3px', color: '#ccc', fontSize: '11.5px',
+                            fontFamily: 'inherit', padding: '2px 6px', outline: 'none',
+                          }}
+                        />
+                      ) : (
+                        <span style={{
+                          flex: 1, fontSize: '11.5px',
+                          color: item.done ? '#555' : '#ccc',
+                          textDecoration: item.done ? 'line-through' : 'none',
+                        }}>{item.text}</span>
+                      )}
+                      <button
+                        type="button"
+                        className="row-delete"
+                        onClick={() => startEditCheck(i)}
+                        aria-label="Edit item"
+                        style={{
+                          background: 'transparent', border: 0, color: '#555', cursor: 'pointer',
+                          padding: '2px 4px', opacity: 0, display: 'inline-flex',
+                        }}
+                      ><Pencil size={11} /></button>
                       <button
                         type="button"
                         className="row-delete"
