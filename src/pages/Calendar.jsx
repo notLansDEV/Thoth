@@ -167,6 +167,18 @@ export default function Calendar({ workspace }) {
               </>
             )}
           </div>
+          {view !== 'month' && (
+            <>
+              <button type="button" className="cal-nav-btn" title="Previous"
+                onClick={() => setAnchor(addDays(anchor, view === 'week' ? -7 : -1))}>
+                <ChevronLeft size={12} />
+              </button>
+              <button type="button" className="cal-nav-btn" title="Next"
+                onClick={() => setAnchor(addDays(anchor, view === 'week' ? 7 : 1))}>
+                <ChevronRight size={12} />
+              </button>
+            </>
+          )}
           <button type="button" className="cal-today-btn" onClick={goToday}>Today</button>
         </div>
         <div className="cal-toolbar-right">
