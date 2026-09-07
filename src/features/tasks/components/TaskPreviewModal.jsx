@@ -243,11 +243,11 @@ export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated,
       <div onClick={(e) => e.stopPropagation()} style={{
         background: 'var(--panel2)', border: '1px solid var(--border)', borderRadius: '6px',
         width: '100%', maxWidth: '760px', maxHeight: '88vh',
-        display: 'grid', gridTemplateColumns: '1fr 240px',
+        display: 'grid', gridTemplateColumns: '1fr 240px', gridTemplateRows: 'minmax(0, 1fr)',
         boxShadow: '0 20px 25px rgba(0,0,0,0.4)', overflow: 'hidden',
       }}>
         {/* LEFT */}
-        <div style={{ padding: '22px', overflowY: 'auto' }}>
+        <div className="modal-scroll" style={{ padding: '22px', minHeight: 0 }}>
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
@@ -543,9 +543,9 @@ export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated,
         </div>
 
         {/* RIGHT */}
-        <div style={{
+        <div className="modal-scroll" style={{
           borderLeft: '1px solid var(--border)', background: 'var(--panel2)',
-          padding: '18px 16px', overflowY: 'auto',
+          padding: '18px 16px', minHeight: 0,
         }}>
           <button
             onClick={onClose}
