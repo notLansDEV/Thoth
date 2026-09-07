@@ -10,6 +10,7 @@ import {
   getWorkspaceMembers,
   getMilestones,
 } from '../tasks.service.js'
+import CopyCode from '../../../components/CopyCode.jsx'
 
 const inputStyle = {
   width: '100%',
@@ -273,9 +274,16 @@ export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated,
 
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '14px', paddingLeft: '2px' }}>
             {task.task_code && (
-              <span style={{ fontFamily: 'monospace', fontSize: '10px', color: '#6e61ff' }}>
-                {task.task_code}
-              </span>
+              <CopyCode
+                page="tasks"
+                id={task.id}
+                code={task.task_code}
+                style={{
+                  color: '#6e61ff',
+                  background: 'rgba(110,97,255,0.08)',
+                  borderColor: 'rgba(110,97,255,0.3)',
+                }}
+              />
             )}
             <span className="badge paused" style={{ fontSize: '9px' }}>
               {(stageOptions.find((s) => s.value === stage) || {}).label || stage}

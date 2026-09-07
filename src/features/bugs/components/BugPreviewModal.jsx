@@ -12,6 +12,7 @@ import {
   TASK_PRIORITIES,
   priorityStyle,
 } from '../../tasks/tasks.service.js'
+import CopyCode from '../../../components/CopyCode.jsx'
 
 const inputStyle = {
   width: '100%',
@@ -249,12 +250,16 @@ export default function BugPreviewModal({ bug, workspaceId, projectName, stages,
 
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '14px', paddingLeft: '2px' }}>
             {bug.bug_id && (
-              <span style={{
-                fontFamily: 'monospace', fontSize: '10px', fontWeight: 700,
-                color: '#ff6b6b', background: 'rgba(255,64,64,0.08)',
-                border: '1px solid rgba(255,64,64,0.3)', borderRadius: '3px',
-                padding: '2px 6px',
-              }}>{bug.bug_id}</span>
+              <CopyCode
+                page="bugs"
+                id={bug.id}
+                code={bug.bug_id}
+                style={{
+                  color: '#ff6b6b',
+                  background: 'rgba(255,64,64,0.08)',
+                  borderColor: 'rgba(255,64,64,0.3)',
+                }}
+              />
             )}
             <span className="badge paused" style={{ fontSize: '9px' }}>
               {(stageOptions.find((s) => s.value === stage) || {}).label || stage}

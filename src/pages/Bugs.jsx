@@ -155,7 +155,7 @@ export default function Bugs({ subPage }) {
 
   useEffect(() => {
     if (!subPage || subPage === 'stages' || subPage === 'all') return
-    const found = bugs.find((b) => b.id === subPage)
+    const found = bugs.find((b) => b.id === subPage || b.bug_id === subPage)
     if (found) setPreview(found)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [subPage, bugs.length])

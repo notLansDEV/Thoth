@@ -186,7 +186,7 @@ export default function Tasks({ subPage }) {
 
   useEffect(() => {
     if (!subPage || subPage === 'stages' || subPage === 'all') return
-    const found = tasks.find((t) => t.id === subPage)
+    const found = tasks.find((t) => t.id === subPage || t.task_code === subPage)
     if (found) setPreview(found)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [subPage, tasks.length])
