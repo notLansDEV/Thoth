@@ -49,6 +49,15 @@ function currentUser() {
   }
 }
 
+function taskProgress(checklist, stage) {
+  const items = Array.isArray(checklist) ? checklist : []
+  if (items.length > 0) {
+    const done = items.filter((c) => c.done).length
+    return Math.round((done / items.length) * 100)
+  }
+  return stage === 'Done' ? 100 : 0
+}
+
 function formatSize(bytes) {
   const n = Number(bytes) || 0
   if (n < 1024) return `${n} B`
@@ -78,7 +87,6 @@ export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated,
   const [assignee, setAssignee] = useState(task.assigned_to || '')
   const [startDate, setStartDate] = useState(toDateInput(task.start_date))
   const [dueDate, setDueDate] = useState(toDateInput(task.due_date))
-  const [progress, setProgress] = useState(task.progress || 0)
   const [milestoneId, setMilestoneId] = useState(task.milestone_id || '')
 
   const [members, setMembers] = useState([])
@@ -147,14 +155,14 @@ export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated,
       i === index ? { ...item, done: !item.done } : item
     )
     setChecklist(next)
-    const updated = await patch({ meta: { checklist: next } })
+    const updated = await patch({ meta: { checklist: next }, progress: taskProgress(next, stage) })
     if (!updated) setChecklist(checklist)
   }
 
   async function removeCheckItem(index) {
     const next = checklist.filter((_, i) => i !== index)
     setChecklist(next)
-    const updated = await patch({ meta: { checklist: next } })
+    const updated = await patch({ meta: { checklist: next }, progress: taskProgress(next, stage) })
     if (!updated) setChecklist(checklist)
   }
 
@@ -187,7 +195,7 @@ export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated,
     const next = [...checklist, { text: newCheckItem.trim(), done: false }]
     setChecklist(next)
     setNewCheckItem('')
-    const updated = await patch({ meta: { checklist: next } })
+    const updated = await patch({ meta: { checklist: next }, progress: taskProgress(next, stage) })
     if (!updated) setChecklist(checklist)
   }
 
@@ -233,6 +241,7 @@ export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated,
   }
 
   const doneCount = checklist.filter((c) => c.done).length
+  const progress = taskProgress(checklist, stage)
 
   return (
     <div onClick={onClose} style={{
@@ -560,7 +569,7 @@ export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated,
             <label style={labelStyle}>Stage</label>
             <select
               value={stage}
-              onChange={(e) => { setStage(e.target.value); patch({ status: e.target.value }) }}
+              onChange={(e) => { setStage(e.target.value); patch({ status: e.target.value, progress: taskProgress(checklist, e.target.value) }) }}
               style={inputStyle}
             >
               {stageOptions.map((s) => (
@@ -616,13 +625,9 @@ export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated,
 
           <div style={{ marginBottom: '13px' }}>
             <label style={labelStyle}>Progress — {progress}%</label>
-            <input
-              type="range" min="0" max="100" step="5" value={progress}
-              onChange={(e) => setProgress(Number(e.target.value))}
-              onMouseUp={(e) => patch({ progress: Number(e.target.value) })}
-              onTouchEnd={(e) => patch({ progress: Number(e.target.value) })}
-              style={{ width: '100%', accentColor: '#695df0' }}
-            />
+            <div className="progress" style={{ height: '4px', marginTop: '6px' }}>
+              <span style={{ width: `${progress}%`, background: progress === 100 ? 'var(--green)' : undefined }} />
+            </div>
           </div>
 
           <div style={{ marginBottom: '13px' }}>
