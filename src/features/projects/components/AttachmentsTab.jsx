@@ -9,9 +9,9 @@ import ConfirmModal from '../../../components/ConfirmModal.jsx'
 const inputStyle = {
   width: '100%',
   padding: '8px 9px',
-  border: '1px solid #2a2a2a',
-  background: '#101010',
-  color: '#ddd',
+  border: '1px solid var(--border)',
+  background: 'var(--panel3)',
+  color: 'var(--text-soft)',
   borderRadius: '4px',
   fontSize: '12px',
   boxSizing: 'border-box',
@@ -23,7 +23,7 @@ const labelStyle = {
   marginBottom: '6px',
   fontSize: '10px',
   fontWeight: '700',
-  color: '#777',
+  color: 'var(--muted)',
   textTransform: 'uppercase',
   letterSpacing: '0.06em',
 }
@@ -106,7 +106,7 @@ export default function AttachmentsTab({ project, onUpdateProject }) {
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-        <span style={{ fontSize: '11px', color: '#777' }}>
+        <span style={{ fontSize: '11px', color: 'var(--muted)' }}>
           {attachments.length} attachment{attachments.length === 1 ? '' : 's'}
         </span>
         <button className="btn primary" onClick={() => setShowUpload(true)} style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
@@ -115,9 +115,9 @@ export default function AttachmentsTab({ project, onUpdateProject }) {
       </div>
 
       {attachments.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '48px 20px', color: '#666' }}>
+        <div style={{ textAlign: 'center', padding: '48px 20px', color: 'var(--muted2)' }}>
           <div style={{ fontSize: '13px', marginBottom: '8px' }}>No attachments yet</div>
-          <div style={{ fontSize: '11px', color: '#555' }}>Upload files to share them with the team</div>
+          <div style={{ fontSize: '11px', color: 'var(--muted2)' }}>Upload files to share them with the team</div>
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))', gap: '10px' }}>
@@ -128,16 +128,16 @@ export default function AttachmentsTab({ project, onUpdateProject }) {
                 key={att.id}
                 onClick={() => setPreviewAtt(att)}
                 style={{
-                  background: '#121212', border: '1px solid #292929', borderRadius: '5px',
+                  background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: '5px',
                   overflow: 'hidden', cursor: 'pointer', transition: 'border-color 0.15s',
                 }}
                 onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#6e61ff' }}
-                onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#292929' }}
+                onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border)' }}
               >
                 {/* Thumbnail */}
                 <div style={{
-                  height: '110px', background: '#0d0d0d', borderBottom: '1px solid #242424',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#555',
+                  height: '110px', background: 'var(--panel)', borderBottom: '1px solid var(--border-soft)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted2)',
                   overflow: 'hidden',
                 }}>
                   {att.dataUrl && (att.type || '').startsWith('image/') ? (
@@ -148,22 +148,22 @@ export default function AttachmentsTab({ project, onUpdateProject }) {
                 </div>
 
                 <div style={{ padding: '10px 11px' }}>
-                  <div style={{ fontSize: '12px', fontWeight: 700, color: '#eee', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-strong)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {att.title}
                   </div>
                   {att.description && (
                     <div style={{
-                      fontSize: '10.5px', color: '#777', marginTop: '4px', lineHeight: 1.45,
+                      fontSize: '10.5px', color: 'var(--muted)', marginTop: '4px', lineHeight: 1.45,
                       display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
                     }}>
                       {att.description}
                     </div>
                   )}
-                  <div style={{ fontSize: '9.5px', color: '#555', marginTop: '7px' }}>
+                  <div style={{ fontSize: '9.5px', color: 'var(--muted2)', marginTop: '7px' }}>
                     {att.uploaded_at ? new Date(att.uploaded_at).toLocaleDateString() : '—'} · {att.uploaded_by || 'Unknown'}
                     {formatSize(att.size) ? ` · ${formatSize(att.size)}` : ''}
                   </div>
-                  <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '5px', fontSize: '10px', color: commentCount > 0 ? '#999' : '#555' }}>
+                  <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '5px', fontSize: '10px', color: commentCount > 0 ? 'var(--muted)' : 'var(--muted2)' }}>
                     <MessageSquare size={11} /> {commentCount} comment{commentCount === 1 ? '' : 's'}
                   </div>
                 </div>
@@ -266,13 +266,13 @@ function UploadAttachmentModal({ onSubmit, onClose }) {
       alignItems: 'center', justifyContent: 'center', zIndex: 1000,
     }}>
       <div onClick={(e) => e.stopPropagation()} style={{
-        background: '#151515', border: '1px solid #292929', borderRadius: '6px',
+        background: 'var(--panel2)', border: '1px solid var(--border)', borderRadius: '6px',
         padding: '24px', width: '100%', maxWidth: '420px', maxHeight: '90vh',
         overflowY: 'auto', boxShadow: '0 20px 25px rgba(0,0,0,0.3)',
       }}>
         <div style={{ marginBottom: '16px' }}>
           <h2 style={{ margin: '0 0 8px 0', fontSize: '16px', fontWeight: '700' }}>Upload Attachment</h2>
-          <p style={{ margin: 0, color: '#777', fontSize: '12px' }}>Attach a file to this project</p>
+          <p style={{ margin: 0, color: 'var(--muted)', fontSize: '12px' }}>Attach a file to this project</p>
         </div>
 
         <form onSubmit={handleSubmit} noValidate>
@@ -294,7 +294,7 @@ function UploadAttachmentModal({ onSubmit, onClose }) {
               <Paperclip size={12} /> Choose file
             </button>
             {file && (
-              <div style={{ fontSize: '10.5px', color: '#888', marginTop: '6px' }}>
+              <div style={{ fontSize: '10.5px', color: 'var(--muted)', marginTop: '6px' }}>
                 {file.name} · {formatSize(file.size)}
               </div>
             )}
@@ -350,15 +350,15 @@ function AttachmentPreviewModal({ att, onAddComment, onDelete, onClose }) {
       alignItems: 'center', justifyContent: 'center', zIndex: 1100,
     }}>
       <div onClick={(e) => e.stopPropagation()} style={{
-        background: '#151515', border: '1px solid #292929', borderRadius: '6px',
+        background: 'var(--panel2)', border: '1px solid var(--border)', borderRadius: '6px',
         width: '100%', maxWidth: '560px', maxHeight: '88vh', overflowY: 'auto',
         boxShadow: '0 20px 25px rgba(0,0,0,0.4)',
       }}>
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '18px 20px 0' }}>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <h2 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: '#f1f1f1' }}>{att.title}</h2>
-            <div style={{ fontSize: '10px', color: '#666', marginTop: '4px' }}>
+            <h2 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: 'var(--text-strong)' }}>{att.title}</h2>
+            <div style={{ fontSize: '10px', color: 'var(--muted2)', marginTop: '4px' }}>
               Uploaded {att.uploaded_at ? new Date(att.uploaded_at).toLocaleString() : '—'} · {att.uploaded_by}
               {att.name ? ` · ${att.name}` : ''}
               {formatSize(att.size) ? ` · ${formatSize(att.size)}` : ''}
@@ -372,25 +372,25 @@ function AttachmentPreviewModal({ att, onAddComment, onDelete, onClose }) {
           {att.dataUrl && (att.type || '').startsWith('image/') && (
             <img
               src={att.dataUrl} alt={att.title}
-              style={{ width: '100%', maxHeight: '320px', objectFit: 'contain', borderRadius: '5px', border: '1px solid #242424', background: '#0d0d0d', marginBottom: '14px' }}
+              style={{ width: '100%', maxHeight: '320px', objectFit: 'contain', borderRadius: '5px', border: '1px solid var(--border-soft)', background: 'var(--panel)', marginBottom: '14px' }}
             />
           )}
 
           {att.description && (
             <div style={{ marginBottom: '14px' }}>
               <div style={labelStyle}>Description</div>
-              <div style={{ fontSize: '12px', color: '#bbb', lineHeight: 1.55, whiteSpace: 'pre-wrap' }}>{att.description}</div>
+              <div style={{ fontSize: '12px', color: 'var(--text-soft)', lineHeight: 1.55, whiteSpace: 'pre-wrap' }}>{att.description}</div>
             </div>
           )}
 
           {!att.description && !att.dataUrl && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '9px', padding: '12px', background: '#101010', border: '1px solid #232323', borderRadius: '4px', color: '#888', marginBottom: '14px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '9px', padding: '12px', background: 'var(--panel3)', border: '1px solid var(--hover)', borderRadius: '4px', color: 'var(--muted)', marginBottom: '14px' }}>
               {fileIcon(att.name)}<span style={{ fontSize: '12px' }}>{att.name}</span>
             </div>
           )}
 
           {/* Comments */}
-          <div style={{ borderTop: '1px solid #292929', paddingTop: '13px' }}>
+          <div style={{ borderTop: '1px solid var(--border)', paddingTop: '13px' }}>
             <div style={labelStyle}>Comments ({(att.comments || []).length})</div>
 
             {(att.comments || []).length > 0 && (
@@ -400,12 +400,12 @@ function AttachmentPreviewModal({ att, onAddComment, onDelete, onClose }) {
                     <span className="avatar">{(c.author || '?').slice(0, 2).toUpperCase()}</span>
                     <div style={{ minWidth: 0, flex: 1 }}>
                       <div style={{ display: 'flex', alignItems: 'baseline', gap: '7px', flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#ddd' }}>{c.author}</span>
-                        <span style={{ fontSize: '9.5px', color: '#666' }}>
+                        <span style={{ fontSize: '11.5px', fontWeight: 700, color: 'var(--text-soft)' }}>{c.author}</span>
+                        <span style={{ fontSize: '9.5px', color: 'var(--muted2)' }}>
                           {new Date(c.at).toLocaleDateString()} · {new Date(c.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </span>
                       </div>
-                      <div style={{ fontSize: '11.5px', color: '#bbb', whiteSpace: 'pre-wrap', marginTop: '2px' }}>{c.text}</div>
+                      <div style={{ fontSize: '11.5px', color: 'var(--text-soft)', whiteSpace: 'pre-wrap', marginTop: '2px' }}>{c.text}</div>
                     </div>
                   </div>
                 ))}

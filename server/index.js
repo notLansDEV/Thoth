@@ -18,6 +18,7 @@ import milestoneRepository from '../src/db/repositories/milestone.repository.js'
 import bugRepository from '../src/db/repositories/bug.repository.js'
 import { ActivityRepository } from '../src/db/repositories/activity.repository.js'
 import { BaseRepository } from '../src/db/repositories/base.repository.js'
+import notificationRepository from '../src/db/repositories/notification.repository.js'
 
 const taskStageRepository = new BaseRepository('task_stages')
 const bugStageRepository = new BaseRepository('bug_stages')
@@ -28,6 +29,14 @@ function logActivity(workspaceId, entityType, action, entityId, actorId, changes
   activityRepository
     .log(workspaceId, entityType, action, entityId, actorId, changes, projectId)
     .catch((err) => console.error('activity log failed:', err.message))
+}
+
+// Notify a user (non-fatal)
+function notifyUser({ userId, workspaceId, entityType, entityId, title, body }) {
+  if (!userId) return
+  notificationRepository
+    .createForUser({ userId, workspaceId, entityType, entityId, title, body })
+    .catch((err) => console.error('notification send failed:', err.message))
 }
 
 const PORT = process.env.PORT || 4000
@@ -514,6 +523,40 @@ app.get('/api/activity', auth, async (req, res) => {
   }
 })
 
+app.get('/api/notifications', auth, async (req, res) => {
+  try {
+    const limit = Math.min(Number(req.query.limit) || 50, 100)
+    const rows = await notificationRepository.getForUser(req.user.id, limit)
+    const unread = await notificationRepository.getUnreadCount(req.user.id)
+    res.json({ notifications: rows, unread })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
+app.post('/api/notifications/:id/read', auth, async (req, res) => {
+  try {
+    const updated = await notificationRepository.markRead(req.params.id, req.user.id)
+    if (!updated) return res.status(404).json({ error: 'Notification not found' })
+    res.json(updated)
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
+app.post('/api/notifications/read-all', auth, async (req, res) => {
+  try {
+    await notificationRepository.markAllRead(req.user.id)
+    const unread = await notificationRepository.getUnreadCount(req.user.id)
+    res.json({ success: true, unread })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
 app.get('/api/tasks', auth, async (req, res) => {
   try {
     const { workspace_id } = req.query
@@ -557,6 +600,16 @@ app.post('/api/tasks', auth, async (req, res) => {
 
     const project = await projectRepository.findById(project_id)
     logActivity(project?.workspace_id, 'task', 'created', created.id, req.user.id, { task_code: created.task_code, title: created.title }, project_id)
+    if (created.assigned_to) {
+      notifyUser({
+        userId: created.assigned_to,
+        workspaceId: project?.workspace_id,
+        entityType: 'task',
+        entityId: created.id,
+        title: 'New task assigned to you',
+        body: `${created.task_code || ''} ${created.title}`.trim(),
+      })
+    }
     res.json(created)
   } catch (err) {
     console.error(err)
@@ -605,6 +658,19 @@ app.patch('/api/tasks/:id', auth, async (req, res) => {
         { task_code: existing.task_code, title: existing.title, from: existing.status, to: data.status },
         existing.project_id
       )
+    }
+
+    // Notify the new assignee when a task gets (re)assigned
+    if (data.assigned_to !== undefined && data.assigned_to !== existing.assigned_to && data.assigned_to) {
+      const project = await projectRepository.findById(existing.project_id)
+      notifyUser({
+        userId: data.assigned_to,
+        workspaceId: project?.workspace_id,
+        entityType: 'task',
+        entityId: updated.id,
+        title: 'Task assigned to you',
+        body: `${existing.task_code || ''} ${updated.title || existing.title}`.trim(),
+      })
     }
     res.json(updated)
   } catch (err) {
@@ -733,6 +799,16 @@ app.post('/api/bugs', auth, async (req, res) => {
     })
 
     logActivity(project.workspace_id, 'bug', 'created', created.id, req.user.id, { bug_id: created.bug_id, title: created.title }, project_id)
+    if (created.assigned_to) {
+      notifyUser({
+        userId: created.assigned_to,
+        workspaceId: project.workspace_id,
+        entityType: 'bug',
+        entityId: created.id,
+        title: `New bug assigned to you`,
+        body: `${created.bug_id || ''} ${created.title}`.trim(),
+      })
+    }
     res.json(created)
   } catch (err) {
     console.error(err)
@@ -808,6 +884,19 @@ app.patch('/api/bugs/:id', auth, async (req, res) => {
         { bug_id: existing.bug_id, title: existing.title, from: existing.kanban_column, to: data.kanban_column },
         existing.project_id
       )
+    }
+
+    // Notify the new assignee when a bug gets (re)assigned
+    if (data.assigned_to !== undefined && data.assigned_to !== existing.assigned_to && data.assigned_to) {
+      const project = await projectRepository.findById(existing.project_id)
+      notifyUser({
+        userId: data.assigned_to,
+        workspaceId: project?.workspace_id,
+        entityType: 'bug',
+        entityId: updated.id,
+        title: 'Bug assigned to you',
+        body: `${existing.bug_id || ''} ${updated.title || existing.title}`.trim(),
+      })
     }
     res.json(updated)
   } catch (err) {

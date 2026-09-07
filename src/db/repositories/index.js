@@ -7,6 +7,7 @@ export { default as reportRepository } from './report.repository.js';
 export { default as workspaceRepository } from './workspace.repository.js';
 export { default as activityRepository } from './activity.repository.js';
 export { default as userRepository } from './user.repository.js';
+export { default as notificationRepository } from './notification.repository.js';
 
 export {
   ProjectRepository,

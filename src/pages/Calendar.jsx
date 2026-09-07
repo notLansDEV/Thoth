@@ -171,7 +171,7 @@ export default function Calendar({ workspace }) {
         </div>
         <div className="cal-toolbar-right">
           <div style={{ position: 'relative' }}>
-            <Search size={12} style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', color: '#666', pointerEvents: 'none' }} />
+            <Search size={12} style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', color: 'var(--muted2)', pointerEvents: 'none' }} />
             <input
               type="text"
               className="search-input"
@@ -193,11 +193,11 @@ export default function Calendar({ workspace }) {
             </button>
             {filterOpen && (
               <div className="dropdown-menu" style={{ top: 'calc(100% + 6px)', right: 0, minWidth: '170px', padding: '10px' }}>
-                <label style={{ display: 'block', fontSize: '10px', fontWeight: 700, color: '#777', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>Type</label>
+                <label style={{ display: 'block', fontSize: '10px', fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>Type</label>
                 <select
                   value={typeFilter}
                   onChange={(e) => { setTypeFilter(e.target.value); setFilterOpen(false) }}
-                  style={{ width: '100%', background: '#101010', border: '1px solid #2a2a2a', color: '#ddd', borderRadius: '4px', fontSize: '11px', padding: '5px 7px' }}
+                  style={{ width: '100%', background: 'var(--panel3)', border: '1px solid var(--border)', color: 'var(--text-soft)', borderRadius: '4px', fontSize: '11px', padding: '5px 7px' }}
                 >
                   <option value="all">All types</option>
                   <option value="task">Tasks only</option>

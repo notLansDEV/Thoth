@@ -6,6 +6,11 @@ import {
   getWorkspaces,
 } from '../../features/workspaces/workspaces.service.js'
 import { getProjects } from '../../features/projects/projects.service.js'
+import {
+  getNotifications,
+  markNotificationRead,
+  relativeTime,
+} from '../../features/notifications/notifications.service.js'
 
 const PAGE_LABELS = {
   dashboard: 'Dashboard',
@@ -52,10 +57,8 @@ export default function Topbar({ collapsed, onToggleCollapse }) {
   const [wsList, setWsList] = useState(null)
   const [profileOpen, setProfileOpen] = useState(false)
   const [notifOpen, setNotifOpen] = useState(false)
-  const [notifications, setNotifications] = useState([
-    { id: 1, text: 'Task "Fix login" was assigned to you', time: '2h ago' },
-    { id: 2, text: 'Bug "Crash on save" is due soon', time: 'Yesterday' },
-  ])
+  const [notifications, setNotifications] = useState([])
+  const [unread, setUnread] = useState(0)
   const menuRef = useRef(null)
 
   useEffect(() => {
@@ -68,6 +71,31 @@ export default function Topbar({ collapsed, onToggleCollapse }) {
     }
     document.addEventListener('mousedown', onDocClick)
     return () => document.removeEventListener('mousedown', onDocClick)
+  }, [])
+
+  async function refreshNotifications() {
+    try {
+      const data = await getNotifications(50)
+      setNotifications(Array.isArray(data.notifications) ? data.notifications : [])
+      setUnread(data.unread || 0)
+    } catch {
+      setNotifications([])
+      setUnread(0)
+    }
+  }
+
+  useEffect(() => {
+    refreshNotifications()
+    const onDataChanged = () => refreshNotifications()
+    window.addEventListener('thoth:data-changed', onDataChanged)
+    const timer = setInterval(refreshNotifications, 15000)
+    const onVisible = () => refreshNotifications()
+    window.addEventListener('focus', onVisible)
+    return () => {
+      window.removeEventListener('thoth:data-changed', onDataChanged)
+      clearInterval(timer)
+      window.removeEventListener('focus', onVisible)
+    }
   }, [])
 
   async function toggleWsMenu() {
@@ -174,7 +202,7 @@ export default function Topbar({ collapsed, onToggleCollapse }) {
           >
             <span className="dot purple" />
             {ws ? ws.name : 'No workspace'}
-            <span style={{ fontSize: '8px', color: '#666' }}><ChevronDown size={10} /></span>
+            <span style={{ fontSize: '8px', color: 'var(--muted2)' }}><ChevronDown size={10} /></span>
           </button>
           {wsOpen && (
             <div className="dropdown-menu" role="menu">
@@ -215,22 +243,43 @@ export default function Topbar({ collapsed, onToggleCollapse }) {
         <div style={{ position: 'relative' }}>
           <button
             className="notif-btn"
-            onClick={() => { setNotifOpen(!notifOpen); setWsOpen(false); setProfileOpen(false) }}
+            onClick={() => {
+              const next = !notifOpen
+              setNotifOpen(next)
+              setWsOpen(false)
+              setProfileOpen(false)
+              if (next) refreshNotifications()
+            }}
             aria-haspopup="menu"
             aria-expanded={notifOpen}
             title="Notifications"
           >
             <Bell size={14} />
-            {notifications.length > 0 && <span className="notif-badge">{notifications.length}</span>}
+            {unread > 0 && <span className="notif-badge">{unread}</span>}
           </button>
           {notifOpen && (
             <div className="dropdown-menu right" role="menu" style={{ minWidth: '260px' }}>
               <div className="dropdown-head">Notifications</div>
               {notifications.length === 0 && <div className="dropdown-empty">No notifications</div>}
               {notifications.map((n) => (
-                <button key={n.id} className="dropdown-item" onClick={() => setNotifOpen(false)} style={{ alignItems: 'flex-start', flexDirection: 'column', gap: 2 }}>
-                  <span style={{ color: '#ddd', fontSize: '11px', lineHeight: 1.4 }}>{n.text}</span>
-                  <span style={{ fontSize: '9px', color: '#666' }}>{n.time}</span>
+                <button
+                  key={n.id}
+                  className={`dropdown-item${n.is_read ? '' : ' unread'}`}
+                  onClick={() => {
+                    setNotifOpen(false)
+                    if (!n.is_read) {
+                      markNotificationRead(n.id).catch(() => {})
+                      setUnread((u) => Math.max(0, u - 1))
+                    }
+                    const page = n.entity_type === 'task' ? 'tasks' : n.entity_type === 'bug' ? 'bugs' : n.entity_type
+                    const base = ['/Thoth', ws?.slug || ws?.id, page].filter(Boolean).join('/')
+                    navigate(n.entity_id ? `${base}/${n.entity_id}` : base)
+                  }}
+                  style={{ alignItems: 'flex-start', flexDirection: 'column', gap: 2 }}
+                >
+                  <span style={{ color: 'var(--text-soft)', fontSize: '11px', lineHeight: 1.4 }}>{n.title}</span>
+                  {n.body && <span style={{ fontSize: '10px', color: 'var(--muted)', lineHeight: 1.3 }}>{n.body}</span>}
+                  <span style={{ fontSize: '9px', color: 'var(--muted2)' }}>{relativeTime(n.created_at)}</span>
                 </button>
               ))}
             </div>

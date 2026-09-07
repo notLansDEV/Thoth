@@ -67,3 +67,27 @@
 	]
 
 - Settings
+Added 
+Settings Module
+General
+Workspace
+- Workspace Name
+- Default Homepage
+Appearance
+Theme
+- Ligh Dark System
+Interface Font
+Layout
+- Compact mode 
+
+Team & Members
+Notification
+- Task assigned to me
+- New comments
+- Due Soone
+- Weekly digest
+
+Data & Storage
+- Export Workspaced data 
+- Clear local preferences
+About

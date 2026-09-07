@@ -40,7 +40,7 @@ process.on('SIGTERM', () => shutdown(0))
 const client = spawn(process.execPath, [viteBin], { cwd: root, env: process.env })
 const server = spawn(
   process.execPath,
-  [path.join(root, 'server', 'index.js')],
+  ['--watch', path.join(root, 'server', 'index.js')],
   { cwd: root, env: process.env }
 )
 children = [client, server]

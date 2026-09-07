@@ -6,13 +6,13 @@ export default function ConfirmModal({ title, message, note, confirmLabel = 'Del
       alignItems: 'center', justifyContent: 'center', zIndex: 1200,
     }}>
       <div onClick={(e) => e.stopPropagation()} style={{
-        background: '#151515', border: '1px solid #292929', borderRadius: '6px',
+        background: 'var(--panel2)', border: '1px solid var(--border)', borderRadius: '6px',
         padding: '22px', width: '100%', maxWidth: '380px',
         boxShadow: '0 20px 25px rgba(0,0,0,0.3)',
       }}>
         <h2 style={{ margin: '0 0 8px', fontSize: '15px', fontWeight: 700 }}>{title}</h2>
         {message && (
-          <p style={{ margin: '0 0 6px', fontSize: '12px', color: '#bbb', lineHeight: 1.5 }}>{message}</p>
+          <p style={{ margin: '0 0 6px', fontSize: '12px', color: 'var(--text-soft)', lineHeight: 1.5 }}>{message}</p>
         )}
         {note && (
           <p style={{ margin: '0 0 4px', fontSize: '11px', color: '#e8c547' }}>{note}</p>

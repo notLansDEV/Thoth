@@ -36,6 +36,9 @@ async function apiRequest(path, options = {}) {
   if (!res.ok) {
     throw new Error((data && data.error) || `Request failed (${res.status})`)
   }
+  if (options.method && options.method !== 'GET') {
+    window.dispatchEvent(new CustomEvent('thoth:data-changed'))
+  }
   return data
 }
 

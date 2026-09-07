@@ -16,9 +16,9 @@ import {
 const inputStyle = {
   width: '100%',
   padding: '6px 8px',
-  border: '1px solid #2a2a2a',
-  background: '#101010',
-  color: '#ddd',
+  border: '1px solid var(--border)',
+  background: 'var(--panel3)',
+  color: 'var(--text-soft)',
   borderRadius: '4px',
   fontSize: '12px',
   boxSizing: 'border-box',
@@ -30,7 +30,7 @@ const labelStyle = {
   marginBottom: '5px',
   fontSize: '10px',
   fontWeight: '700',
-  color: '#777',
+  color: 'var(--muted)',
   textTransform: 'uppercase',
   letterSpacing: '0.06em',
 }
@@ -226,7 +226,7 @@ export default function BugPreviewModal({ bug, workspaceId, projectName, stages,
       alignItems: 'center', justifyContent: 'center', zIndex: 1000,
     }}>
       <div onClick={(e) => e.stopPropagation()} style={{
-        background: '#151515', border: '1px solid #292929', borderRadius: '6px',
+        background: 'var(--panel2)', border: '1px solid var(--border)', borderRadius: '6px',
         width: '100%', maxWidth: '760px', maxHeight: '88vh',
         display: 'flex', minHeight: 0,
         boxShadow: '0 20px 25px rgba(0,0,0,0.4)', overflow: 'hidden',
@@ -239,11 +239,11 @@ export default function BugPreviewModal({ bug, workspaceId, projectName, stages,
             onBlur={onTitleBlur}
             style={{
               width: '100%', background: 'transparent', border: '1px solid transparent',
-              borderRadius: '4px', color: '#f1f1f1', fontSize: '16px', fontWeight: '700',
+              borderRadius: '4px', color: 'var(--text-strong)', fontSize: '16px', fontWeight: '700',
               padding: '4px 6px', margin: '-4px -6px 4px', outline: 'none',
               fontFamily: 'inherit', boxSizing: 'border-box',
             }}
-            onFocus={(e) => { e.target.style.borderColor = '#2a2a2a'; e.target.style.background = '#101010' }}
+            onFocus={(e) => { e.target.style.borderColor = 'var(--border)'; e.target.style.background = 'var(--panel3)' }}
             onBlur={(e) => { e.target.style.borderColor = 'transparent'; e.target.style.background = 'transparent'; onTitleBlur() }}
           />
 
@@ -263,12 +263,12 @@ export default function BugPreviewModal({ bug, workspaceId, projectName, stages,
               {priority}
             </span>
             {projectName && (
-              <span style={{ color: '#666', fontSize: '10px' }}>in {projectName}</span>
+              <span style={{ color: 'var(--muted2)', fontSize: '10px' }}>in {projectName}</span>
             )}
           </div>
 
           {/* Section tabs */}
-          <div style={{ display: 'flex', gap: '2px', borderBottom: '1px solid #292929', marginBottom: '16px' }}>
+          <div style={{ display: 'flex', gap: '2px', borderBottom: '1px solid var(--border)', marginBottom: '16px' }}>
             {[
               { key: 'description', label: 'Description' },
               { key: 'comments', label: `Comments${comments.length ? ` (${comments.length})` : ''}` },
@@ -280,9 +280,9 @@ export default function BugPreviewModal({ bug, workspaceId, projectName, stages,
                 onClick={() => setTab(t.key)}
                 style={{
                   padding: '8px 12px', fontSize: '11.5px', fontWeight: 700,
-                  background: tab === t.key ? '#1d1d1d' : 'transparent',
-                  color: tab === t.key ? '#fff' : '#777',
-                  border: '1px solid transparent', borderColor: tab === t.key ? '#2c2c2c' : 'transparent',
+                  background: tab === t.key ? 'var(--hover)' : 'transparent',
+                  color: tab === t.key ? 'var(--text-strong)' : 'var(--muted)',
+                  border: '1px solid transparent', borderColor: tab === t.key ? 'var(--border)' : 'transparent',
                   borderBottom: tab === t.key ? '2px solid #695df0' : '2px solid transparent',
                   marginBottom: '-1px', cursor: 'pointer', fontFamily: 'inherit',
                   borderRadius: '4px 4px 0 0',
@@ -297,7 +297,7 @@ export default function BugPreviewModal({ bug, workspaceId, projectName, stages,
             <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
                 <label style={labelStyle}>Description</label>
-                <span style={{ fontSize: '9px', color: '#555' }}>Add context about the issue</span>
+                <span style={{ fontSize: '9px', color: 'var(--muted2)' }}>Add context about the issue</span>
               </div>
               <textarea
                 value={description}
@@ -313,7 +313,7 @@ export default function BugPreviewModal({ bug, workspaceId, projectName, stages,
                 onChange={(e) => setStepsToReproduce(e.target.value)}
                 onBlur={onStepsBlur}
                 placeholder="1. Go to…&#10;2. Click on…&#10;3. See error"
-                style={{ ...inputStyle, minHeight: '90px', resize: 'vertical', marginBottom: '18px', borderColor: '#3a3a3a' }}
+                style={{ ...inputStyle, minHeight: '90px', resize: 'vertical', marginBottom: '18px', borderColor: 'var(--hover-border)' }}
               />
 
               <label style={{ ...labelStyle, color: '#4cdf8a', marginBottom: '6px' }}>Expected Behavior</label>
@@ -355,14 +355,14 @@ export default function BugPreviewModal({ bug, workspaceId, projectName, stages,
                       </span>
                       <div style={{ minWidth: 0, flex: 1 }}>
                         <div style={{ display: 'flex', alignItems: 'baseline', gap: '7px', flexWrap: 'wrap' }}>
-                          <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#ddd' }}>
+                          <span style={{ fontSize: '11.5px', fontWeight: 700, color: 'var(--text-soft)' }}>
                             {c.author_full_name || c.author_name || 'Unknown'}
                           </span>
-                          <span style={{ fontSize: '9.5px', color: '#666' }}>
+                          <span style={{ fontSize: '9.5px', color: 'var(--muted2)' }}>
                             {new Date(c.created_at).toLocaleDateString()} · {new Date(c.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </span>
                         </div>
-                        <div style={{ fontSize: '11.5px', color: '#bbb', whiteSpace: 'pre-wrap', marginTop: '2px' }}>{c.content}</div>
+                        <div style={{ fontSize: '11.5px', color: 'var(--text-soft)', whiteSpace: 'pre-wrap', marginTop: '2px' }}>{c.content}</div>
                       </div>
                     </div>
                   ))}
@@ -389,7 +389,7 @@ export default function BugPreviewModal({ bug, workspaceId, projectName, stages,
           {tab === 'files' && (
             <>
               {files.length === 0 ? (
-                <div style={{ color: '#555', fontSize: '11px', marginBottom: '8px' }}>No files attached yet</div>
+                <div style={{ color: 'var(--muted2)', fontSize: '11px', marginBottom: '8px' }}>No files attached yet</div>
               ) : (
                 <div style={{ marginBottom: '10px' }}>
                   {files.map((f, i) => (
@@ -404,17 +404,17 @@ export default function BugPreviewModal({ bug, workspaceId, projectName, stages,
                           alt={f.name}
                           style={{
                             width: '34px', height: '34px', objectFit: 'cover',
-                            borderRadius: '3px', border: '1px solid #2a2a2a', flexShrink: 0,
+                            borderRadius: '3px', border: '1px solid var(--border)', flexShrink: 0,
                           }}
                         />
                       ) : (
-                        <span style={{ display: 'inline-flex', color: '#888' }}>{fileIcon(f.name)}</span>
+                        <span style={{ display: 'inline-flex', color: 'var(--muted)' }}>{fileIcon(f.name)}</span>
                       )}
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: '11px', color: '#ccc', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <div style={{ fontSize: '11px', color: 'var(--text-soft)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {f.name}
                         </div>
-                        <div style={{ fontSize: '9px', color: '#555' }}>
+                        <div style={{ fontSize: '9px', color: 'var(--muted2)' }}>
                           {[f.size != null ? formatSize(f.size) : null, f.added_by].filter(Boolean).join(' · ')}
                         </div>
                       </div>
@@ -424,7 +424,7 @@ export default function BugPreviewModal({ bug, workspaceId, projectName, stages,
                         onClick={() => removeFile(i)}
                         aria-label="Remove file"
                         style={{
-                          background: 'transparent', border: 0, color: '#555', cursor: 'pointer',
+                          background: 'transparent', border: 0, color: 'var(--muted2)', cursor: 'pointer',
                           padding: '2px 4px', opacity: 0, display: 'inline-flex',
                         }}
                       ><X size={11} /></button>
@@ -448,13 +448,13 @@ export default function BugPreviewModal({ bug, workspaceId, projectName, stages,
         {/* RIGHT */}
         <div style={{
           width: '240px', flexShrink: 0,
-          borderLeft: '1px solid #292929', background: '#111',
+          borderLeft: '1px solid var(--border)', background: 'var(--panel2)',
           padding: '18px 16px', overflowY: 'auto', minHeight: 0,
         }}>
           <button
             onClick={onClose}
             style={{
-              float: 'right', background: 'transparent', border: 0, color: '#666',
+              float: 'right', background: 'transparent', border: 0, color: 'var(--muted2)',
               cursor: 'pointer', fontSize: '14px', lineHeight: 1, padding: 0,
             }}
             aria-label="Close"
@@ -520,7 +520,7 @@ export default function BugPreviewModal({ bug, workspaceId, projectName, stages,
 
           <div style={{ marginBottom: '13px' }}>
             <label style={labelStyle}>Project</label>
-            <div style={{ fontSize: '12px', color: '#ddd', padding: '6px 8px', background: '#101010', border: '1px solid #2a2a2a', borderRadius: '4px' }}>
+            <div style={{ fontSize: '12px', color: 'var(--text-soft)', padding: '6px 8px', background: 'var(--panel3)', border: '1px solid var(--border)', borderRadius: '4px' }}>
               {projectName || '—'}
             </div>
           </div>

@@ -90,7 +90,7 @@ export default function Projects({ workspace, projectId }) {
       }}>
         <div>
           <h1 style={{ margin: '0 0 4px 0', fontSize: '20px', fontWeight: '700' }}>Projects</h1>
-          <p style={{ margin: '0', color: '#737373', fontSize: '12px' }}>Manage and track your projects</p>
+          <p style={{ margin: '0', color: 'var(--muted)', fontSize: '12px' }}>Manage and track your projects</p>
         </div>
         <button
           onClick={() => setShowForm(true)}
@@ -105,10 +105,10 @@ export default function Projects({ workspace, projectId }) {
         <div style={{
           textAlign: 'center',
           padding: '60px 20px',
-          color: '#777'
+          color: 'var(--muted)'
         }}>
           <div style={{ fontSize: '14px', marginBottom: '12px' }}>No projects yet</div>
-          <div style={{ fontSize: '12px', color: '#555' }}>Create your first project to get started</div>
+          <div style={{ fontSize: '12px', color: 'var(--muted2)' }}>Create your first project to get started</div>
         </div>
       ) : (
         <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))' }}>

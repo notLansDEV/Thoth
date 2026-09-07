@@ -282,6 +282,19 @@ CREATE TABLE IF NOT EXISTS activity_logs (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Notifications Table
+CREATE TABLE IF NOT EXISTS notifications (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+  entity_type VARCHAR(50),
+  entity_id UUID,
+  title VARCHAR(255) NOT NULL,
+  body TEXT,
+  is_read BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Users Table (for future auth integration)
 CREATE TABLE IF NOT EXISTS users (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -323,5 +336,7 @@ CREATE INDEX idx_reports_project_id ON reports(project_id);
 CREATE INDEX idx_reports_report_date ON reports(report_date);
 CREATE INDEX idx_activity_logs_workspace_id ON activity_logs(workspace_id);
 CREATE INDEX idx_activity_logs_created_at ON activity_logs(created_at);
+CREATE INDEX idx_notifications_user_id ON notifications(user_id);
+CREATE INDEX idx_notifications_user_read ON notifications(user_id, is_read);
 
 

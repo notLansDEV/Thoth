@@ -348,25 +348,25 @@ export default function Markdown({ subPage }) {
                 <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setShowRecents(false)} />
                 <div style={{
                   position: 'absolute', right: 0, top: 'calc(100% + 5px)', width: '260px',
-                  background: '#151515', border: '1px solid #292929', borderRadius: '6px',
+                  background: 'var(--panel2)', border: '1px solid var(--border)', borderRadius: '6px',
                   boxShadow: '0 14px 22px rgba(0,0,0,0.45)', zIndex: 50, overflow: 'hidden',
                 }}>
-                  <div style={{ fontSize: '9.5px', fontWeight: 700, color: '#666', letterSpacing: '0.07em', padding: '9px 12px 5px', borderBottom: '1px solid #242424' }}>RECENTLY EDITED</div>
+                  <div style={{ fontSize: '9.5px', fontWeight: 700, color: 'var(--muted2)', letterSpacing: '0.07em', padding: '9px 12px 5px', borderBottom: '1px solid var(--border-soft)' }}>RECENTLY EDITED</div>
                   {recents.length === 0 ? (
-                    <div style={{ padding: '14px 12px', fontSize: '11px', color: '#555' }}>No pages yet</div>
+                    <div style={{ padding: '14px 12px', fontSize: '11px', color: 'var(--muted2)' }}>No pages yet</div>
                   ) : recents.map((p) => (
                     <button key={p.id} onClick={() => { setOpenPage(p); setShowRecents(false) }}
                       style={{
                         display: 'flex', width: '100%', textAlign: 'left', gap: '8px', alignItems: 'center',
                         background: 'transparent', border: 0, cursor: 'pointer', padding: '9px 12px',
                       }}
-                      onMouseEnter={(e) => { e.currentTarget.style.background = '#1c1c1c' }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--border-soft)' }}
                       onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
                     >
-                      {p.page_type === 'journal' ? <CalendarDays size={12} style={{ color: '#8b7ff5', flexShrink: 0 }} /> : <FileText size={12} style={{ color: '#777', flexShrink: 0 }} />}
+                      {p.page_type === 'journal' ? <CalendarDays size={12} style={{ color: '#8b7ff5', flexShrink: 0 }} /> : <FileText size={12} style={{ color: 'var(--muted)', flexShrink: 0 }} />}
                       <span style={{ flex: 1, minWidth: 0 }}>
-                        <span style={{ display: 'block', fontSize: '11.5px', color: '#ddd', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.title || 'Untitled'}</span>
-                        <span style={{ display: 'block', fontSize: '9.5px', color: '#666' }}>{relTime(p.updated_at)}</span>
+                        <span style={{ display: 'block', fontSize: '11.5px', color: 'var(--text-soft)', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.title || 'Untitled'}</span>
+                        <span style={{ display: 'block', fontSize: '9.5px', color: 'var(--muted2)' }}>{relTime(p.updated_at)}</span>
                       </span>
                     </button>
                   ))}
@@ -645,40 +645,40 @@ function AllPagesGrid({ pages, loaded, onOpen, onDelete }) {
             </>
           )}
         </div>
-        <span style={{ fontSize: '10.5px', color: '#666' }}>{filtered.length} of {pages.length}</span>
+        <span style={{ fontSize: '10.5px', color: 'var(--muted2)' }}>{filtered.length} of {pages.length}</span>
       </div>
 
       {!loaded ? (
-        <div style={{ textAlign: 'center', padding: '48px', color: '#666', fontSize: '12px' }}>Loading pages…</div>
+        <div style={{ textAlign: 'center', padding: '48px', color: 'var(--muted2)', fontSize: '12px' }}>Loading pages…</div>
       ) : filtered.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '48px 20px', color: '#666' }}>
+        <div style={{ textAlign: 'center', padding: '48px 20px', color: 'var(--muted2)' }}>
           <div style={{ fontSize: '13px', marginBottom: '8px' }}>No pages found</div>
-          <div style={{ fontSize: '11px', color: '#555' }}>{q ? `Nothing matches “${q}”` : 'Create your first page with "New Page"'}</div>
+          <div style={{ fontSize: '11px', color: 'var(--muted2)' }}>{q ? `Nothing matches “${q}”` : 'Create your first page with "New Page"'}</div>
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))', gap: '10px' }}>
           {filtered.map((p) => (
             <div key={p.id}
               onClick={() => onOpen(p)}
-              style={{ background: '#121212', border: '1px solid #292929', borderRadius: '5px', padding: '12px', cursor: 'pointer', transition: 'border-color 0.15s' }}
+              style={{ background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: '5px', padding: '12px', cursor: 'pointer', transition: 'border-color 0.15s' }}
               onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#6e61ff' }}
-              onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#292929' }}
+              onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border)' }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '7px', marginBottom: '6px' }}>
                 {p.page_type === 'journal'
                   ? <CalendarDays size={12} style={{ color: '#8b7ff5', flexShrink: 0 }} />
-                  : <FileText size={12} style={{ color: '#777', flexShrink: 0 }} />}
-                <span style={{ fontSize: '12px', fontWeight: 700, color: '#eee', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{p.title || 'Untitled'}</span>
+                  : <FileText size={12} style={{ color: 'var(--muted)', flexShrink: 0 }} />}
+                <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-strong)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{p.title || 'Untitled'}</span>
                 <button
                   className="icon-btn" title="Delete"
                   onClick={(e) => { e.stopPropagation(); onDelete(p) }}
                   style={{ color: '#ff6b6b' }}
                 ><Trash2 size={11} /></button>
               </div>
-              <div style={{ fontSize: '10.5px', color: '#777', lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', minHeight: '31px' }}>
+              <div style={{ fontSize: '10.5px', color: 'var(--muted)', lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', minHeight: '31px' }}>
                 {(p.content || '').replace(/[#*`>\-[\]]/g, '').trim().slice(0, 120) || 'Empty page'}
               </div>
-              <div style={{ fontSize: '9.5px', color: '#555', marginTop: '7px' }}>Edited {relTime(p.updated_at)}</div>
+              <div style={{ fontSize: '9.5px', color: 'var(--muted2)', marginTop: '7px' }}>Edited {relTime(p.updated_at)}</div>
             </div>
           ))}
         </div>
@@ -693,9 +693,9 @@ function NewPageModal({ onSubmit, onClose }) {
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
       <form onClick={(e) => e.stopPropagation()} onSubmit={(e) => { e.preventDefault(); if (!loading) { setLoading(true); onSubmit(title.trim()) } }}
-        style={{ background: '#151515', border: '1px solid #292929', borderRadius: '6px', padding: '24px', width: '100%', maxWidth: '380px', boxShadow: '0 20px 25px rgba(0,0,0,0.3)' }}>
+        style={{ background: 'var(--panel2)', border: '1px solid var(--border)', borderRadius: '6px', padding: '24px', width: '100%', maxWidth: '380px', boxShadow: '0 20px 25px rgba(0,0,0,0.3)' }}>
         <h2 style={{ margin: '0 0 6px', fontSize: '15px', fontWeight: 700 }}>New Page</h2>
-        <p style={{ margin: '0 0 14px', fontSize: '11.5px', color: '#777' }}>Give your page a title</p>
+        <p style={{ margin: '0 0 14px', fontSize: '11.5px', color: 'var(--muted)' }}>Give your page a title</p>
         <input
           type="text" value={title} autoFocus
           onChange={(e) => setTitle(e.target.value)}
@@ -856,11 +856,11 @@ const LONG_LINES = 12
 const NEW_WINDOW_MS = 30 * 60 * 1000
 
 function JournalFeed({ entries, loaded, authors, myId, myName, patchPage, onDeleteConfirm, focusMode, showToolbar, onToggleFocus, onToggleToolbar, onFocusPage }) {
-  if (!loaded) return <div style={{ textAlign: 'center', padding: '40px', color: '#666', fontSize: '12px' }}>Loading notes…</div>
+  if (!loaded) return <div style={{ textAlign: 'center', padding: '40px', color: 'var(--muted2)', fontSize: '12px' }}>Loading notes…</div>
   return (
     <div className="j-feed" style={{ marginTop: '10px' }}>
       {entries.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '26px 12px', color: '#555', fontSize: '11px', border: '1px dashed #2a2a2a', borderRadius: '8px' }}>
+        <div style={{ textAlign: 'center', padding: '26px 12px', color: 'var(--muted2)', fontSize: '11px', border: '1px dashed var(--border)', borderRadius: '8px' }}>
           Nothing here yet — write the first note above.
         </div>
       ) : (
@@ -1011,7 +1011,7 @@ function NoteCard({ page, authorName, myId, myName, patchPage, onDeleteConfirm, 
                     ? <img src={a.dataUrl} alt="" style={{ width: '14px', height: '14px', objectFit: 'cover', borderRadius: '3px' }} />
                     : <Paperclip size={9} />}
                   {a.name}
-                  <button type="button" onClick={() => setEditAtts((prev) => prev.filter((x) => x.id !== a.id))} style={{ background: 'none', border: 0, color: '#888', cursor: 'pointer', padding: 0, marginLeft: 2, lineHeight: 1 }}>✕</button>
+                  <button type="button" onClick={() => setEditAtts((prev) => prev.filter((x) => x.id !== a.id))} style={{ background: 'none', border: 0, color: 'var(--muted)', cursor: 'pointer', padding: 0, marginLeft: 2, lineHeight: 1 }}>✕</button>
                 </span>
               ))}
             </div>
@@ -1125,9 +1125,9 @@ function NoteCard({ page, authorName, myId, myName, patchPage, onDeleteConfirm, 
                       {(c.author || '?').slice(0, 2).toUpperCase()}
                     </span>
                     <div style={{ minWidth: 0, flex: 1 }}>
-                      <span style={{ fontWeight: 700, color: '#ccc', marginRight: '6px', fontSize: '10.5px' }}>{c.author}</span>
-                      {replyAuthor && <span style={{ color: '#666', fontSize: '9.5px', marginRight: '4px' }}>replying to {replyAuthor}</span>}
-                      <span style={{ color: '#b5b5b5', fontSize: '11px', whiteSpace: 'pre-wrap' }}>{c.text}</span>
+                      <span style={{ fontWeight: 700, color: 'var(--text-soft)', marginRight: '6px', fontSize: '10.5px' }}>{c.author}</span>
+                      {replyAuthor && <span style={{ color: 'var(--muted2)', fontSize: '9.5px', marginRight: '4px' }}>replying to {replyAuthor}</span>}
+                      <span style={{ color: 'var(--muted)', fontSize: '11px', whiteSpace: 'pre-wrap' }}>{c.text}</span>
                       <div className="j-cmt-actions">
                         {c.emoji ? (
                           <button type="button" className="j-cmt-action j-cmt-emoji-active" onClick={() => { setReactOpen(i); setReplyTo(null) }}>

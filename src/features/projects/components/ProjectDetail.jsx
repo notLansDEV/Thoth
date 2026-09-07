@@ -21,7 +21,7 @@ const labelStyle = {
   marginBottom: '5px',
   fontSize: '10px',
   fontWeight: '700',
-  color: '#777',
+  color: 'var(--muted)',
   textTransform: 'uppercase',
   letterSpacing: '0.06em',
 }
@@ -35,10 +35,10 @@ function fmtDate(value) {
 function StatCard({ icon, label, value }) {
   return (
     <div className="card" style={{ padding: '12px' }}>
-      <div style={{ fontSize: '9px', fontWeight: 700, color: '#666', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+      <div style={{ fontSize: '9px', fontWeight: 700, color: 'var(--muted2)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '5px' }}>
         <span style={{ display: 'inline-flex' }}>{icon}</span> {label}
       </div>
-      <div style={{ fontSize: '18px', fontWeight: 700, color: '#f1f1f1' }}>{value}</div>
+      <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-strong)' }}>{value}</div>
     </div>
   )
 }
@@ -92,7 +92,7 @@ export default function ProjectDetail({ projectId, onBack }) {
 
   if (!project) {
     return (
-      <div className="card" style={{ padding: '20px', fontSize: '12px', color: '#777' }}>
+      <div className="card" style={{ padding: '20px', fontSize: '12px', color: 'var(--muted)' }}>
         Loading project…
       </div>
     )
@@ -124,12 +124,12 @@ export default function ProjectDetail({ projectId, onBack }) {
             <h1 className="page-title">{project.name}</h1>
             <div style={{ display: 'flex', gap: '7px', alignItems: 'center' }}>
               <span className="badge" style={{
-                color: statusMeta?.color || '#777', background: 'transparent',
-                border: `1px solid ${statusMeta?.color || '#777'}55`,
+                color: statusMeta?.color || 'var(--muted)', background: 'transparent',
+                border: `1px solid ${statusMeta?.color || 'var(--muted)'}55`,
               }}>{statusMeta?.label || project.status}</span>
               <span className="badge" style={{
-                color: priorityMeta?.color || '#777', background: 'transparent',
-                border: `1px solid ${priorityMeta?.color || '#777'}55`,
+                color: priorityMeta?.color || 'var(--muted)', background: 'transparent',
+                border: `1px solid ${priorityMeta?.color || 'var(--muted)'}55`,
               }}>{priorityMeta?.label || project.priority || 'Medium'} priority</span>
               {overdue && <span className="badge" style={{ color: '#ff4040', background: 'transparent', border: '1px solid rgba(255,64,64,0.4)' }}>Overdue</span>}
             </div>
@@ -147,7 +147,7 @@ export default function ProjectDetail({ projectId, onBack }) {
 
       {/* Overall progress */}
       <div className="card" style={{ padding: '12px', marginBottom: '10px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: '#888', marginBottom: '6px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'var(--muted)', marginBottom: '6px' }}>
           <span>Overall progress</span>
           <span>{progress}%</span>
         </div>
@@ -155,7 +155,7 @@ export default function ProjectDetail({ projectId, onBack }) {
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: '4px', borderBottom: '1px solid #292929', marginBottom: '13px', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: '4px', borderBottom: '1px solid var(--border)', marginBottom: '13px', flexWrap: 'wrap' }}>
         {TABS.map((t) => (
           <button
             key={t}
@@ -163,7 +163,7 @@ export default function ProjectDetail({ projectId, onBack }) {
             style={{
               padding: '7px 11px', fontSize: '11px', fontWeight: 600, fontFamily: 'inherit',
               background: 'transparent', border: 0, cursor: 'pointer',
-              color: tab === t ? '#fff' : '#777',
+              color: tab === t ? 'var(--text-strong)' : 'var(--muted)',
               borderBottom: tab === t ? '2px solid #695df0' : '2px solid transparent',
             }}
           >
@@ -176,27 +176,27 @@ export default function ProjectDetail({ projectId, onBack }) {
       {tab === 'Overview' && (
         <div className="card">
           <label style={labelStyle}>Description</label>
-          <p style={{ margin: '0 0 14px', fontSize: '12px', color: '#bbb', lineHeight: 1.55 }}>
+          <p style={{ margin: '0 0 14px', fontSize: '12px', color: 'var(--text-soft)', lineHeight: 1.55 }}>
             {project.description || 'No description yet.'}
           </p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px' }}>
             <div>
               <label style={labelStyle}>Start date</label>
-              <div style={{ fontSize: '12px', color: '#ddd' }}>{fmtDate(project.start_date)}</div>
+              <div style={{ fontSize: '12px', color: 'var(--text-soft)' }}>{fmtDate(project.start_date)}</div>
             </div>
             <div>
               <label style={labelStyle}>Deadline</label>
-              <div style={{ fontSize: '12px', color: overdue ? '#ff4040' : '#ddd' }}>
+              <div style={{ fontSize: '12px', color: overdue ? '#ff4040' : 'var(--text-soft)' }}>
                 {fmtDate(project.deadline)}{overdue ? ' (overdue)' : ''}
               </div>
             </div>
             <div>
               <label style={labelStyle}>Status</label>
-              <div style={{ fontSize: '12px', color: '#ddd' }}>{statusMeta?.label || project.status}</div>
+              <div style={{ fontSize: '12px', color: 'var(--text-soft)' }}>{statusMeta?.label || project.status}</div>
             </div>
             <div>
               <label style={labelStyle}>Priority</label>
-              <div style={{ fontSize: '12px', color: priorityMeta?.color || '#ddd' }}>
+              <div style={{ fontSize: '12px', color: priorityMeta?.color || 'var(--text-soft)' }}>
                 {priorityMeta?.label || project.priority}
               </div>
             </div>
@@ -208,11 +208,11 @@ export default function ProjectDetail({ projectId, onBack }) {
         members.length === 0 ? <Empty text="No team members in this workspace yet." /> : (
           <div className="card">
             {members.map((m) => (
-              <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: '9px', padding: '7px 0', borderBottom: '1px solid #222' }}>
+              <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: '9px', padding: '7px 0', borderBottom: '1px solid var(--border-soft)' }}>
                 <span className="avatar">{(m.full_name || m.username || '?').slice(0, 2).toUpperCase()}</span>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: '12px', color: '#ddd', fontWeight: 600 }}>{m.full_name || m.username}</div>
-                  <div style={{ fontSize: '10px', color: '#666' }}>{m.email}</div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-soft)', fontWeight: 600 }}>{m.full_name || m.username}</div>
+                  <div style={{ fontSize: '10px', color: 'var(--muted2)' }}>{m.email}</div>
                 </div>
                 {m.role && <span className="badge paused">{m.role}</span>}
               </div>
@@ -252,7 +252,7 @@ export default function ProjectDetail({ projectId, onBack }) {
                   <div key={ms.id} className="card" style={{ padding: '13px 14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     {/* Title left · status hard right */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <span style={{ flex: 1, minWidth: 0, fontSize: '13px', fontWeight: 700, color: '#eee', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <span style={{ flex: 1, minWidth: 0, fontSize: '13px', fontWeight: 700, color: 'var(--text-strong)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {ms.name}
                       </span>
                       <button
@@ -273,16 +273,16 @@ export default function ProjectDetail({ projectId, onBack }) {
                     </div>
 
                     {ms.description && (
-                      <div style={{ fontSize: '11px', color: '#777', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                      <div style={{ fontSize: '11px', color: 'var(--muted)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
                         {ms.description}
                       </div>
                     )}
 
                     {/* Start / due dates */}
-                    <div style={{ display: 'flex', gap: '14px', fontSize: '10.5px', color: '#666', flexWrap: 'wrap' }}>
-                      <span>Start: <span style={{ color: '#999' }}>{fmtDate(ms.start_date)}</span></span>
-                      <span>Due: <span style={{ color: '#999' }}>{fmtDate(ms.due_date)}</span></span>
-                      {checklist.length > 0 && <span>Checklist: <span style={{ color: '#999' }}>{doneCount}/{checklist.length}</span></span>}
+                    <div style={{ display: 'flex', gap: '14px', fontSize: '10.5px', color: 'var(--muted2)', flexWrap: 'wrap' }}>
+                      <span>Start: <span style={{ color: 'var(--muted)' }}>{fmtDate(ms.start_date)}</span></span>
+                      <span>Due: <span style={{ color: 'var(--muted)' }}>{fmtDate(ms.due_date)}</span></span>
+                      {checklist.length > 0 && <span>Checklist: <span style={{ color: 'var(--muted)' }}>{doneCount}/{checklist.length}</span></span>}
                     </div>
 
                     {/* Full-row progress bar */}
@@ -290,26 +290,26 @@ export default function ProjectDetail({ projectId, onBack }) {
                       <div className="progress" style={{ width: '100%' }}>
                         <span style={{ width: `${Number(ms.progress) || 0}%` }} />
                       </div>
-                      <span style={{ fontSize: '10px', color: '#666', flexShrink: 0 }}>{Number(ms.progress) || 0}%</span>
+                      <span style={{ fontSize: '10px', color: 'var(--muted2)', flexShrink: 0 }}>{Number(ms.progress) || 0}%</span>
                     </div>
 
                     {/* 4 stat cards */}
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', marginTop: '4px' }}>
-                      <div style={{ padding: '8px 10px', background: '#101010', border: '1px solid #232323', borderRadius: '4px' }}>
-                        <div style={{ fontSize: '9px', fontWeight: 700, color: '#666', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>Total Task</div>
-                        <div style={{ fontSize: '15px', fontWeight: 700, color: '#f1f1f1' }}>{msTasks.length}</div>
+                      <div style={{ padding: '8px 10px', background: 'var(--panel3)', border: '1px solid var(--hover)', borderRadius: '4px' }}>
+                        <div style={{ fontSize: '9px', fontWeight: 700, color: 'var(--muted2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>Total Task</div>
+                        <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-strong)' }}>{msTasks.length}</div>
                       </div>
-                      <div style={{ padding: '8px 10px', background: '#101010', border: '1px solid #232323', borderRadius: '4px' }}>
-                        <div style={{ fontSize: '9px', fontWeight: 700, color: '#666', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>Completed Task</div>
+                      <div style={{ padding: '8px 10px', background: 'var(--panel3)', border: '1px solid var(--hover)', borderRadius: '4px' }}>
+                        <div style={{ fontSize: '9px', fontWeight: 700, color: 'var(--muted2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>Completed Task</div>
                         <div style={{ fontSize: '15px', fontWeight: 700, color: '#20d96b' }}>{msDoneTasks}</div>
                       </div>
-                      <div style={{ padding: '8px 10px', background: '#101010', border: '1px solid #232323', borderRadius: '4px' }}>
-                        <div style={{ fontSize: '9px', fontWeight: 700, color: '#666', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>Open Bugs</div>
+                      <div style={{ padding: '8px 10px', background: 'var(--panel3)', border: '1px solid var(--hover)', borderRadius: '4px' }}>
+                        <div style={{ fontSize: '9px', fontWeight: 700, color: 'var(--muted2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>Open Bugs</div>
                         <div style={{ fontSize: '15px', fontWeight: 700, color: '#ff7918' }}>{openBugsCount}</div>
                       </div>
-                      <div style={{ padding: '8px 10px', background: '#101010', border: '1px solid #232323', borderRadius: '4px' }}>
-                        <div style={{ fontSize: '9px', fontWeight: 700, color: '#666', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>Closed Bugs</div>
-                        <div style={{ fontSize: '15px', fontWeight: 700, color: '#777' }}>{closedBugsCount}</div>
+                      <div style={{ padding: '8px 10px', background: 'var(--panel3)', border: '1px solid var(--hover)', borderRadius: '4px' }}>
+                        <div style={{ fontSize: '9px', fontWeight: 700, color: 'var(--muted2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>Closed Bugs</div>
+                        <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--muted)' }}>{closedBugsCount}</div>
                       </div>
                     </div>
                   </div>
@@ -379,12 +379,12 @@ export default function ProjectDetail({ projectId, onBack }) {
                       const stage = TASK_STAGES.find((s) => s.value === (t.status || 'To Do'))
                       return (
                         <tr key={t.id}>
-                          <td style={{ color: '#888', fontFamily: 'monospace', fontSize: '10.5px' }}>{t.task_code || '—'}</td>
-                          <td style={{ color: '#ddd', fontWeight: 600 }}>{t.title}</td>
+                          <td style={{ color: 'var(--muted)', fontFamily: 'monospace', fontSize: '10.5px' }}>{t.task_code || '—'}</td>
+                          <td style={{ color: 'var(--text-soft)', fontWeight: 600 }}>{t.title}</td>
                           <td>{t.assignee_name || 'Unassigned'}</td>
                           <td>
-                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#ccc' }}>
-                              <span className="dot" style={{ background: stage?.color || '#555' }} />
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: 'var(--text-soft)' }}>
+                              <span className="dot" style={{ background: stage?.color || 'var(--muted2)' }} />
                               {t.status || 'To Do'}
                             </span>
                           </td>
@@ -397,7 +397,7 @@ export default function ProjectDetail({ projectId, onBack }) {
                           <td style={{ minWidth: '90px' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
                               <div className="progress" style={{ flex: 1 }}><span style={{ width: `${Number(t.progress) || 0}%` }} /></div>
-                              <span style={{ fontSize: '10px', color: '#666' }}>{Number(t.progress) || 0}%</span>
+                              <span style={{ fontSize: '10px', color: 'var(--muted2)' }}>{Number(t.progress) || 0}%</span>
                             </div>
                           </td>
                         </tr>
@@ -434,8 +434,8 @@ export default function ProjectDetail({ projectId, onBack }) {
                 <tbody>
                   {bugs.map((b) => (
                     <tr key={b.id}>
-                      <td style={{ color: '#888', fontFamily: 'monospace', fontSize: '10.5px' }}>{b.bug_id || '—'}</td>
-                      <td style={{ color: '#ddd', fontWeight: 600 }}>{b.title}</td>
+                      <td style={{ color: 'var(--muted)', fontFamily: 'monospace', fontSize: '10.5px' }}>{b.bug_id || '—'}</td>
+                      <td style={{ color: 'var(--text-soft)', fontWeight: 600 }}>{b.title}</td>
                       <td>
                         <span className="badge" style={{ ...priorityStyle(b.priority), background: 'transparent', fontSize: '9px' }}>
                           {b.priority || 'medium'}
@@ -491,14 +491,14 @@ export default function ProjectDetail({ projectId, onBack }) {
                   <tbody>
                     {filtered.map((a) => (
                       <tr key={a.id}>
-                        <td style={{ color: '#ddd' }}>
+                        <td style={{ color: 'var(--text-soft)' }}>
                           {describeActivity(a)}
                           {a.action === 'status_changed' && (
                             <span className="badge" style={{ marginLeft: '7px', fontSize: '9px', background: 'transparent' }}>status</span>
                           )}
                         </td>
-                        <td style={{ color: '#888' }}>{actorName(a)}</td>
-                        <td style={{ color: '#666', whiteSpace: 'nowrap', fontSize: '11px' }}>
+                        <td style={{ color: 'var(--muted)' }}>{actorName(a)}</td>
+                        <td style={{ color: 'var(--muted2)', whiteSpace: 'nowrap', fontSize: '11px' }}>
                           {new Date(a.created_at).toLocaleDateString()} · {new Date(a.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                         </td>
                       </tr>
@@ -518,8 +518,8 @@ export default function ProjectDetail({ projectId, onBack }) {
 function Empty({ text }) {
   return (
     <div style={{
-      border: '1px dashed #2a2a2a', borderRadius: '4px', padding: '22px',
-      textAlign: 'center', color: '#555', fontSize: '11px',
+      border: '1px dashed var(--border)', borderRadius: '4px', padding: '22px',
+      textAlign: 'center', color: 'var(--muted2)', fontSize: '11px',
     }}>
       {text}
     </div>

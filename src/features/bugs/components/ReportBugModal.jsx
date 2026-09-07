@@ -6,9 +6,9 @@ import { Paperclip, X } from 'lucide-react'
 const inputStyle = {
   width: '100%',
   padding: '8px 9px',
-  border: '1px solid #2a2a2a',
-  background: '#101010',
-  color: '#ddd',
+  border: '1px solid var(--border)',
+  background: 'var(--panel3)',
+  color: 'var(--text-soft)',
   borderRadius: '4px',
   fontSize: '12px',
   boxSizing: 'border-box',
@@ -20,7 +20,7 @@ const labelStyle = {
   marginBottom: '6px',
   fontSize: '12px',
   fontWeight: '600',
-  color: '#ddd',
+  color: 'var(--text-soft)',
 }
 
 const MAX_FILE_BYTES = 2 * 1024 * 1024
@@ -127,13 +127,13 @@ export default function ReportBugModal({ projects, workspaceId, stages, defaultS
       alignItems: 'center', justifyContent: 'center', zIndex: 1100,
     }}>
       <div onClick={(e) => e.stopPropagation()} style={{
-        background: '#151515', border: '1px solid #292929', borderRadius: '6px',
+        background: 'var(--panel2)', border: '1px solid var(--border)', borderRadius: '6px',
         padding: '24px', width: '100%', maxWidth: '560px', maxHeight: '90vh',
         overflowY: 'auto', boxShadow: '0 20px 25px rgba(0,0,0,0.3)',
       }}>
         <div style={{ marginBottom: '16px' }}>
           <h2 style={{ margin: '0 0 8px 0', fontSize: '16px', fontWeight: '700' }}>Report a Bug</h2>
-          <p style={{ margin: 0, color: '#777', fontSize: '12px' }}>Describe the issue so it can be tracked and fixed</p>
+          <p style={{ margin: 0, color: 'var(--muted)', fontSize: '12px' }}>Describe the issue so it can be tracked and fixed</p>
         </div>
 
         <form onSubmit={handleSubmit} noValidate>
@@ -217,7 +217,7 @@ export default function ReportBugModal({ projects, workspaceId, stages, defaultS
               <select
                 value={priority}
                 onChange={(e) => setPriority(e.target.value)}
-                style={{ ...inputStyle, borderColor: `${priorityColor || '#2a2a2a'}66` }}
+                style={{ ...inputStyle, borderColor: `${priorityColor || 'var(--border)'}66` }}
               >
                 {TASK_PRIORITIES.map((p) => (
                   <option key={p.value} value={p.value}>{p.label}</option>
@@ -284,8 +284,8 @@ export default function ReportBugModal({ projects, workspaceId, stages, defaultS
                 {attachments.map((f, i) => (
                   <span key={`${f.name}-${i}`} style={{
                     display: 'flex', alignItems: 'center', gap: '7px',
-                    fontSize: '10.5px', color: '#999', background: '#101010',
-                    border: '1px solid #232323', borderRadius: '3px', padding: '4px 7px',
+                    fontSize: '10.5px', color: 'var(--muted)', background: 'var(--panel3)',
+                    border: '1px solid var(--hover)', borderRadius: '3px', padding: '4px 7px',
                   }}>
                     <Paperclip size={11} style={{ flexShrink: 0 }} />
                     <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
@@ -298,7 +298,7 @@ export default function ReportBugModal({ projects, workspaceId, stages, defaultS
                 ))}
               </div>
             )}
-            <div style={{ fontSize: '9.5px', color: '#555', marginTop: '5px' }}>Files up to 2 MB each.</div>
+            <div style={{ fontSize: '9.5px', color: 'var(--muted2)', marginTop: '5px' }}>Files up to 2 MB each.</div>
           </div>
 
           {/* Row: Start Date + Due Date */}

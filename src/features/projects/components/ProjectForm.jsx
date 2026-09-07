@@ -4,9 +4,9 @@ import { PROJECT_STATUSES } from '../projects.service.js'
 const inputStyle = {
   width: '100%',
   padding: '8px 9px',
-  border: '1px solid #2a2a2a',
-  background: '#101010',
-  color: '#ddd',
+  border: '1px solid var(--border)',
+  background: 'var(--panel3)',
+  color: 'var(--text-soft)',
   borderRadius: '4px',
   fontSize: '12px',
   boxSizing: 'border-box',
@@ -18,7 +18,7 @@ const labelStyle = {
   marginBottom: '6px',
   fontSize: '12px',
   fontWeight: '600',
-  color: '#ddd'
+  color: 'var(--text-soft)'
 }
 
 export default function ProjectForm({ onSubmit, onCancel }) {
@@ -54,8 +54,8 @@ export default function ProjectForm({ onSubmit, onCancel }) {
       zIndex: 1000
     }}>
       <div style={{
-        background: '#151515',
-        border: '1px solid #292929',
+        background: 'var(--panel2)',
+        border: '1px solid var(--border)',
         borderRadius: '6px',
         padding: '24px',
         width: '100%',
@@ -66,7 +66,7 @@ export default function ProjectForm({ onSubmit, onCancel }) {
       }}>
         <div style={{ marginBottom: '16px' }}>
           <h2 style={{ margin: '0 0 8px 0', fontSize: '16px', fontWeight: '700' }}>New Project</h2>
-          <p style={{ margin: '0', color: '#777', fontSize: '12px' }}>Create a new project to get started</p>
+          <p style={{ margin: '0', color: 'var(--muted)', fontSize: '12px' }}>Create a new project to get started</p>
         </div>
 
         <form onSubmit={handleSubmit}>

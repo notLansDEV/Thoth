@@ -34,10 +34,10 @@ function formatDate(value) {
 function StatCard({ icon, label, value }) {
   return (
     <div className="card" style={{ padding: '12px' }}>
-      <div style={{ fontSize: '9px', fontWeight: 700, color: '#666', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+      <div style={{ fontSize: '9px', fontWeight: 700, color: 'var(--muted2)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '5px' }}>
         <span style={{ display: 'inline-flex' }}>{icon}</span> {label}
       </div>
-      <div style={{ fontSize: '18px', fontWeight: 700, color: '#f1f1f1' }}>{value}</div>
+      <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-strong)' }}>{value}</div>
     </div>
   )
 }
@@ -52,15 +52,15 @@ function TaskCard({ task, onOpen, onDelete, onDragStart }) {
       onDragStart={(e) => onDragStart(e, task.id)}
       onClick={() => onOpen(task)}
       style={{
-        background: '#101010', border: overdue ? '1px solid rgba(255,64,64,0.4)' : '1px solid #2a2a2a',
+        background: 'var(--panel3)', border: overdue ? '1px solid rgba(255,64,64,0.4)' : '1px solid var(--border)',
         borderRadius: '4px', padding: '10px', marginBottom: '8px', cursor: 'grab',
         transition: 'border-color 0.15s',
       }}
       onMouseEnter={(e) => { e.currentTarget.style.borderColor = overdue ? 'rgba(255,64,64,0.7)' : '#6e61ff' }}
-      onMouseLeave={(e) => { e.currentTarget.style.borderColor = overdue ? 'rgba(255,64,64,0.4)' : '#2a2a2a' }}
+      onMouseLeave={(e) => { e.currentTarget.style.borderColor = overdue ? 'rgba(255,64,64,0.4)' : 'var(--border)' }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', alignItems: 'flex-start' }}>
-        <div style={{ fontSize: '12px', color: '#eee', fontWeight: 600, minWidth: 0 }}>
+        <div style={{ fontSize: '12px', color: 'var(--text-strong)', fontWeight: 600, minWidth: 0 }}>
           {task.task_code && (
             <span style={{ fontFamily: 'monospace', fontSize: '9.5px', color: '#6e61ff', marginRight: '6px' }}>
               {task.task_code}
@@ -76,24 +76,24 @@ function TaskCard({ task, onOpen, onDelete, onDragStart }) {
             type="button"
             onClick={(e) => { e.stopPropagation(); onOpen(task) }}
             title="Edit"
-            style={{ background: 'transparent', border: 0, color: '#555', cursor: 'pointer', padding: '2px', display: 'inline-flex', borderRadius: '3px' }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = '#888'; e.currentTarget.style.background = '#1a1a1a' }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = '#555'; e.currentTarget.style.background = 'transparent' }}
+            style={{ background: 'transparent', border: 0, color: 'var(--muted2)', cursor: 'pointer', padding: '2px', display: 'inline-flex', borderRadius: '3px' }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--muted)'; e.currentTarget.style.background = 'var(--hover)' }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--muted2)'; e.currentTarget.style.background = 'transparent' }}
           ><Pencil size={11} /></button>
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); onDelete(task) }}
             title="Delete"
-            style={{ background: 'transparent', border: 0, color: '#555', cursor: 'pointer', padding: '2px', display: 'inline-flex', borderRadius: '3px' }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = '#ff4040'; e.currentTarget.style.background = '#1a1a1a' }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = '#555'; e.currentTarget.style.background = 'transparent' }}
+            style={{ background: 'transparent', border: 0, color: 'var(--muted2)', cursor: 'pointer', padding: '2px', display: 'inline-flex', borderRadius: '3px' }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = '#ff4040'; e.currentTarget.style.background = 'var(--hover)' }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--muted2)'; e.currentTarget.style.background = 'transparent' }}
           ><Trash2 size={11} /></button>
         </div>
       </div>
 
       {task.description && (
         <div style={{
-          color: '#777', fontSize: '10px', marginTop: '5px',
+          color: 'var(--muted)', fontSize: '10px', marginTop: '5px',
           display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
         }}>
           {task.description}
@@ -101,13 +101,13 @@ function TaskCard({ task, onOpen, onDelete, onDragStart }) {
       )}
 
       {task.assignee_name && (
-        <div style={{ fontSize: '10px', color: '#888', marginTop: '7px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+        <div style={{ fontSize: '10px', color: 'var(--muted)', marginTop: '7px', display: 'flex', alignItems: 'center', gap: '4px' }}>
           <User size={10} /> {task.assignee_name}
         </div>
       )}
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px' }}>
-        <span style={{ fontSize: '9px', color: '#666', display: 'flex', alignItems: 'center', gap: '4px' }}>
+        <span style={{ fontSize: '9px', color: 'var(--muted2)', display: 'flex', alignItems: 'center', gap: '4px' }}>
           <span className="dot" style={{ background: task.project_color || '#6e61ff', width: 6, height: 6 }} />
           {task.project_name}
         </span>
@@ -118,7 +118,7 @@ function TaskCard({ task, onOpen, onDelete, onDragStart }) {
                 Overdue
               </span>
             )}
-            <span style={{ color: overdue ? '#ff8080' : '#777', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+            <span style={{ color: overdue ? '#ff8080' : 'var(--muted)', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
               <Clock size={10} /> {due}
             </span>
           </span>
@@ -183,6 +183,13 @@ export default function Tasks({ subPage }) {
     return () => { alive = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useEffect(() => {
+    if (!subPage || subPage === 'stages' || subPage === 'all') return
+    const found = tasks.find((t) => t.id === subPage)
+    if (found) setPreview(found)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subPage, tasks.length])
 
   function handleDrop(status) {
     const id = dragId.current
@@ -336,15 +343,15 @@ export default function Tasks({ subPage }) {
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={() => handleDrop(stage.name)}
                 style={{
-                  background: '#121212', border: '1px solid #292929', borderRadius: '5px',
+                  background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: '5px',
                   padding: '9px', minHeight: '120px',
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '9px', padding: '0 2px' }}>
-                  <span style={{ fontSize: '11px', fontWeight: '700', color: stage.color || '#999', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  <span style={{ fontSize: '11px', fontWeight: '700', color: stage.color || 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                     {stage.name}
                   </span>
-                  <span style={{ fontSize: '10px', color: '#555' }}>{columnTasks.length}</span>
+                  <span style={{ fontSize: '10px', color: 'var(--muted2)' }}>{columnTasks.length}</span>
                 </div>
 
                 {columnTasks.map((task) => (
@@ -359,8 +366,8 @@ export default function Tasks({ subPage }) {
 
                 {columnTasks.length === 0 && (
                   <div style={{
-                    border: '1px dashed #2a2a2a', borderRadius: '4px', padding: '14px',
-                    textAlign: 'center', color: '#444', fontSize: '10px',
+                    border: '1px dashed var(--border)', borderRadius: '4px', padding: '14px',
+                    textAlign: 'center', color: 'var(--muted2)', fontSize: '10px',
                   }}>
                     Drop tasks here
                   </div>

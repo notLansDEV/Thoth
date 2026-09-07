@@ -7,7 +7,7 @@ const labelStyle = {
   marginBottom: '5px',
   fontSize: '10px',
   fontWeight: '700',
-  color: '#777',
+  color: 'var(--muted)',
   textTransform: 'uppercase',
   letterSpacing: '0.06em',
 }
@@ -15,9 +15,9 @@ const labelStyle = {
 const inputStyle = {
   width: '100%',
   padding: '8px 9px',
-  border: '1px solid #2a2a2a',
-  background: '#101010',
-  color: '#ddd',
+  border: '1px solid var(--border)',
+  background: 'var(--panel3)',
+  color: 'var(--text-soft)',
   borderRadius: '4px',
   fontSize: '12px',
   boxSizing: 'border-box',
@@ -81,7 +81,7 @@ export default function CreateMilestoneModal({ projectId, milestone = null, onSa
       alignItems: 'center', justifyContent: 'center', zIndex: 1100,
     }}>
       <div onClick={(e) => e.stopPropagation()} style={{
-        background: '#151515', border: '1px solid #292929', borderRadius: '6px',
+        background: 'var(--panel2)', border: '1px solid var(--border)', borderRadius: '6px',
         padding: '22px', width: '100%', maxWidth: '440px', maxHeight: '88vh', overflowY: 'auto',
         boxShadow: '0 20px 25px rgba(0,0,0,0.4)',
       }}>
@@ -128,15 +128,15 @@ export default function CreateMilestoneModal({ projectId, milestone = null, onSa
           {checkItems.length > 0 && (
             <div style={{ marginBottom: '8px' }}>
               {checkItems.map((item, i) => (
-                <div key={`${item.text}-${i}`} className="check-row" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 8px', borderRadius: '4px', fontSize: '11.5px', color: '#ccc' }}>
-                  <Circle size={12} style={{ color: '#666', flexShrink: 0 }} />
+                <div key={`${item.text}-${i}`} className="check-row" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 8px', borderRadius: '4px', fontSize: '11.5px', color: 'var(--text-soft)' }}>
+                  <Circle size={12} style={{ color: 'var(--muted2)', flexShrink: 0 }} />
                   <span style={{ flex: 1 }}>{item.text}</span>
                   <button
                     type="button"
                     className="row-delete"
                     onClick={() => setCheckItems((cur) => cur.filter((_, x) => x !== i))}
                     aria-label="Remove item"
-                    style={{ background: 'transparent', border: 0, color: '#555', cursor: 'pointer', lineHeight: 1, padding: '2px 4px', display: 'inline-flex' }}
+                    style={{ background: 'transparent', border: 0, color: 'var(--muted2)', cursor: 'pointer', lineHeight: 1, padding: '2px 4px', display: 'inline-flex' }}
                   ><X size={11} /></button>
                 </div>
               ))}

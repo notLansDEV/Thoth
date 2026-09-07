@@ -29,9 +29,9 @@ const iconBtn = {
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
-  border: '1px solid #2a2a2a',
-  background: '#111',
-  color: '#999',
+  border: '1px solid var(--border)',
+  background: 'var(--panel2)',
+  color: 'var(--muted)',
   borderRadius: '4px',
   cursor: 'pointer',
   fontSize: '11px',
@@ -39,7 +39,7 @@ const iconBtn = {
 }
 
 export default function ProjectCard({ project, onView, onEdit, onDelete }) {
-  const statusColor = STATUS_COLORS[project.status] || '#777'
+  const statusColor = STATUS_COLORS[project.status] || 'var(--muted)'
   const statusLabel = STATUS_LABELS[project.status] || project.status || 'Active'
   const priorityMeta = PROJECT_PRIORITIES.find((p) => p.value === project.priority)
   const start = formatDate(project.start_date)
@@ -54,7 +54,7 @@ export default function ProjectCard({ project, onView, onEdit, onDelete }) {
       style={{ cursor: 'pointer', transition: 'border-color 0.2s' }}
       onClick={() => onView(project)}
       onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#6e61ff' }}
-      onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#292929' }}
+      onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border)' }}
     >
       <div className="card-head">
         <div className="name">

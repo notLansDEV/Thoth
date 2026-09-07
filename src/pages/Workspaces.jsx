@@ -26,7 +26,7 @@ const labelStyle = {
   marginBottom: '5px',
   fontSize: '10px',
   fontWeight: '700',
-  color: '#777',
+  color: 'var(--muted)',
   textTransform: 'uppercase',
   letterSpacing: '0.06em',
 }
@@ -183,18 +183,18 @@ export default function Workspaces() {
         {/* Workspace navbar */}
         <div style={{
           display: 'flex', alignItems: 'center', gap: '10px',
-          borderBottom: '1px solid #292929', paddingBottom: '12px', marginBottom: '16px',
+          borderBottom: '1px solid var(--border)', paddingBottom: '12px', marginBottom: '16px',
         }}>
           <button className="btn" onClick={() => { setPreview(null); setPanel(null); setPanelError(null) }} style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
             <ArrowLeft size={12} /> Back
           </button>
           <span className="dot purple" />
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: '15px', fontWeight: 700, color: '#f1f1f1', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-strong)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {preview.name}
               {current?.id === preview.id && <span className="badge paused" style={{ fontSize: '9px', marginLeft: '7px' }}>current</span>}
             </div>
-            <div style={{ fontSize: '10px', color: '#666' }}>/{preview.slug} · {members.length} member{members.length === 1 ? '' : 's'}</div>
+            <div style={{ fontSize: '10px', color: 'var(--muted2)' }}>/{preview.slug} · {members.length} member{members.length === 1 ? '' : 's'}</div>
           </div>
           <button
             className={`btn${panel === 'settings' ? ' primary' : ''}`}
@@ -259,7 +259,7 @@ export default function Workspaces() {
                   Cancel
                 </button>
               </div>
-              <div style={{ fontSize: '10px', color: '#555', marginTop: '6px' }}>
+              <div style={{ fontSize: '10px', color: 'var(--muted2)', marginTop: '6px' }}>
                 The user must already have a Thoth account.
               </div>
             </form>
@@ -279,15 +279,15 @@ export default function Workspaces() {
               </thead>
               <tbody>
                 {membersLoading ? (
-                  <tr><td colSpan={5} style={{ color: '#555' }}>Loading members…</td></tr>
+                  <tr><td colSpan={5} style={{ color: 'var(--muted2)' }}>Loading members…</td></tr>
                 ) : members.length === 0 ? (
-                  <tr><td colSpan={5} style={{ color: '#555' }}>No members found.</td></tr>
+                  <tr><td colSpan={5} style={{ color: 'var(--muted2)' }}>No members found.</td></tr>
                 ) : members.map((m) => (
                   <tr key={m.id}>
                     <td>
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
                         <span className="avatar">{(m.full_name || m.username || '?').slice(0, 2).toUpperCase()}</span>
-                        <span style={{ color: '#ddd', fontWeight: 600 }}>{m.full_name || m.username}</span>
+                        <span style={{ color: 'var(--text-soft)', fontWeight: 600 }}>{m.full_name || m.username}</span>
                       </span>
                     </td>
                     <td>{m.email}</td>
@@ -296,7 +296,7 @@ export default function Workspaces() {
                         <select
                           value={editingRole.role}
                           onChange={(e) => setEditingRole({ userId: m.id, role: e.target.value })}
-                          style={{ background: '#101010', border: '1px solid #2a2a2a', color: '#ddd', borderRadius: '4px', fontSize: '11px', padding: '3px 6px' }}
+                          style={{ background: 'var(--panel3)', border: '1px solid var(--border)', color: 'var(--text-soft)', borderRadius: '4px', fontSize: '11px', padding: '3px 6px' }}
                         >
                           {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
                         </select>
@@ -379,15 +379,15 @@ export default function Workspaces() {
       {workspaces === null ? (
         <div className="card"><div className="description" style={{ margin: 0 }}>Loading workspaces…</div></div>
       ) : workspaces.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '60px 20px', color: '#777' }}>
+        <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--muted)' }}>
           <div style={{ fontSize: '14px', marginBottom: '12px' }}>No workspaces yet</div>
-          <div style={{ fontSize: '12px', color: '#555' }}>Create your first workspace to get started</div>
+          <div style={{ fontSize: '12px', color: 'var(--muted2)' }}>Create your first workspace to get started</div>
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '10px', marginBottom: '18px' }}>
           {workspaces.map((ws) => (
             <div key={ws.id} className="card" style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px' }}>
-              <div style={{ fontSize: '13px', fontWeight: 700, color: '#eee', display: 'flex', alignItems: 'center', gap: '7px', minWidth: 0 }}>
+              <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-strong)', display: 'flex', alignItems: 'center', gap: '7px', minWidth: 0 }}>
                 <span className="dot purple" style={{ flexShrink: 0 }} />
                 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ws.name}</span>
                 {current?.id === ws.id && <span className="badge paused" style={{ fontSize: '9px', flexShrink: 0 }}>current</span>}
@@ -396,7 +396,7 @@ export default function Workspaces() {
               <div style={{ display: 'flex', alignItems: 'center', gap: '7px', flexWrap: 'wrap' }}>
                 <span className="badge paused" title="Members"><Users size={11} /> {ws.members_count ?? 1}</span>
                 {ws.role && <span className="badge">{ws.role}</span>}
-                <span style={{ fontSize: '10px', color: '#555' }}>
+                <span style={{ fontSize: '10px', color: 'var(--muted2)' }}>
                   Created {new Date(ws.created_at).toLocaleDateString()}
                 </span>
                 <span style={{ flex: 1 }} />
@@ -475,13 +475,13 @@ function CreateWorkspaceModal({ onCreate, onClose }) {
       alignItems: 'center', justifyContent: 'center', zIndex: 1000,
     }}>
       <div onClick={(e) => e.stopPropagation()} style={{
-        background: '#151515', border: '1px solid #292929', borderRadius: '6px',
+        background: 'var(--panel2)', border: '1px solid var(--border)', borderRadius: '6px',
         padding: '24px', width: '100%', maxWidth: '440px', maxHeight: '90vh',
         overflowY: 'auto', boxShadow: '0 20px 25px rgba(0,0,0,0.3)',
       }}>
         <div style={{ marginBottom: '16px' }}>
           <h2 style={{ margin: '0 0 8px 0', fontSize: '16px', fontWeight: '700' }}>New Workspace</h2>
-          <p style={{ margin: 0, color: '#777', fontSize: '12px' }}>
+          <p style={{ margin: 0, color: 'var(--muted)', fontSize: '12px' }}>
             A workspace holds your projects, tasks and bugs
           </p>
         </div>
@@ -498,7 +498,7 @@ function CreateWorkspaceModal({ onCreate, onClose }) {
           <div style={{ marginBottom: '20px' }}>
             <label style={{
               display: 'block', marginBottom: '6px',
-              fontSize: '12px', fontWeight: '600', color: '#ddd',
+              fontSize: '12px', fontWeight: '600', color: 'var(--text-soft)',
             }}>Workspace Name</label>
             <input
               type="text"
@@ -506,8 +506,8 @@ function CreateWorkspaceModal({ onCreate, onClose }) {
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g., Game Dev"
               style={{
-                width: '100%', padding: '8px 9px', border: '1px solid #2a2a2a',
-                background: '#101010', color: '#ddd', borderRadius: '4px',
+                width: '100%', padding: '8px 9px', border: '1px solid var(--border)',
+                background: 'var(--panel3)', color: 'var(--text-soft)', borderRadius: '4px',
                 fontSize: '12px', boxSizing: 'border-box', outline: 'none',
               }}
               autoFocus

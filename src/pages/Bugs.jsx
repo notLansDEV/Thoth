@@ -23,10 +23,10 @@ import BugPreviewModal from '../features/bugs/components/BugPreviewModal.jsx'
 function StatCard({ icon, label, value }) {
   return (
     <div className="card" style={{ padding: '12px' }}>
-      <div style={{ fontSize: '9px', fontWeight: 700, color: '#666', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+      <div style={{ fontSize: '9px', fontWeight: 700, color: 'var(--muted2)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '5px' }}>
         <span style={{ display: 'inline-flex' }}>{icon}</span> {label}
       </div>
-      <div style={{ fontSize: '18px', fontWeight: 700, color: '#f1f1f1' }}>{value}</div>
+      <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-strong)' }}>{value}</div>
     </div>
   )
 }
@@ -38,15 +38,15 @@ function BugCard({ bug, projectName, projectColor, onDragStart, onOpen, onDelete
       onDragStart={(e) => onDragStart(e, bug.id)}
       onClick={() => onOpen(bug)}
       style={{
-        background: '#101010', border: '1px solid #2a2a2a',
+        background: 'var(--panel3)', border: '1px solid var(--border)',
         borderRadius: '4px', padding: '10px', marginBottom: '8px', cursor: 'pointer',
         transition: 'border-color 0.15s',
       }}
       onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#ff6b6b' }}
-      onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#2a2a2a' }}
+      onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border)' }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', alignItems: 'flex-start' }}>
-        <div style={{ fontSize: '12px', color: '#eee', fontWeight: 600, minWidth: 0 }}>
+        <div style={{ fontSize: '12px', color: 'var(--text-strong)', fontWeight: 600, minWidth: 0 }}>
           {bug.bug_id && (
             <span style={{ fontFamily: 'monospace', fontSize: '9.5px', color: '#ff6b6b', marginRight: '6px' }}>
               {bug.bug_id}
@@ -62,24 +62,24 @@ function BugCard({ bug, projectName, projectColor, onDragStart, onOpen, onDelete
             type="button"
             onClick={(e) => { e.stopPropagation(); onOpen(bug) }}
             title="Edit"
-            style={{ background: 'transparent', border: 0, color: '#555', cursor: 'pointer', padding: '2px', display: 'inline-flex', borderRadius: '3px' }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = '#888'; e.currentTarget.style.background = '#1a1a1a' }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = '#555'; e.currentTarget.style.background = 'transparent' }}
+            style={{ background: 'transparent', border: 0, color: 'var(--muted2)', cursor: 'pointer', padding: '2px', display: 'inline-flex', borderRadius: '3px' }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--muted)'; e.currentTarget.style.background = 'var(--hover)' }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--muted2)'; e.currentTarget.style.background = 'transparent' }}
           ><Pencil size={11} /></button>
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); onDelete(bug) }}
             title="Delete"
-            style={{ background: 'transparent', border: 0, color: '#555', cursor: 'pointer', padding: '2px', display: 'inline-flex', borderRadius: '3px' }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = '#ff4040'; e.currentTarget.style.background = '#1a1a1a' }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = '#555'; e.currentTarget.style.background = 'transparent' }}
+            style={{ background: 'transparent', border: 0, color: 'var(--muted2)', cursor: 'pointer', padding: '2px', display: 'inline-flex', borderRadius: '3px' }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = '#ff4040'; e.currentTarget.style.background = 'var(--hover)' }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--muted2)'; e.currentTarget.style.background = 'transparent' }}
           ><Trash2 size={11} /></button>
         </div>
       </div>
 
       {bug.description && (
         <div style={{
-          color: '#777', fontSize: '10px', marginTop: '5px',
+          color: 'var(--muted)', fontSize: '10px', marginTop: '5px',
           display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
         }}>
           {bug.description}
@@ -87,11 +87,11 @@ function BugCard({ bug, projectName, projectColor, onDragStart, onOpen, onDelete
       )}
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px' }}>
-        <span style={{ fontSize: '9px', color: '#666', display: 'flex', alignItems: 'center', gap: '4px' }}>
+        <span style={{ fontSize: '9px', color: 'var(--muted2)', display: 'flex', alignItems: 'center', gap: '4px' }}>
           <span className="dot" style={{ background: projectColor || '#6e61ff', width: 6, height: 6 }} />
           {projectName || 'Project'}
         </span>
-        <span style={{ fontSize: '9px', color: '#555' }}>
+        <span style={{ fontSize: '9px', color: 'var(--muted2)' }}>
           {new Date(bug.created_at).toLocaleDateString()}
         </span>
       </div>
@@ -152,6 +152,13 @@ export default function Bugs({ subPage }) {
     return () => { alive = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useEffect(() => {
+    if (!subPage || subPage === 'stages' || subPage === 'all') return
+    const found = bugs.find((b) => b.id === subPage)
+    if (found) setPreview(found)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subPage, bugs.length])
 
   function handleDrop(stageName) {
     const id = dragId.current
@@ -292,15 +299,15 @@ export default function Bugs({ subPage }) {
                     onDragOver={(e) => e.preventDefault()}
                     onDrop={() => handleDrop(stage.name)}
                     style={{
-                      background: '#121212', border: '1px solid #292929', borderRadius: '5px',
+                      background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: '5px',
                       padding: '9px', minHeight: '120px',
                     }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '9px', padding: '0 2px' }}>
-                      <span style={{ fontSize: '11px', fontWeight: '700', color: stage.color || '#999', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      <span style={{ fontSize: '11px', fontWeight: '700', color: stage.color || 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                         {stage.name}
                       </span>
-                      <span style={{ fontSize: '10px', color: '#555' }}>{columnBugs.length}</span>
+                      <span style={{ fontSize: '10px', color: 'var(--muted2)' }}>{columnBugs.length}</span>
                     </div>
 
                     {columnBugs.map((bug) => (
@@ -317,8 +324,8 @@ export default function Bugs({ subPage }) {
 
                     {columnBugs.length === 0 && (
                       <div style={{
-                        border: '1px dashed #2a2a2a', borderRadius: '4px', padding: '14px',
-                        textAlign: 'center', color: '#444', fontSize: '10px',
+                        border: '1px dashed var(--border)', borderRadius: '4px', padding: '14px',
+                        textAlign: 'center', color: 'var(--muted2)', fontSize: '10px',
                       }}>
                         Drop bugs here
                       </div>

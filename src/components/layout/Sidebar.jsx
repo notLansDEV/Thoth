@@ -132,7 +132,7 @@ export default function Sidebar({ collapsed }) {
                 <span className="label">{item.label}</span>
                 {item.children && !collapsed && (
                   <span className="chev" style={{
-                    marginLeft: 'auto', color: '#555', display: 'inline-flex',
+                    marginLeft: 'auto', color: 'var(--muted2)', display: 'inline-flex',
                     transform: openKey === item.key ? 'rotate(90deg)' : 'none',
                     transition: 'transform 0.15s',
                   }}><ChevronRight size={11} /></span>
@@ -161,7 +161,7 @@ export default function Sidebar({ collapsed }) {
           <div className="section-title">Projects</div>
           <div>
             {projects.length === 0 ? (
-              <div className="project" style={{ color: '#555' }}>No projects yet</div>
+              <div className="project" style={{ color: 'var(--muted2)' }}>No projects yet</div>
             ) : (
               projects.map((p) => (
                 <a
@@ -172,7 +172,7 @@ export default function Sidebar({ collapsed }) {
                   style={{ display: 'flex', cursor: 'pointer' }}
                   onClick={(e) => openProject(e, p.id)}
                 >
-                  <span className="dot" style={{ background: STATUS_COLORS[p.status] || '#777', flexShrink: 0 }} />
+                  <span className="dot" style={{ background: STATUS_COLORS[p.status] || 'var(--muted)', flexShrink: 0 }} />
                   <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</span>
                 </a>
               ))

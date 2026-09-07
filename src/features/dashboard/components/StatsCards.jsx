@@ -19,10 +19,10 @@
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
       {stats.map((s) => (
-        <div key={s.id} style={{ padding: 12, background: '#121212', border: '1px solid #292929', borderRadius: 6 }}>
-          <div style={{ fontSize: 10, color: '#777', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 }}>{s.label}</div>
-          <div style={{ fontSize: 20, fontWeight: 700, marginTop: 6, color: '#f1f1f1' }}>{s.value}</div>
-          <div style={{ fontSize: 11, color: '#666', marginTop: 6 }}>{s.note}</div>
+        <div key={s.id} style={{ padding: 12, background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: 6 }}>
+          <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 }}>{s.label}</div>
+          <div style={{ fontSize: 20, fontWeight: 700, marginTop: 6, color: 'var(--text-strong)' }}>{s.value}</div>
+          <div style={{ fontSize: 11, color: 'var(--muted2)', marginTop: 6 }}>{s.note}</div>
         </div>
       ))}
     </div>

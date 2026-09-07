@@ -174,7 +174,7 @@ export default function Settings() {
             <p className="settings-card-desc">
               Manage who has access to the {ws?.name || 'current'} workspace. Members, roles and permissions are configured from the Workspace page.
             </p>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#777', fontSize: '11px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--muted)', fontSize: '11px' }}>
               <Boxes size={13} /> Open the Workspaces page to invite and manage members.
             </div>
           </div>
@@ -249,7 +249,7 @@ export default function Settings() {
               ].map(([k, v]) => (
                 <div key={k}>
                   <div className="settings-label" style={{ marginBottom: 3 }}>{k}</div>
-                  <div style={{ fontSize: '12px', color: '#ddd' }}>{v}</div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-soft)' }}>{v}</div>
                 </div>
               ))}
             </div>

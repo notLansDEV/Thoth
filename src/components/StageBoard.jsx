@@ -3,15 +3,15 @@ import { Pencil, Trash2 } from 'lucide-react'
 
 const PALETTE = [
   '#6e61ff', '#ff7918', '#a14cff', '#20d96b', '#5f74ff',
-  '#e8c547', '#ff4040', '#20d8d9', '#d95fd0', '#777777',
+  '#e8c547', '#ff4040', '#20d8d9', '#d95fd0', 'var(--muted)',
 ]
 
 const inputStyle = {
   width: '100%',
   padding: '8px 9px',
-  border: '1px solid #2a2a2a',
-  background: '#101010',
-  color: '#ddd',
+  border: '1px solid var(--border)',
+  background: 'var(--panel3)',
+  color: 'var(--text-soft)',
   borderRadius: '4px',
   fontSize: '12px',
   boxSizing: 'border-box',
@@ -36,7 +36,7 @@ function StageForm({ initial, onSave, onCancel }) {
       alignItems: 'center', justifyContent: 'center', zIndex: 1200,
     }}>
       <div onClick={(e) => e.stopPropagation()} style={{
-        background: '#151515', border: '1px solid #292929', borderRadius: '6px',
+        background: 'var(--panel2)', border: '1px solid var(--border)', borderRadius: '6px',
         padding: '22px', width: '100%', maxWidth: '340px',
         boxShadow: '0 20px 25px rgba(0,0,0,0.3)',
       }}>
@@ -53,7 +53,7 @@ function StageForm({ initial, onSave, onCancel }) {
         )}
 
         <form onSubmit={submit}>
-          <label style={{ display: 'block', marginBottom: '6px', fontSize: '11px', fontWeight: 700, color: '#999' }}>
+          <label style={{ display: 'block', marginBottom: '6px', fontSize: '11px', fontWeight: 700, color: 'var(--muted)' }}>
             Stage name
           </label>
           <input
@@ -65,7 +65,7 @@ function StageForm({ initial, onSave, onCancel }) {
             autoFocus
           />
 
-          <label style={{ display: 'block', marginBottom: '6px', fontSize: '11px', fontWeight: 700, color: '#999' }}>
+          <label style={{ display: 'block', marginBottom: '6px', fontSize: '11px', fontWeight: 700, color: 'var(--muted)' }}>
             Color
           </label>
           <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '18px' }}>
@@ -132,7 +132,7 @@ export default function StageBoard({ stages, counts = {}, itemLabel = 'tasks', o
             onDragOver={(e) => e.preventDefault()}
             onDrop={() => handleDrop(stage.id)}
             style={{
-              background: '#121212', border: dragId === stage.id ? '1px solid #695df0' : '1px solid #292929',
+              background: 'var(--panel)', border: dragId === stage.id ? '1px solid #695df0' : '1px solid var(--border)',
               borderRadius: '5px', padding: '11px 12px', width: '100%', boxSizing: 'border-box',
               cursor: String(stage.name) === 'Archived' ? 'default' : 'grab',
               opacity: dragId === stage.id ? 0.5 : 1,
@@ -141,15 +141,15 @@ export default function StageBoard({ stages, counts = {}, itemLabel = 'tasks', o
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '7px' }}>
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
                 <span className="dot" style={{ background: stage.color || '#6e61ff' }} />
-                <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#eee', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <span style={{ fontSize: '11.5px', fontWeight: 700, color: 'var(--text-strong)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {stage.name}
                 </span>
               </span>
-              <span style={{ fontSize: '10px', color: '#555' }}>{counts[stage.name] || 0}</span>
+              <span style={{ fontSize: '10px', color: 'var(--muted2)' }}>{counts[stage.name] || 0}</span>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '9px', color: '#555' }}>
+              <span style={{ fontSize: '9px', color: 'var(--muted2)' }}>
                 {counts[stage.name] || 0} {itemLabel}
               </span>
               <div style={{ display: 'flex', gap: '4px' }}>
@@ -174,8 +174,8 @@ export default function StageBoard({ stages, counts = {}, itemLabel = 'tasks', o
         <button
           onClick={() => setForm({})}
           style={{
-            border: '1px dashed #2a2a2a', borderRadius: '5px', background: 'transparent',
-            color: '#666', cursor: 'pointer', width: '100%', boxSizing: 'border-box',
+            border: '1px dashed var(--border)', borderRadius: '5px', background: 'transparent',
+            color: 'var(--muted2)', cursor: 'pointer', width: '100%', boxSizing: 'border-box',
             minHeight: '40px', fontSize: '11px',
           }}
         >
@@ -183,7 +183,7 @@ export default function StageBoard({ stages, counts = {}, itemLabel = 'tasks', o
         </button>
       </div>
 
-      <div style={{ marginTop: '10px', fontSize: '10px', color: '#444' }}>
+      <div style={{ marginTop: '10px', fontSize: '10px', color: 'var(--muted2)' }}>
         Drag a stage card onto another stage to reorder · deleting a stage moves its items to Archived
       </div>
 

@@ -9,9 +9,9 @@ import {
 const inputStyle = {
   width: '100%',
   padding: '8px 9px',
-  border: '1px solid #2a2a2a',
-  background: '#101010',
-  color: '#ddd',
+  border: '1px solid var(--border)',
+  background: 'var(--panel3)',
+  color: 'var(--text-soft)',
   borderRadius: '4px',
   fontSize: '12px',
   boxSizing: 'border-box',
@@ -23,7 +23,7 @@ const labelStyle = {
   marginBottom: '6px',
   fontSize: '12px',
   fontWeight: '600',
-  color: '#ddd',
+  color: 'var(--text-soft)',
 }
 
 export default function CreateTaskModal({ projects, workspaceId, stages, defaultProjectId, onCreated, onClose }) {
@@ -97,13 +97,13 @@ export default function CreateTaskModal({ projects, workspaceId, stages, default
       alignItems: 'center', justifyContent: 'center', zIndex: 1000,
     }}>
       <div onClick={(e) => e.stopPropagation()} style={{
-        background: '#151515', border: '1px solid #292929', borderRadius: '6px',
+        background: 'var(--panel2)', border: '1px solid var(--border)', borderRadius: '6px',
         padding: '24px', width: '100%', maxWidth: '520px', maxHeight: '90vh',
         overflowY: 'auto', boxShadow: '0 20px 25px rgba(0,0,0,0.3)',
       }}>
         <div style={{ marginBottom: '16px' }}>
           <h2 style={{ margin: '0 0 8px 0', fontSize: '16px', fontWeight: '700' }}>Create Task</h2>
-          <p style={{ margin: 0, color: '#777', fontSize: '12px' }}>Add a new task to a project</p>
+          <p style={{ margin: 0, color: 'var(--muted)', fontSize: '12px' }}>Add a new task to a project</p>
         </div>
 
         <form onSubmit={handleSubmit} noValidate>

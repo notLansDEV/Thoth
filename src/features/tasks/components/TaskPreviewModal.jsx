@@ -14,9 +14,9 @@ import {
 const inputStyle = {
   width: '100%',
   padding: '6px 8px',
-  border: '1px solid #2a2a2a',
-  background: '#101010',
-  color: '#ddd',
+  border: '1px solid var(--border)',
+  background: 'var(--panel3)',
+  color: 'var(--text-soft)',
   borderRadius: '4px',
   fontSize: '12px',
   boxSizing: 'border-box',
@@ -28,7 +28,7 @@ const labelStyle = {
   marginBottom: '5px',
   fontSize: '10px',
   fontWeight: '700',
-  color: '#777',
+  color: 'var(--muted)',
   textTransform: 'uppercase',
   letterSpacing: '0.06em',
 }
@@ -241,7 +241,7 @@ export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated,
       alignItems: 'center', justifyContent: 'center', zIndex: 1000,
     }}>
       <div onClick={(e) => e.stopPropagation()} style={{
-        background: '#151515', border: '1px solid #292929', borderRadius: '6px',
+        background: 'var(--panel2)', border: '1px solid var(--border)', borderRadius: '6px',
         width: '100%', maxWidth: '760px', maxHeight: '88vh',
         display: 'grid', gridTemplateColumns: '1fr 240px',
         boxShadow: '0 20px 25px rgba(0,0,0,0.4)', overflow: 'hidden',
@@ -254,11 +254,11 @@ export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated,
             onBlur={onTitleBlur}
             style={{
               width: '100%', background: 'transparent', border: '1px solid transparent',
-              borderRadius: '4px', color: '#f1f1f1', fontSize: '16px', fontWeight: '700',
+              borderRadius: '4px', color: 'var(--text-strong)', fontSize: '16px', fontWeight: '700',
               padding: '4px 6px', margin: '-4px -6px 4px', outline: 'none',
               fontFamily: 'inherit', boxSizing: 'border-box',
             }}
-            onFocus={(e) => { e.target.style.borderColor = '#2a2a2a'; e.target.style.background = '#101010' }}
+            onFocus={(e) => { e.target.style.borderColor = 'var(--border)'; e.target.style.background = 'var(--panel3)' }}
             onBlur={(e) => { e.target.style.borderColor = 'transparent'; e.target.style.background = 'transparent'; onTitleBlur() }}
           />
 
@@ -275,12 +275,12 @@ export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated,
               {priority}
             </span>
             {task.project_name && (
-              <span style={{ color: '#666', fontSize: '10px' }}>in {task.project_name}</span>
+              <span style={{ color: 'var(--muted2)', fontSize: '10px' }}>in {task.project_name}</span>
             )}
           </div>
 
           {/* Section tabs in a row */}
-          <div style={{ display: 'flex', gap: '6px', borderBottom: '1px solid #292929', marginBottom: '14px' }}>
+          <div style={{ display: 'flex', gap: '6px', borderBottom: '1px solid var(--border)', marginBottom: '14px' }}>
             {[
               { key: 'description', label: 'Description' },
               { key: 'comments', label: `Comments${comments.length ? ` (${comments.length})` : ''}` },
@@ -294,7 +294,7 @@ export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated,
                 style={{
                   padding: '7px 10px', fontSize: '11px', fontWeight: 600,
                   background: 'transparent',
-                  color: tab === t.key ? '#fff' : '#777',
+                  color: tab === t.key ? 'var(--text-strong)' : 'var(--muted)',
                   border: 0, borderTop: '2px solid transparent',
                   borderBottom: tab === t.key ? '2px solid #695df0' : '2px solid transparent',
                   cursor: 'pointer', fontFamily: 'inherit',
@@ -319,14 +319,14 @@ export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated,
           {tab === 'checklist' && (
             <>
               <div style={{
-                background: '#101010', border: '1px solid #242424', borderRadius: '4px',
+                background: 'var(--panel3)', border: '1px solid var(--border-soft)', borderRadius: '4px',
                 padding: '10px 12px', marginBottom: '10px',
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '7px' }}>
-                  <span style={{ fontSize: '10px', fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                  <span style={{ fontSize: '10px', fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                     Checklist
                   </span>
-                  <span style={{ fontSize: '10px', color: doneCount === checklist.length && checklist.length > 0 ? '#20d96b' : '#777' }}>
+                  <span style={{ fontSize: '10px', color: doneCount === checklist.length && checklist.length > 0 ? '#20d96b' : 'var(--muted)' }}>
                     {doneCount}/{checklist.length} done
                   </span>
                 </div>
@@ -339,7 +339,7 @@ export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated,
               </div>
 
               {checklist.length === 0 ? (
-                <div style={{ color: '#555', fontSize: '11px', marginBottom: '8px' }}>No checklist items yet</div>
+                <div style={{ color: 'var(--muted2)', fontSize: '11px', marginBottom: '8px' }}>No checklist items yet</div>
               ) : (
                 <div style={{ marginBottom: '10px' }}>
                   {checklist.map((item, i) => (
@@ -354,7 +354,7 @@ export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated,
                         aria-label={item.done ? 'Mark as not done' : 'Mark as done'}
                         style={{
                           width: '15px', height: '15px', flexShrink: 0, borderRadius: '3px',
-                          border: item.done ? '0' : '1px solid #3a3a3a',
+                          border: item.done ? '0' : '1px solid var(--hover-border)',
                           background: item.done ? '#695df0' : 'transparent',
                           color: '#fff', fontSize: '9px', lineHeight: 1, cursor: 'pointer',
                           display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
@@ -373,15 +373,15 @@ export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated,
                             if (e.key === 'Escape') cancelEditCheck()
                           }}
                           style={{
-                            flex: 1, background: '#181818', border: '1px solid #3a3a3a',
-                            borderRadius: '3px', color: '#ccc', fontSize: '11.5px',
+                            flex: 1, background: 'var(--hover)', border: '1px solid var(--hover-border)',
+                            borderRadius: '3px', color: 'var(--text-soft)', fontSize: '11.5px',
                             fontFamily: 'inherit', padding: '2px 6px', outline: 'none',
                           }}
                         />
                       ) : (
                         <span style={{
                           flex: 1, fontSize: '11.5px',
-                          color: item.done ? '#555' : '#ccc',
+                          color: item.done ? 'var(--muted2)' : 'var(--text-soft)',
                           textDecoration: item.done ? 'line-through' : 'none',
                         }}>{item.text}</span>
                       )}
@@ -391,7 +391,7 @@ export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated,
                         onClick={() => startEditCheck(i)}
                         aria-label="Edit item"
                         style={{
-                          background: 'transparent', border: 0, color: '#555', cursor: 'pointer',
+                          background: 'transparent', border: 0, color: 'var(--muted2)', cursor: 'pointer',
                           padding: '2px 4px', opacity: 0, display: 'inline-flex',
                         }}
                       ><Pencil size={11} /></button>
@@ -401,7 +401,7 @@ export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated,
                         onClick={() => removeCheckItem(i)}
                         aria-label="Delete item"
                         style={{
-                          background: 'transparent', border: 0, color: '#555', cursor: 'pointer',
+                          background: 'transparent', border: 0, color: 'var(--muted2)', cursor: 'pointer',
                           padding: '2px 4px', opacity: 0, display: 'inline-flex',
                         }}
                       ><X size={11} /></button>
@@ -428,7 +428,7 @@ export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated,
             <>
               <div style={{ marginBottom: '8px' }}>
                 {comments.length === 0 && (
-                  <div style={{ color: '#555', fontSize: '11px' }}>No comments yet</div>
+                  <div style={{ color: 'var(--muted2)', fontSize: '11px' }}>No comments yet</div>
                 )}
                 {comments.map((c, i) => {
                   const name = c.author_name || 'Unknown'
@@ -438,16 +438,16 @@ export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated,
                         {name.slice(0, 2).toUpperCase()}
                       </span>
                       <div style={{
-                        flex: 1, background: '#101010', border: '1px solid #242424',
+                        flex: 1, background: 'var(--panel3)', border: '1px solid var(--border-soft)',
                         borderRadius: '4px', padding: '7px 9px',
                       }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', marginBottom: '3px' }}>
-                          <span style={{ fontSize: '10.5px', fontWeight: 700, color: '#ddd' }}>{name}</span>
-                          <span style={{ fontSize: '9px', color: '#555' }}>
+                          <span style={{ fontSize: '10.5px', fontWeight: 700, color: 'var(--text-soft)' }}>{name}</span>
+                          <span style={{ fontSize: '9px', color: 'var(--muted2)' }}>
                             {new Date(c.at).toLocaleString()}
                           </span>
                         </div>
-                        <div style={{ fontSize: '11px', color: '#ccc', lineHeight: 1.5 }}>{c.text}</div>
+                        <div style={{ fontSize: '11px', color: 'var(--text-soft)', lineHeight: 1.5 }}>{c.text}</div>
                       </div>
                     </div>
                   )
@@ -480,13 +480,13 @@ export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated,
                 <div
                   onClick={() => fileInputRef.current?.click()}
                   style={{
-                    border: '1px dashed #2a2a2a', borderRadius: '4px', padding: '22px',
-                    textAlign: 'center', color: '#666', fontSize: '11px', cursor: 'pointer',
+                    border: '1px dashed var(--border)', borderRadius: '4px', padding: '22px',
+                    textAlign: 'center', color: 'var(--muted2)', fontSize: '11px', cursor: 'pointer',
                     marginBottom: '8px',
                   }}
                 >
                   <Paperclip size={12} style={{ verticalAlign: '-2px', marginRight: '4px' }} />Click to attach files<br />
-                  <span style={{ fontSize: '9px', color: '#444' }}>PNG, JPG, PDF, TXT, DOC, XLS, ZIP…</span>
+                  <span style={{ fontSize: '9px', color: 'var(--muted2)' }}>PNG, JPG, PDF, TXT, DOC, XLS, ZIP…</span>
                 </div>
               ) : (
                 <div style={{ marginBottom: '10px' }}>
@@ -502,17 +502,17 @@ export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated,
                           alt={f.name}
                           style={{
                             width: '34px', height: '34px', objectFit: 'cover',
-                            borderRadius: '3px', border: '1px solid #2a2a2a', flexShrink: 0,
+                            borderRadius: '3px', border: '1px solid var(--border)', flexShrink: 0,
                           }}
                         />
                       ) : (
-                        <span style={{ display: 'inline-flex', color: '#888' }}>{fileIcon(f.name)}</span>
+                        <span style={{ display: 'inline-flex', color: 'var(--muted)' }}>{fileIcon(f.name)}</span>
                       )}
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: '11px', color: '#ccc', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <div style={{ fontSize: '11px', color: 'var(--text-soft)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {f.name}
                         </div>
-                        <div style={{ fontSize: '9px', color: '#555' }}>
+                        <div style={{ fontSize: '9px', color: 'var(--muted2)' }}>
                           {[f.size != null ? formatSize(f.size) : null, f.added_by].filter(Boolean).join(' · ')}
                         </div>
                       </div>
@@ -522,7 +522,7 @@ export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated,
                         onClick={() => removeFile(i)}
                         aria-label="Remove file"
                         style={{
-                          background: 'transparent', border: 0, color: '#555', cursor: 'pointer',
+                          background: 'transparent', border: 0, color: 'var(--muted2)', cursor: 'pointer',
                           padding: '2px 4px', opacity: 0, display: 'inline-flex',
                         }}
                       ><X size={11} /></button>
@@ -544,13 +544,13 @@ export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated,
 
         {/* RIGHT */}
         <div style={{
-          borderLeft: '1px solid #292929', background: '#111',
+          borderLeft: '1px solid var(--border)', background: 'var(--panel2)',
           padding: '18px 16px', overflowY: 'auto',
         }}>
           <button
             onClick={onClose}
             style={{
-              float: 'right', background: 'transparent', border: 0, color: '#666',
+              float: 'right', background: 'transparent', border: 0, color: 'var(--muted2)',
               cursor: 'pointer', fontSize: '14px', lineHeight: 1, padding: 0,
             }}
             aria-label="Close"
@@ -627,7 +627,7 @@ export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated,
 
           <div style={{ marginBottom: '13px' }}>
             <label style={labelStyle}>Project</label>
-            <div style={{ fontSize: '12px', color: '#ddd', padding: '6px 8px', background: '#101010', border: '1px solid #2a2a2a', borderRadius: '4px' }}>
+            <div style={{ fontSize: '12px', color: 'var(--text-soft)', padding: '6px 8px', background: 'var(--panel3)', border: '1px solid var(--border)', borderRadius: '4px' }}>
               {task.project_name || '—'}
             </div>
           </div>

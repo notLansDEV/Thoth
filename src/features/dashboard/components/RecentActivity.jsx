@@ -27,13 +27,13 @@ export default function RecentActivity({ activities = [] }) {
     <div className="card">
       <div className="card-head"><div className="name">Recent activity</div></div>
       {activities.length === 0 ? (
-        <div style={{ padding: '12px 0 4px', fontSize: 11, color: '#555' }}>Nothing has happened yet.</div>
+        <div style={{ padding: '12px 0 4px', fontSize: 11, color: 'var(--muted2)' }}>Nothing has happened yet.</div>
       ) : (
         <ul style={{ marginTop: 10, listStyle: 'none', paddingLeft: 0 }}>
           {activities.slice(0, 8).map((a) => {
             const Icon = TYPE_ICONS[a.entity_type] || ListChecks
             return (
-              <li key={a.id} style={{ padding: 8, borderBottom: '1px solid #232323', display: 'flex', gap: 9, alignItems: 'flex-start' }}>
+              <li key={a.id} style={{ padding: 8, borderBottom: '1px solid var(--hover)', display: 'flex', gap: 9, alignItems: 'flex-start' }}>
                 {a.actor_avatar_url ? (
                   <img
                     src={a.actor_avatar_url}
@@ -47,14 +47,14 @@ export default function RecentActivity({ activities = [] }) {
                   </span>
                 )}
                 <div style={{ minWidth: 0, flex: 1 }}>
-                  <div style={{ fontSize: 12, color: '#ccc', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                    <span style={{ fontWeight: 700, color: '#ddd' }}>{actorName(a)}</span>
+                  <div style={{ fontSize: 12, color: 'var(--text-soft)', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                    <span style={{ fontWeight: 700, color: 'var(--text-soft)' }}>{actorName(a)}</span>
                     <span style={{
-                      display: 'inline-flex', color: '#666',
+                      display: 'inline-flex', color: 'var(--muted2)',
                     }}><Icon size={11} /></span>
                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{describeActivity(a)}</span>
                   </div>
-                  <div style={{ fontSize: 10, color: '#666' }}>{relTime(a.created_at)}</div>
+                  <div style={{ fontSize: 10, color: 'var(--muted2)' }}>{relTime(a.created_at)}</div>
                 </div>
               </li>
             )
