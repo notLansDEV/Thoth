@@ -12,6 +12,8 @@ import {
   monthLabel,
   isCurrentMonth,
 } from '../features/calendar/calendar.service.js'
+import TaskPreviewModal from '../features/tasks/components/TaskPreviewModal.jsx'
+import BugPreviewModal from '../features/bugs/components/BugPreviewModal.jsx'
 
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 const WEEK_DAYS = [1, 2, 3, 4, 5, 6, 0]
@@ -22,19 +24,15 @@ const VIEWS = [
   { key: 'day', label: 'Day', Icon: CalendarClock },
 ]
 
-function navigateTo(workspace, page, id) {
-  let path = `/Thoth/${workspace}/${page}`
-  if (id) path += `/${id}`
-  window.history.pushState({}, '', path)
-  window.dispatchEvent(new PopStateEvent('popstate'))
-}
-
 export default function Calendar({ workspace }) {
   const ws = getCurrentWorkspace()
   const [view, setView] = useState('month')
   const [anchor, setAnchor] = useState(() => new Date())
   const [byDay, setByDay] = useState({})
   const [loading, setLoading] = useState(true)
+  const [calOpen, setCalOpen] = useState(false)
+  const [calMonth, setCalMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1))
+  const [selected, setSelected] = useState(null)
 
   useEffect(() => {
     let alive = true
@@ -52,11 +50,6 @@ export default function Calendar({ workspace }) {
     setAnchor(new Date())
   }
 
-  function shift(direction) {
-    const step = view === 'month' ? 1 : view === 'week' ? 7 : 1
-    setAnchor(addDays(anchor, step * direction))
-  }
-
   const weekStart = startOfWeek(anchor)
   const weekEnd = addDays(weekStart, 6)
   const weekStartLabel = weekStart.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
@@ -67,6 +60,21 @@ export default function Calendar({ workspace }) {
       ? monthLabel(anchor)
       : `${weekStartLabel} – ${weekEndLabel}`
   )
+
+  const calYear = calMonth.getFullYear()
+  const calMon = calMonth.getMonth()
+  const calLabel = calMonth.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
+  const calFirstDay = new Date(calYear, calMon, 1).getDay()
+  const calDaysInMonth = new Date(calYear, calMon + 1, 0).getDate()
+  const calDays = []
+  for (let i = 0; i < calFirstDay; i++) calDays.push(null)
+  for (let d = 1; d <= calDaysInMonth; d++) calDays.push(d)
+
+  function pickCalDay(day) {
+    if (!day) return
+    setAnchor(new Date(calYear, calMon, day))
+    setCalOpen(false)
+  }
 
   let gridDays = []
   if (view === 'month') {
@@ -97,7 +105,7 @@ export default function Calendar({ workspace }) {
             style={{ background: `${item.color}1f`, color: item.color, borderColor: `${item.color}55` }}
             onMouseEnter={(e) => { e.currentTarget.style.background = `${item.color}33` }}
             onMouseLeave={(e) => { e.currentTarget.style.background = `${item.color}1f` }}
-            onClick={() => navigateTo(ws?.id, item.kind === 'task' ? 'tasks' : 'bugs', item.id)}
+            onClick={() => setSelected({ kind: item.kind, raw: item.raw })}
             title={`${item.kind === 'task' ? 'Task' : 'Bug'}: ${item.title}`}
           >
             {item.kind === 'task' ? <ListTodo size={9} /> : <Bug size={9} />}
@@ -113,13 +121,44 @@ export default function Calendar({ workspace }) {
     <section className="card" style={{ padding: '0' }}>
       <div className="cal-toolbar">
         <div className="cal-toolbar-left">
-          <button type="button" className="cal-nav-btn" onClick={() => shift(-1)} aria-label="Previous">
-            <ChevronLeft size={14} />
-          </button>
-          <span className="cal-title">{title}</span>
-          <button type="button" className="cal-nav-btn" onClick={() => shift(1)} aria-label="Next">
-            <ChevronRight size={14} />
-          </button>
+          <div style={{ position: 'relative' }}>
+            <button type="button" className="cal-title-btn" onClick={() => setCalOpen((v) => !v)}>
+              {title}
+            </button>
+            {calOpen && (
+              <>
+                <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setCalOpen(false)} />
+                <div className="md-cal cal-mini">
+                  <div className="md-cal-head">
+                    <button className="icon-btn" onClick={() => setCalMonth(new Date(calYear, calMon - 1, 1))}><ChevronLeft size={12} /></button>
+                    <span className="md-cal-title">{calLabel}</span>
+                    <button className="icon-btn" onClick={() => setCalMonth(new Date(calYear, calMon + 1, 1))}><ChevronRight size={12} /></button>
+                  </div>
+                  <div className="md-cal-week">
+                    {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map((d) => <span key={d}>{d}</span>)}
+                  </div>
+                  <div className="md-cal-grid">
+                    {calDays.map((day, i) => {
+                      if (day === null) return <span key={`e${i}`} />
+                      const ds = toDateKey(new Date(calYear, calMon, day))
+                      const isToday = ds === today
+                      return (
+                        <button
+                          key={ds}
+                          type="button"
+                          className={`md-cal-day${isToday ? ' today' : ''}`}
+                          onClick={() => pickCalDay(day)}
+                        >
+                          {day}
+                          {(byDay[ds] || []).length > 0 && <span className="md-cal-dot" />}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
           <button type="button" className="cal-today-btn" onClick={goToday}>Today</button>
         </div>
 
@@ -207,6 +246,24 @@ export default function Calendar({ workspace }) {
             </div>
           )}
         </>
+      )}
+
+      {selected && selected.kind === 'task' && (
+        <TaskPreviewModal
+          task={selected.raw}
+          workspaceId={ws?.id}
+          onUpdated={(updated) => setSelected({ kind: 'task', raw: updated })}
+          onClose={() => setSelected(null)}
+        />
+      )}
+
+      {selected && selected.kind === 'bug' && (
+        <BugPreviewModal
+          bug={selected.raw}
+          workspaceId={ws?.id}
+          onUpdated={(updated) => setSelected({ kind: 'bug', raw: updated })}
+          onClose={() => setSelected(null)}
+        />
       )}
     </section>
   )
