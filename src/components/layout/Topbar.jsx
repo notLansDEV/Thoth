@@ -1,5 +1,5 @@
 ﻿import { useEffect, useRef, useState } from 'react'
-import { LogOut, Menu, PanelLeftClose, ChevronDown } from 'lucide-react'
+import { LogOut, Menu, PanelLeftClose, ChevronDown, Bell } from 'lucide-react'
 import {
   getCurrentWorkspace,
   setCurrentWorkspace,
@@ -51,6 +51,11 @@ export default function Topbar({ collapsed, onToggleCollapse }) {
   const [wsOpen, setWsOpen] = useState(false)
   const [wsList, setWsList] = useState(null)
   const [profileOpen, setProfileOpen] = useState(false)
+  const [notifOpen, setNotifOpen] = useState(false)
+  const [notifications, setNotifications] = useState([
+    { id: 1, text: 'Task "Fix login" was assigned to you', time: '2h ago' },
+    { id: 2, text: 'Bug "Crash on save" is due soon', time: 'Yesterday' },
+  ])
   const menuRef = useRef(null)
 
   useEffect(() => {
@@ -58,6 +63,7 @@ export default function Topbar({ collapsed, onToggleCollapse }) {
       if (menuRef.current && !menuRef.current.contains(e.target)) {
         setWsOpen(false)
         setProfileOpen(false)
+        setNotifOpen(false)
       }
     }
     document.addEventListener('mousedown', onDocClick)
@@ -68,6 +74,7 @@ export default function Topbar({ collapsed, onToggleCollapse }) {
     const next = !wsOpen
     setWsOpen(next)
     setProfileOpen(false)
+    setNotifOpen(false)
     if (next && wsList === null) {
       try {
         const rows = await getWorkspaces()
@@ -204,17 +211,42 @@ export default function Topbar({ collapsed, onToggleCollapse }) {
           )}
         </div>
 
+        {/* Notifications */}
+        <div style={{ position: 'relative' }}>
+          <button
+            className="notif-btn"
+            onClick={() => { setNotifOpen(!notifOpen); setWsOpen(false); setProfileOpen(false) }}
+            aria-haspopup="menu"
+            aria-expanded={notifOpen}
+            title="Notifications"
+          >
+            <Bell size={14} />
+            {notifications.length > 0 && <span className="notif-badge">{notifications.length}</span>}
+          </button>
+          {notifOpen && (
+            <div className="dropdown-menu right" role="menu" style={{ minWidth: '260px' }}>
+              <div className="dropdown-head">Notifications</div>
+              {notifications.length === 0 && <div className="dropdown-empty">No notifications</div>}
+              {notifications.map((n) => (
+                <button key={n.id} className="dropdown-item" onClick={() => setNotifOpen(false)} style={{ alignItems: 'flex-start', flexDirection: 'column', gap: 2 }}>
+                  <span style={{ color: '#ddd', fontSize: '11px', lineHeight: 1.4 }}>{n.text}</span>
+                  <span style={{ fontSize: '9px', color: '#666' }}>{n.time}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
         {/* Profile menu */}
         <div style={{ position: 'relative' }}>
           <button
             className="profile-btn"
-            onClick={() => { setProfileOpen(!profileOpen); setWsOpen(false) }}
+            onClick={() => { setProfileOpen(!profileOpen); setWsOpen(false); setNotifOpen(false) }}
             aria-haspopup="menu"
             aria-expanded={profileOpen}
-            title="Account"
+            title={name}
           >
             <span className="avatar">{initials}</span>
-            <span className="user">{name}</span>
           </button>
           {profileOpen && (
             <div className="dropdown-menu right" role="menu">
