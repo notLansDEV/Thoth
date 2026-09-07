@@ -311,7 +311,7 @@ export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated,
               onChange={(e) => setDescription(e.target.value)}
               onBlur={onDescriptionBlur}
               placeholder="Add a more detailed description…"
-              style={{ ...inputStyle, minHeight: '140px', resize: 'vertical', marginBottom: '18px' }}
+              style={{ ...inputStyle, minHeight: '320px', resize: 'vertical', marginBottom: '18px' }}
             />
           )}
 
