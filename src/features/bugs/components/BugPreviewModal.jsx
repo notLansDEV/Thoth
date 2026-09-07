@@ -228,11 +228,11 @@ export default function BugPreviewModal({ bug, workspaceId, projectName, stages,
       <div onClick={(e) => e.stopPropagation()} style={{
         background: '#151515', border: '1px solid #292929', borderRadius: '6px',
         width: '100%', maxWidth: '760px', maxHeight: '88vh',
-        display: 'grid', gridTemplateColumns: '1fr 240px',
+        display: 'flex', minHeight: 0,
         boxShadow: '0 20px 25px rgba(0,0,0,0.4)', overflow: 'hidden',
       }}>
         {/* LEFT */}
-        <div style={{ padding: '22px', overflowY: 'auto' }}>
+        <div style={{ flex: 1, minWidth: 0, minHeight: 0, padding: '22px', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
@@ -268,12 +268,9 @@ export default function BugPreviewModal({ bug, workspaceId, projectName, stages,
           </div>
 
           {/* Section tabs */}
-          <div style={{ display: 'flex', gap: '6px', borderBottom: '1px solid #292929', marginBottom: '14px' }}>
+          <div style={{ display: 'flex', gap: '2px', borderBottom: '1px solid #292929', marginBottom: '16px' }}>
             {[
               { key: 'description', label: 'Description' },
-              { key: 'steps', label: 'Steps' },
-              { key: 'expected', label: 'Expected' },
-              { key: 'actual', label: 'Actual' },
               { key: 'comments', label: `Comments${comments.length ? ` (${comments.length})` : ''}` },
               { key: 'files', label: `Files${files.length ? ` (${files.length})` : ''}` },
             ].map((t) => (
@@ -282,12 +279,13 @@ export default function BugPreviewModal({ bug, workspaceId, projectName, stages,
                 type="button"
                 onClick={() => setTab(t.key)}
                 style={{
-                  padding: '7px 10px', fontSize: '11px', fontWeight: 600,
-                  background: 'transparent',
+                  padding: '8px 12px', fontSize: '11.5px', fontWeight: 700,
+                  background: tab === t.key ? '#1d1d1d' : 'transparent',
                   color: tab === t.key ? '#fff' : '#777',
-                  border: 0, borderTop: '2px solid transparent',
+                  border: '1px solid transparent', borderColor: tab === t.key ? '#2c2c2c' : 'transparent',
                   borderBottom: tab === t.key ? '2px solid #695df0' : '2px solid transparent',
-                  cursor: 'pointer', fontFamily: 'inherit',
+                  marginBottom: '-1px', cursor: 'pointer', fontFamily: 'inherit',
+                  borderRadius: '4px 4px 0 0',
                 }}
               >
                 {t.label}
@@ -296,51 +294,54 @@ export default function BugPreviewModal({ bug, workspaceId, projectName, stages,
           </div>
 
           {tab === 'description' && (
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              onBlur={onDescriptionBlur}
-              placeholder="Add a more detailed description…"
-              style={{ ...inputStyle, minHeight: '140px', resize: 'vertical', marginBottom: '18px' }}
-            />
-          )}
+            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                <label style={labelStyle}>Description</label>
+                <span style={{ fontSize: '9px', color: '#555' }}>Add context about the issue</span>
+              </div>
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                onBlur={onDescriptionBlur}
+                placeholder="Add a more detailed description…"
+                style={{ ...inputStyle, minHeight: '90px', resize: 'vertical', marginBottom: '18px' }}
+              />
 
-          {tab === 'steps' && (
-            <textarea
-              value={stepsToReproduce}
-              onChange={(e) => setStepsToReproduce(e.target.value)}
-              onBlur={onStepsBlur}
-              placeholder="1. Go to…&#10;2. Click on…&#10;3. See error"
-              style={{ ...inputStyle, minHeight: '140px', resize: 'vertical', marginBottom: '18px' }}
-            />
-          )}
+              <label style={{ ...labelStyle, color: '#e88', marginBottom: '6px' }}>Steps to Reproduce</label>
+              <textarea
+                value={stepsToReproduce}
+                onChange={(e) => setStepsToReproduce(e.target.value)}
+                onBlur={onStepsBlur}
+                placeholder="1. Go to…&#10;2. Click on…&#10;3. See error"
+                style={{ ...inputStyle, minHeight: '90px', resize: 'vertical', marginBottom: '18px', borderColor: '#3a3a3a' }}
+              />
 
-          {tab === 'expected' && (
-            <textarea
-              value={expectedBehavior}
-              onChange={(e) => setExpectedBehavior(e.target.value)}
-              onBlur={onExpectedBlur}
-              placeholder="What should have happened?"
-              style={{
-                ...inputStyle, minHeight: '140px', resize: 'vertical', marginBottom: '18px',
-                borderColor: 'rgba(32,217,107,0.35)',
-                background: 'rgba(32,217,107,0.04)',
-              }}
-            />
-          )}
+              <label style={{ ...labelStyle, color: '#4cdf8a', marginBottom: '6px' }}>Expected Behavior</label>
+              <textarea
+                value={expectedBehavior}
+                onChange={(e) => setExpectedBehavior(e.target.value)}
+                onBlur={onExpectedBlur}
+                placeholder="What should have happened?"
+                style={{
+                  ...inputStyle, minHeight: '70px', resize: 'vertical', marginBottom: '18px',
+                  borderColor: 'rgba(32,217,107,0.35)',
+                  background: 'rgba(32,217,107,0.04)',
+                }}
+              />
 
-          {tab === 'actual' && (
-            <textarea
-              value={actualBehavior}
-              onChange={(e) => setActualBehavior(e.target.value)}
-              onBlur={onActualBlur}
-              placeholder="What actually happened?"
-              style={{
-                ...inputStyle, minHeight: '140px', resize: 'vertical', marginBottom: '18px',
-                borderColor: 'rgba(255,64,64,0.35)',
-                background: 'rgba(255,64,64,0.04)',
-              }}
-            />
+              <label style={{ ...labelStyle, color: '#ff7c7c', marginBottom: '6px' }}>Actual Behavior</label>
+              <textarea
+                value={actualBehavior}
+                onChange={(e) => setActualBehavior(e.target.value)}
+                onBlur={onActualBlur}
+                placeholder="What actually happened?"
+                style={{
+                  ...inputStyle, minHeight: '70px', resize: 'vertical', marginBottom: '4px',
+                  borderColor: 'rgba(255,64,64,0.35)',
+                  background: 'rgba(255,64,64,0.04)',
+                }}
+              />
+            </div>
           )}
 
           {tab === 'comments' && (
@@ -446,8 +447,9 @@ export default function BugPreviewModal({ bug, workspaceId, projectName, stages,
 
         {/* RIGHT */}
         <div style={{
+          width: '240px', flexShrink: 0,
           borderLeft: '1px solid #292929', background: '#111',
-          padding: '18px 16px', overflowY: 'auto',
+          padding: '18px 16px', overflowY: 'auto', minHeight: 0,
         }}>
           <button
             onClick={onClose}
