@@ -124,6 +124,38 @@ app.get('/api/me', async (req, res) => {
   }
 })
 
+app.post('/api/auth/change-password', auth, async (req, res) => {
+  try {
+    const { current_password, new_password } = req.body
+    if (!current_password || !new_password) return res.status(400).json({ error: 'Missing fields' })
+    if (new_password.length < 6) return res.status(400).json({ error: 'New password must be at least 6 characters' })
+
+    const user = await userRepository.findById(req.user.id)
+    if (!user) return res.status(404).json({ error: 'User not found' })
+
+    const ok = await bcrypt.compare(current_password, user.password_hash || '')
+    if (!ok) return res.status(401).json({ error: 'Current password is incorrect' })
+
+    const hash = await bcrypt.hash(new_password, 10)
+    await userRepository.updatePassword(user.id, hash)
+    res.json({ ok: true })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
+app.delete('/api/auth/account', auth, async (req, res) => {
+  try {
+    const deleted = await userRepository.deleteById(req.user.id)
+    if (!deleted) return res.status(404).json({ error: 'Account not found' })
+    res.json({ ok: true })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
 app.get('/api/workspaces', auth, async (req, res) => {
   try {
     const rows = await workspaceRepository.findByUserId(req.user.id)
