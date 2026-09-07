@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
-  ChevronLeft, ChevronRight, ListTodo, Bug, CalendarDays, CalendarRange, CalendarClock,
+  ChevronLeft, ChevronRight, ListTodo, Bug, CalendarDays, CalendarRange, CalendarClock, Search, SlidersHorizontal,
 } from 'lucide-react'
 import { getCurrentWorkspace } from '../features/workspaces/workspaces.service.js'
 import {
@@ -33,6 +33,9 @@ export default function Calendar({ workspace }) {
   const [calOpen, setCalOpen] = useState(false)
   const [calMonth, setCalMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1))
   const [selected, setSelected] = useState(null)
+  const [query, setQuery] = useState('')
+  const [typeFilter, setTypeFilter] = useState('all')
+  const [filterOpen, setFilterOpen] = useState(false)
 
   useEffect(() => {
     let alive = true
@@ -89,7 +92,12 @@ export default function Calendar({ workspace }) {
   }
 
   function dayItems(date) {
-    return byDay[toDateKey(date)] || []
+    const q = query.trim().toLowerCase()
+    return (byDay[toDateKey(date)] || []).filter((item) => {
+      if (typeFilter !== 'all' && item.kind !== typeFilter) return false
+      if (q && !item.title.toLowerCase().includes(q)) return false
+      return true
+    })
   }
 
   function renderPills(items, max) {
@@ -161,8 +169,54 @@ export default function Calendar({ workspace }) {
           </div>
           <button type="button" className="cal-today-btn" onClick={goToday}>Today</button>
         </div>
-
         <div className="cal-toolbar-right">
+          <div style={{ position: 'relative' }}>
+            <Search size={12} style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', color: '#666', pointerEvents: 'none' }} />
+            <input
+              type="text"
+              className="search-input"
+              placeholder="Search…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              style={{ height: '26px', width: '140px', paddingLeft: '25px', fontSize: '11px' }}
+            />
+          </div>
+
+          <div style={{ position: 'relative' }}>
+            <button
+              type="button"
+              className={`btn${typeFilter !== 'all' ? ' primary' : ''}`}
+              onClick={() => setFilterOpen((o) => !o)}
+              style={{ height: '26px', display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '11px' }}
+            >
+              <SlidersHorizontal size={11} /> Filter{typeFilter !== 'all' ? ' •' : ''}
+            </button>
+            {filterOpen && (
+              <div className="dropdown-menu" style={{ top: 'calc(100% + 6px)', right: 0, minWidth: '170px', padding: '10px' }}>
+                <label style={{ display: 'block', fontSize: '10px', fontWeight: 700, color: '#777', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>Type</label>
+                <select
+                  value={typeFilter}
+                  onChange={(e) => { setTypeFilter(e.target.value); setFilterOpen(false) }}
+                  style={{ width: '100%', background: '#101010', border: '1px solid #2a2a2a', color: '#ddd', borderRadius: '4px', fontSize: '11px', padding: '5px 7px' }}
+                >
+                  <option value="all">All types</option>
+                  <option value="task">Tasks only</option>
+                  <option value="bug">Bugs only</option>
+                </select>
+                {typeFilter !== 'all' && (
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={() => { setTypeFilter('all'); setFilterOpen(false) }}
+                    style={{ width: '100%', marginTop: '8px', height: '24px', fontSize: '11px' }}
+                  >
+                    Clear filter
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+
           {VIEWS.map((v) => {
             const Icon = v.Icon
             return (
