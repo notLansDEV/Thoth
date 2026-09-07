@@ -19,6 +19,9 @@ export function saveSettings(patch) {
   const next = { ...getSettings(), ...patch }
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(next))
   applySettings(next)
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('thoth:settings-changed', { detail: next }))
+  }
   return next
 }
 

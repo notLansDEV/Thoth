@@ -1,5 +1,5 @@
 ﻿import { useEffect, useRef, useState } from 'react'
-import { LogOut, Menu, PanelLeftClose, ChevronDown, Bell } from 'lucide-react'
+import { LogOut, Menu, PanelLeftClose, ChevronDown, Bell, Sun, Moon } from 'lucide-react'
 import {
   getCurrentWorkspace,
   setCurrentWorkspace,
@@ -11,6 +11,7 @@ import {
   markNotificationRead,
   relativeTime,
 } from '../../features/notifications/notifications.service.js'
+import { getSettings, saveSettings } from '../../features/settings/settings.service.js'
 
 const PAGE_LABELS = {
   dashboard: 'Dashboard',
@@ -59,6 +60,7 @@ export default function Topbar({ collapsed, onToggleCollapse }) {
   const [notifOpen, setNotifOpen] = useState(false)
   const [notifications, setNotifications] = useState([])
   const [unread, setUnread] = useState(0)
+  const [theme, setTheme] = useState(() => getSettings().theme)
   const menuRef = useRef(null)
 
   useEffect(() => {
@@ -88,15 +90,32 @@ export default function Topbar({ collapsed, onToggleCollapse }) {
     refreshNotifications()
     const onDataChanged = () => refreshNotifications()
     window.addEventListener('thoth:data-changed', onDataChanged)
+    const onSettingsChanged = (e) => { if (e.detail?.theme) setTheme(e.detail.theme) }
+    window.addEventListener('thoth:settings-changed', onSettingsChanged)
     const timer = setInterval(refreshNotifications, 15000)
     const onVisible = () => refreshNotifications()
     window.addEventListener('focus', onVisible)
     return () => {
       window.removeEventListener('thoth:data-changed', onDataChanged)
+      window.removeEventListener('thoth:settings-changed', onSettingsChanged)
       clearInterval(timer)
       window.removeEventListener('focus', onVisible)
     }
   }, [])
+
+  function resolvedTheme() {
+    if (theme === 'system') {
+      const dark = window.matchMedia?.('(prefers-color-scheme: dark)').matches
+      return dark ? 'dark' : 'light'
+    }
+    return theme
+  }
+
+  function toggleTheme() {
+    const next = resolvedTheme() === 'dark' ? 'light' : 'dark'
+    setTheme(next)
+    saveSettings({ theme: next })
+  }
 
   async function toggleWsMenu() {
     const next = !wsOpen
@@ -238,6 +257,16 @@ export default function Topbar({ collapsed, onToggleCollapse }) {
             </div>
           )}
         </div>
+
+        {/* Theme toggle */}
+        <button
+          className="notif-btn"
+          onClick={() => { toggleTheme(); setWsOpen(false); setNotifOpen(false); setProfileOpen(false) }}
+          aria-label={resolvedTheme() === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+          title={resolvedTheme() === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+        >
+          {resolvedTheme() === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
+        </button>
 
         {/* Notifications */}
         <div style={{ position: 'relative' }}>
