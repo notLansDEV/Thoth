@@ -894,6 +894,7 @@ function NoteCard({ page, authorName, myId, myName, patchPage, onDeleteConfirm, 
   const [cText, setCText] = useState('')
   const [replyTo, setReplyTo] = useState(null)
   const [collapsedReplies, setCollapsedReplies] = useState(new Set())
+  const [showAllComments, setShowAllComments] = useState(false)
   const [copied, setCopied] = useState(null)
   const [editing, setEditing] = useState(false)
   const [editTitle, setEditTitle] = useState(page.title || '')
@@ -1110,10 +1111,12 @@ function NoteCard({ page, authorName, myId, myName, patchPage, onDeleteConfirm, 
         collapsedReplies.forEach((ci) => { getDescendants(ci).forEach((d) => hidden.add(d)) })
         const visible = comments.map((_, i) => !hidden.has(i))
         const visibleComments = comments.map((c, i) => ({ c, i })).filter(({ i }) => visible[i])
+        const many = visibleComments.length >= 3
+        const shown = !many || showAllComments ? visibleComments : visibleComments.slice(0, 2)
 
         return (
           <div className="j-cmts">
-            {visibleComments.map(({ c, i }) => {
+            {shown.map(({ c, i }) => {
               const depth = depthMap[i] || 0
               const childCount = (childrenMap[i] || []).length
               const isCollapsed = collapsedReplies.has(i)
@@ -1191,6 +1194,11 @@ function NoteCard({ page, authorName, myId, myName, patchPage, onDeleteConfirm, 
                 </div>
               )
             })}
+            {many && (
+              <button type="button" className="j-cmt-thread-toggle" style={{ marginTop: '8px' }} onClick={() => setShowAllComments((v) => !v)}>
+                {showAllComments ? '▾ Hide comments' : `▸ Show all comments (${visibleComments.length})`}
+              </button>
+            )}
           </div>
         )
       })()}
