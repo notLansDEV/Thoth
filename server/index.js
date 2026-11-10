@@ -5,7 +5,7 @@ import bcrypt from 'bcrypt'
 import jwt from 'jsonwebtoken'
 import path from 'path'
 
-import { initializeDatabase, initializeSchema, getMany, getOne, query } from '../src/db/database.js'
+import { initializeDatabase, initializeSchema, getMany, getOne, query, closeDatabase } from '../src/db/database.js'
 import userRepository from '../src/db/repositories/user.repository.js'
 import projectRepository from '../src/db/repositories/project.repository.js'
 import workspaceRepository from '../src/db/repositories/workspace.repository.js'
@@ -1192,4 +1192,23 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(process.cwd(), 'dist', 'index.html'))
 })
 
-app.listen(PORT, () => console.log(`Server listening on ${PORT}`))
+const server = app.listen(PORT, '0.0.0.0', () => console.log(`Server listening on ${PORT}`))
+
+// Graceful shutdown for Docker/systemd: stop accepting requests, then close the pool.
+async function shutdown(signal) {
+  console.log(`\n${signal} received — shutting down`)
+  server.close(async () => {
+    try {
+      await closeDatabase()
+      process.exit(0)
+    } catch (err) {
+      console.error('Shutdown error:', err)
+      process.exit(1)
+    }
+  })
+  // Force exit if open connections keep the process alive.
+  setTimeout(() => process.exit(1), 10_000).unref()
+}
+
+process.on('SIGINT', () => shutdown('SIGINT'))
+process.on('SIGTERM', () => shutdown('SIGTERM'))

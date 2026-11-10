@@ -8,9 +8,10 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const envPath = path.join(root, '.env')
 const envLocalPath = path.join(root, '.env.local')
 
-// Load .env first, then .env.local (local overrides win, mirroring Vite).
+// Load .env.local first, then .env. dotenv never overwrites variables that are
+// already set, so precedence is: process env > .env.local > .env (mirrors Vite).
+if (fs.existsSync(envLocalPath)) dotenv.config({ path: envLocalPath })
 if (fs.existsSync(envPath)) dotenv.config({ path: envPath })
-if (fs.existsSync(envLocalPath)) dotenv.config({ path: envLocalPath, override: true })
 
 const NODE_ENV = process.env.NODE_ENV || 'development'
 const isProduction = NODE_ENV === 'production'
@@ -60,6 +61,28 @@ if (isProduction) {
 
 const DATABASE_URL = (process.env.DATABASE_URL || '').trim() || undefined
 
+let databaseUrlPassword = ''
+if (DATABASE_URL) {
+  try {
+    const parsed = new URL(DATABASE_URL)
+    if (!['postgres:', 'postgresql:'].includes(parsed.protocol)) {
+      fail(
+        `DATABASE_URL must use the postgres:// or postgresql:// scheme (got "${parsed.protocol}").`
+      )
+    }
+    databaseUrlPassword = decodeURIComponent(parsed.password || '')
+  } catch (err) {
+    if (String(err.message).startsWith('[env]')) throw err
+    fail('DATABASE_URL is not a valid connection URL.')
+  }
+}
+
+const normalizedUrlPassword = databaseUrlPassword.toLowerCase()
+const databaseUrlLooksInsecure =
+  databaseUrlPassword === 'postgres' ||
+  INSECURE_SECRETS.has(normalizedUrlPassword) ||
+  PLACEHOLDER_HINTS.some((hint) => normalizedUrlPassword.includes(hint))
+
 const db = {
   connectionString: DATABASE_URL,
   host: process.env.DB_HOST || 'localhost',
@@ -68,6 +91,11 @@ const db = {
   user: process.env.DB_USER || 'postgres',
   password: process.env.DB_PASSWORD || 'postgres',
 }
+
+const normalizedDbPassword = String(db.password).toLowerCase()
+const dbPasswordLooksLikePlaceholder =
+  INSECURE_SECRETS.has(normalizedDbPassword) ||
+  PLACEHOLDER_HINTS.some((hint) => normalizedDbPassword.includes(hint))
 
 if (!Number.isInteger(db.port) || db.port < 1 || db.port > 65535) {
   fail(`DB_PORT must be an integer between 1 and 65535 (got "${process.env.DB_PORT}").`)
@@ -80,10 +108,25 @@ if (isProduction) {
         'Set DATABASE_URL (recommended) or DB_PASSWORD.'
     )
   }
+  if (DATABASE_URL && !databaseUrlPassword) {
+    fail('DATABASE_URL must include a database password in production.')
+  }
+  if (DATABASE_URL && databaseUrlLooksInsecure) {
+    fail(
+      'DATABASE_URL uses a default or placeholder password. ' +
+        'Set a unique database password (openssl rand -hex 24).'
+    )
+  }
   if (!DATABASE_URL && db.password === 'postgres') {
     fail(
       'Refusing to use the default PostgreSQL password in production. ' +
         'Set DATABASE_URL or DB_PASSWORD.'
+    )
+  }
+  if (!DATABASE_URL && dbPasswordLooksLikePlaceholder) {
+    fail(
+      'DB_PASSWORD still looks like a placeholder. ' +
+        'Generate a unique value with: openssl rand -hex 24'
     )
   }
 }

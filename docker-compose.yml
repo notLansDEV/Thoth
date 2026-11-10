@@ -1,0 +1,44 @@
+name: thoth
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-thoth}
+      POSTGRES_USER: ${POSTGRES_USER:-thoth}
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env (openssl rand -hex 24)}"
+    volumes:
+      - thoth-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    # Uncomment to reach Postgres from the host (psql, backups, GUI clients).
+    # ports:
+    #   - "127.0.0.1:5432:5432"
+
+  app:
+    build: .
+    restart: unless-stopped
+    init: true
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      JWT_SECRET: "${JWT_SECRET:?Set JWT_SECRET in .env (openssl rand -hex 32)}"
+      # Bundled PostgreSQL. To use an external database instead, remove the
+      # DB_* block and set DATABASE_URL here instead.
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${POSTGRES_DB:-thoth}
+      DB_USER: ${POSTGRES_USER:-thoth}
+      DB_PASSWORD: "${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env (openssl rand -hex 24)}"
+    ports:
+      - "${APP_PORT:-5232}:4000"
+
+volumes:
+  thoth-db:
