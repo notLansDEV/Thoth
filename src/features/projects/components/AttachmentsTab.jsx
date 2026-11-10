@@ -1,10 +1,11 @@
 import { useRef, useState } from 'react'
 import {
   Paperclip, FileImage, FileText, FileArchive, FileType2, FileSpreadsheet,
-  MessageSquare, Trash2, Upload,
+  MessageSquare, Trash2, Upload, Reply,
 } from 'lucide-react'
 import { updateProject } from '../projects.service.js'
 import ConfirmModal from '../../../components/ConfirmModal.jsx'
+import Snackbar from '../../../components/Snackbar.jsx'
 
 const inputStyle = {
   width: '100%',
@@ -94,12 +95,19 @@ export default function AttachmentsTab({ project, onUpdateProject }) {
     }
   }
 
-  async function handleAddComment(attId, text) {
-    const next = attachments.map((a) => (
-      a.id === attId
-        ? { ...a, comments: [...(a.comments || []), { text, author: currentUser(), at: new Date().toISOString() }] }
-        : a
-    ))
+  async function handleAddComment(attId, text, parentIndex = null) {
+    const entry = { text, author: currentUser(), at: new Date().toISOString() }
+    const next = attachments.map((a) => {
+      if (a.id !== attId) return a
+      const comments = a.comments || []
+      if (parentIndex == null) return { ...a, comments: [...comments, entry] }
+      return {
+        ...a,
+        comments: comments.map((c, i) => (
+          i === parentIndex ? { ...c, replies: [...(c.replies || []), entry] } : c
+        )),
+      }
+    })
     await persist(next)
   }
 
@@ -196,6 +204,7 @@ export default function AttachmentsTab({ project, onUpdateProject }) {
         <AttachmentPreviewModal
           att={attachments.find((a) => a.id === previewAtt.id) || previewAtt}
           onAddComment={(text) => handleAddComment(previewAtt.id, text)}
+          onAddReply={(index, text) => handleAddComment(previewAtt.id, text, index)}
           onDelete={() => setConfirmDelete(previewAtt)}
           onClose={() => setPreviewAtt(null)}
         />
@@ -220,6 +229,7 @@ function UploadAttachmentModal({ onSubmit, onClose }) {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [error, setError] = useState(null)
+  const [snackbar, setSnackbar] = useState(null)
   const [loading, setLoading] = useState(false)
   const fileRef = useRef(null)
 
@@ -228,7 +238,7 @@ function UploadAttachmentModal({ onSubmit, onClose }) {
     e.target.value = ''
     if (!f) return
     if (f.size > MAX_FILE_BYTES) {
-      setError('File is too large (max 2 MB).')
+      setSnackbar('File is too large (max 2 MB).')
       return
     }
     setError(null)
@@ -328,12 +338,15 @@ function UploadAttachmentModal({ onSubmit, onClose }) {
           </div>
         </form>
       </div>
+      {snackbar && <Snackbar message={snackbar} type="error" onClose={() => setSnackbar(null)} />}
     </div>
   )
 }
 
-function AttachmentPreviewModal({ att, onAddComment, onDelete, onClose }) {
+function AttachmentPreviewModal({ att, onAddComment, onAddReply, onDelete, onClose }) {
   const [commentText, setCommentText] = useState('')
+  const [replyTo, setReplyTo] = useState(null)
+  const [replyText, setReplyText] = useState('')
   const me = currentUser()
 
   async function postComment(e) {
@@ -341,6 +354,14 @@ function AttachmentPreviewModal({ att, onAddComment, onDelete, onClose }) {
     if (!commentText.trim()) return
     await onAddComment(commentText.trim())
     setCommentText('')
+  }
+
+  async function postReply(e, index) {
+    e.preventDefault()
+    if (!replyText.trim()) return
+    await onAddReply(index, replyText.trim())
+    setReplyText('')
+    setReplyTo(null)
   }
 
   return (
@@ -404,8 +425,55 @@ function AttachmentPreviewModal({ att, onAddComment, onDelete, onClose }) {
                         <span style={{ fontSize: '9.5px', color: 'var(--muted2)' }}>
                           {new Date(c.at).toLocaleDateString()} · {new Date(c.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </span>
+                        <button
+                          type="button"
+                          onClick={() => { setReplyTo(replyTo === i ? null : i); setReplyText('') }}
+                          style={{
+                            marginLeft: 'auto', background: 'transparent', border: 0, padding: 0,
+                            color: replyTo === i ? '#6e61ff' : 'var(--muted)', cursor: 'pointer',
+                            fontSize: '10px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '3px',
+                          }}
+                        >
+                          <Reply size={10} /> Reply
+                        </button>
                       </div>
                       <div style={{ fontSize: '11.5px', color: 'var(--text-soft)', whiteSpace: 'pre-wrap', marginTop: '2px' }}>{c.text}</div>
+
+                      {(c.replies || []).length > 0 && (
+                        <div style={{ marginTop: '7px', display: 'flex', flexDirection: 'column', gap: '7px', borderLeft: '2px solid var(--border)', paddingLeft: '9px' }}>
+                          {c.replies.map((r, ri) => (
+                            <div key={ri} style={{ display: 'flex', gap: '7px', alignItems: 'flex-start' }}>
+                              <span className="avatar" style={{ width: '18px', height: '18px', fontSize: '8px' }}>
+                                {(r.author || '?').slice(0, 2).toUpperCase()}
+                              </span>
+                              <div style={{ minWidth: 0, flex: 1 }}>
+                                <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', flexWrap: 'wrap' }}>
+                                  <span style={{ fontSize: '10.5px', fontWeight: 700, color: 'var(--text-soft)' }}>{r.author}</span>
+                                  <span style={{ fontSize: '9px', color: 'var(--muted2)' }}>
+                                    {new Date(r.at).toLocaleDateString()} · {new Date(r.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                  </span>
+                                </div>
+                                <div style={{ fontSize: '11px', color: 'var(--text-soft)', whiteSpace: 'pre-wrap', marginTop: '1px' }}>{r.text}</div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {replyTo === i && (
+                        <form onSubmit={(e) => postReply(e, i)} style={{ display: 'flex', gap: '6px', alignItems: 'center', marginTop: '7px' }}>
+                          <input
+                            type="text"
+                            value={replyText}
+                            onChange={(e) => setReplyText(e.target.value)}
+                            placeholder={`Reply to ${c.author || 'comment'}…`}
+                            className="search"
+                            style={{ flex: 1 }}
+                            autoFocus
+                          />
+                          <button type="submit" className="btn primary" disabled={!replyText.trim()} style={{ cursor: 'pointer' }}>Reply</button>
+                        </form>
+                      )}
                     </div>
                   </div>
                 ))}

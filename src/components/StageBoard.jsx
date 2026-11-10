@@ -60,10 +60,14 @@ function StageForm({ initial, onSave, onCancel }) {
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
+            maxLength={64}
             placeholder="e.g. QA Testing"
             style={{ ...inputStyle, marginBottom: '14px' }}
             autoFocus
           />
+          <div style={{ fontSize: '9.5px', color: 'var(--muted2)', marginTop: '-10px', marginBottom: '12px', textAlign: 'right' }}>
+            {name.length}/64
+          </div>
 
           <label style={{ display: 'block', marginBottom: '6px', fontSize: '11px', fontWeight: 700, color: 'var(--muted)' }}>
             Color
@@ -172,12 +176,8 @@ export default function StageBoard({ stages, counts = {}, itemLabel = 'tasks', o
         ))}
 
         <button
+          className="add-stage-btn"
           onClick={() => setForm({})}
-          style={{
-            border: '1px dashed var(--border)', borderRadius: '5px', background: 'transparent',
-            color: 'var(--muted2)', cursor: 'pointer', width: '100%', boxSizing: 'border-box',
-            minHeight: '40px', fontSize: '11px',
-          }}
         >
           + Add Stage
         </button>

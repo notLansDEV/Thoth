@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import {
-  Check, X, Pencil, Paperclip, FileImage, FileText, FileArchive, FileType2, FileSpreadsheet,
+  Check, X, Pencil, Paperclip, FileImage, FileText, FileArchive, FileType2, FileSpreadsheet, Reply,
 } from 'lucide-react'
 import {
   TASK_STAGES,
@@ -100,6 +100,9 @@ export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated,
   const [files, setFiles] = useState(task.meta?.files || [])
   const [tab, setTab] = useState('description')
   const [newComment, setNewComment] = useState('')
+  const [replyingTo, setReplyingTo] = useState(null)
+  const [replyText, setReplyText] = useState('')
+  const [dragOver, setDragOver] = useState(false)
   const [newCheckItem, setNewCheckItem] = useState('')
   const [editCheckIndex, setEditCheckIndex] = useState(null)
   const [editCheckText, setEditCheckText] = useState('')
@@ -156,6 +159,26 @@ export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated,
     }]
     setComments(next)
     setNewComment('')
+    const updated = await patch({ meta: { comments: next } })
+    if (!updated) setComments(comments)
+  }
+
+  async function addReply(e, index) {
+    e.preventDefault()
+    if (!replyText.trim()) return
+    const user = currentUser()
+    const entry = {
+      text: replyText.trim(),
+      at: new Date().toISOString(),
+      author_id: user.id,
+      author_name: user.name,
+    }
+    const next = comments.map((c, i) => (
+      i === index ? { ...c, replies: [...(c.replies || []), entry] } : c
+    ))
+    setComments(next)
+    setReplyText('')
+    setReplyingTo(null)
     const updated = await patch({ meta: { comments: next } })
     if (!updated) setComments(comments)
   }
@@ -218,10 +241,8 @@ export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated,
     })
   }
 
-  async function onFilesPicked(e) {
-    const picked = Array.from(e.target.files || [])
-    e.target.value = ''
-    if (picked.length === 0) return
+  async function addFiles(picked) {
+    if (!picked || picked.length === 0) return
     // Images up to 2MB are inlined as data URLs so the Files tab can show thumbnails
     const additions = await Promise.all(picked.map(async (f) => {
       const entry = {
@@ -241,6 +262,31 @@ export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated,
     patch({ meta: { files: next } }).then((updated) => {
       if (!updated) setFiles(files)
     })
+  }
+
+  function onFilesPicked(e) {
+    const picked = Array.from(e.target.files || [])
+    e.target.value = ''
+    addFiles(picked)
+  }
+
+  function onFileDragOver(e) {
+    e.preventDefault()
+    e.stopPropagation()
+    setDragOver(true)
+  }
+
+  function onFileDragLeave(e) {
+    e.preventDefault()
+    e.stopPropagation()
+    setDragOver(false)
+  }
+
+  function onFileDrop(e) {
+    e.preventDefault()
+    e.stopPropagation()
+    setDragOver(false)
+    addFiles(Array.from(e.dataTransfer.files || []))
   }
 
   async function removeFile(index) {
@@ -474,6 +520,45 @@ export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated,
                           </span>
                         </div>
                         <div style={{ fontSize: '11px', color: 'var(--text-soft)', lineHeight: 1.5 }}>{c.text}</div>
+
+                        <button
+                          type="button"
+                          onClick={() => { setReplyingTo(replyingTo === i ? null : i); setReplyText('') }}
+                          style={{
+                            marginTop: '5px', background: 'transparent', border: 0, padding: 0,
+                            color: replyingTo === i ? '#6e61ff' : 'var(--muted)', cursor: 'pointer',
+                            fontSize: '9.5px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '3px',
+                          }}
+                        >
+                          <Reply size={10} /> Reply
+                        </button>
+
+                        {(c.replies || []).length > 0 && (
+                          <div style={{ marginTop: '7px', display: 'flex', flexDirection: 'column', gap: '6px', borderLeft: '2px solid var(--border)', paddingLeft: '8px' }}>
+                            {c.replies.map((r, ri) => (
+                              <div key={ri}>
+                                <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', flexWrap: 'wrap' }}>
+                                  <span style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-soft)' }}>{r.author_name || 'Unknown'}</span>
+                                  <span style={{ fontSize: '8.5px', color: 'var(--muted2)' }}>{new Date(r.at).toLocaleString()}</span>
+                                </div>
+                                <div style={{ fontSize: '10.5px', color: 'var(--text-soft)', lineHeight: 1.5 }}>{r.text}</div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {replyingTo === i && (
+                          <form onSubmit={(e) => addReply(e, i)} style={{ display: 'flex', gap: '5px', marginTop: '7px' }}>
+                            <input
+                              type="text" value={replyText}
+                              onChange={(e) => setReplyText(e.target.value)}
+                              placeholder={`Reply to ${name}…`}
+                              style={{ ...inputStyle, padding: '4px 7px' }}
+                              autoFocus
+                            />
+                            <button type="submit" className="btn primary" disabled={!replyText.trim()} style={{ cursor: 'pointer', flexShrink: 0 }}>Reply</button>
+                          </form>
+                        )}
                       </div>
                     </div>
                   )
@@ -502,19 +587,26 @@ export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated,
                 style={{ display: 'none' }}
                 onChange={onFilesPicked}
               />
-              {files.length === 0 ? (
-                <div
-                  onClick={() => fileInputRef.current?.click()}
-                  style={{
-                    border: '1px dashed var(--border)', borderRadius: '4px', padding: '22px',
-                    textAlign: 'center', color: 'var(--muted2)', fontSize: '11px', cursor: 'pointer',
-                    marginBottom: '8px',
-                  }}
-                >
-                  <Paperclip size={12} style={{ verticalAlign: '-2px', marginRight: '4px' }} />Click to attach files<br />
-                  <span style={{ fontSize: '9px', color: 'var(--muted2)' }}>PNG, JPG, PDF, TXT, DOC, XLS, ZIP…</span>
-                </div>
-              ) : (
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                onDragOver={onFileDragOver}
+                onDragEnter={onFileDragOver}
+                onDragLeave={onFileDragLeave}
+                onDrop={onFileDrop}
+                style={{
+                  border: `1px dashed ${dragOver ? '#6e61ff' : 'var(--border)'}`,
+                  background: dragOver ? 'rgba(95,116,255,0.1)' : 'transparent',
+                  borderRadius: '4px', padding: '22px', textAlign: 'center',
+                  color: dragOver ? '#8f9bff' : 'var(--muted2)', fontSize: '11px', cursor: 'pointer',
+                  marginBottom: '10px', transition: 'border-color .15s, background .15s, color .15s',
+                }}
+              >
+                <Paperclip size={12} style={{ verticalAlign: '-2px', marginRight: '4px' }} />
+                {dragOver ? 'Drop files to attach' : 'Drag & drop files here, or click to browse'}<br />
+                <span style={{ fontSize: '9px', color: 'var(--muted2)' }}>PNG, JPG, PDF, TXT, DOC, XLS, ZIP…</span>
+              </div>
+
+              {files.length > 0 && (
                 <div style={{ marginBottom: '10px' }}>
                   {files.map((f, i) => (
                     <div

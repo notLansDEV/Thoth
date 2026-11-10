@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { createMilestone, updateMilestone } from '../../milestones/milestones.service.js'
-import { X, Circle } from 'lucide-react'
+import { X, Circle, Pencil } from 'lucide-react'
 
 const labelStyle = {
   display: 'block',
@@ -38,6 +38,8 @@ export default function CreateMilestoneModal({ projectId, milestone = null, onSa
   const [status, setStatus] = useState(milestone?.status || 'planned')
   const [checkItems, setCheckItems] = useState(milestone?.meta?.checklist || [])
   const [newItem, setNewItem] = useState('')
+  const [editIndex, setEditIndex] = useState(null)
+  const [editText, setEditText] = useState('')
   const [error, setError] = useState(null)
   const [saving, setSaving] = useState(false)
 
@@ -46,6 +48,23 @@ export default function CreateMilestoneModal({ projectId, milestone = null, onSa
     if (!newItem.trim()) return
     setCheckItems((cur) => [...cur, { text: newItem.trim(), done: false }])
     setNewItem('')
+  }
+
+  function startEdit(i) {
+    setEditIndex(i)
+    setEditText(checkItems[i].text)
+  }
+
+  function cancelEdit() {
+    setEditIndex(null)
+    setEditText('')
+  }
+
+  function saveEdit() {
+    const text = editText.trim()
+    if (!text || editIndex == null) { cancelEdit(); return }
+    setCheckItems((cur) => cur.map((it, i) => (i === editIndex ? { ...it, text } : it)))
+    cancelEdit()
   }
 
   async function submit(e) {
@@ -130,11 +149,37 @@ export default function CreateMilestoneModal({ projectId, milestone = null, onSa
               {checkItems.map((item, i) => (
                 <div key={`${item.text}-${i}`} className="check-row" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 8px', borderRadius: '4px', fontSize: '11.5px', color: 'var(--text-soft)' }}>
                   <Circle size={12} style={{ color: 'var(--muted2)', flexShrink: 0 }} />
-                  <span style={{ flex: 1 }}>{item.text}</span>
+                  {editIndex === i ? (
+                    <input
+                      autoFocus
+                      value={editText}
+                      onChange={(e) => setEditText(e.target.value)}
+                      onBlur={saveEdit}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') { e.preventDefault(); saveEdit() }
+                        if (e.key === 'Escape') cancelEdit()
+                      }}
+                      style={{ ...inputStyle, flex: 1, padding: '2px 6px', fontSize: '11.5px' }}
+                    />
+                  ) : (
+                    <span style={{ flex: 1 }}>{item.text}</span>
+                  )}
+                  {editIndex !== i && (
+                    <button
+                      type="button"
+                      className="row-delete"
+                      onClick={() => startEdit(i)}
+                      aria-label="Edit item"
+                      style={{ background: 'transparent', border: 0, color: 'var(--muted2)', cursor: 'pointer', lineHeight: 1, padding: '2px 4px', display: 'inline-flex' }}
+                    ><Pencil size={11} /></button>
+                  )}
                   <button
                     type="button"
                     className="row-delete"
-                    onClick={() => setCheckItems((cur) => cur.filter((_, x) => x !== i))}
+                    onClick={() => {
+                      if (editIndex === i) cancelEdit()
+                      setCheckItems((cur) => cur.filter((_, x) => x !== i))
+                    }}
                     aria-label="Remove item"
                     style={{ background: 'transparent', border: 0, color: 'var(--muted2)', cursor: 'pointer', lineHeight: 1, padding: '2px 4px', display: 'inline-flex' }}
                   ><X size={11} /></button>

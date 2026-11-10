@@ -301,9 +301,11 @@ export default function Tasks({ subPage }) {
           <p className="page-subtitle">Plan, track and move work across stages</p>
         </div>
 
-        <button className="btn primary" onClick={() => setShowCreate(true)} style={{ cursor: 'pointer' }}>
-          + New Task
-        </button>
+        {tab !== 'stages' && (
+          <button className="btn primary" onClick={() => setShowCreate(true)} style={{ cursor: 'pointer' }}>
+            + New Task
+          </button>
+        )}
       </div>
 
       {/* 3 stat cards */}
