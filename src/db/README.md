@@ -35,15 +35,25 @@ The `pg` package is already included in `package.json`.
 
 ### 2. Configure Environment
 
-Create a `.env.local` file in the root directory:
+Copy `.env.example` to `.env` and fill in your values:
+
+```bash
+cp .env.example .env
+```
 
 ```env
+# Recommended: one connection string
+DATABASE_URL=postgresql://postgres:your_secure_password@127.0.0.1:5432/thoth
+
+# Or discrete settings (used when DATABASE_URL is empty)
 DB_USER=postgres
 DB_PASSWORD=your_secure_password
 DB_HOST=localhost
 DB_PORT=5432
 DB_NAME=thoth
 ```
+
+`.env` and `.env.local` are git-ignored. `.env.local` overrides `.env`.
 
 ### 3. Create Database
 

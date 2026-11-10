@@ -1,5 +1,5 @@
 import BaseRepository from './base.repository.js';
-import { getMany } from '../database.js';
+import { getMany, query } from '../database.js';
 
 export class ProjectRepository extends BaseRepository {
   constructor() {
@@ -60,6 +60,44 @@ export class ProjectRepository extends BaseRepository {
       RETURNING *
     `;
     return getMany(sql, [JSON.stringify(settings), projectId]).then(rows => rows[0] || null);
+  }
+
+  /**
+   * Get workspace members allowed to work in a project
+   */
+  async getMembers(projectId) {
+    return getMany(
+      `SELECT u.id, u.username, u.email, u.full_name, u.avatar_url
+       FROM project_members pm
+       JOIN users u ON pm.user_id = u.id
+       WHERE pm.project_id = $1
+       ORDER BY u.full_name`,
+      [projectId]
+    );
+  }
+
+  /**
+   * Replace the set of members allowed to work in a project
+   */
+  async setMembers(projectId, userIds) {
+    if (userIds && userIds.length > 0) {
+      const values = userIds
+        .map((_, i) => `($1, $${i + 2})`)
+        .join(', ');
+      await query(
+        `DELETE FROM project_members WHERE project_id = $1`
+      );
+      await query(
+        `INSERT INTO project_members (project_id, user_id) VALUES ${values}`,
+        [projectId, ...userIds]
+      );
+    } else {
+      await query(
+        `DELETE FROM project_members WHERE project_id = $1`,
+        [projectId]
+      );
+    }
+    return this.getMembers(projectId);
   }
 }
 

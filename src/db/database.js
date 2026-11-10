@@ -28,11 +28,11 @@ export function initializeDatabase(config = {}) {
     database: config.database || process.env.DB_NAME || 'thoth',
   };
 
-  // Prefer discrete DB_* variables; fall back to DATABASE_URL only if
-  // no database name is configured (DATABASE_URL is often a placeholder).
+  // Prefer an explicit connection string, then DATABASE_URL, then discrete
+  // DB_* settings. A single, predictable precedence avoids silently ignoring
+  // DATABASE_URL (which previously happened whenever DB_NAME had a default).
   const connectionString =
-    (!discrete.database && (config.connectionString || process.env.DATABASE_URL)) ||
-    undefined;
+    config.connectionString || process.env.DATABASE_URL || undefined;
 
   const poolOptions = {
     ...(connectionString ? { connectionString } : discrete),

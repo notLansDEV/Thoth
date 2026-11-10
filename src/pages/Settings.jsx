@@ -19,6 +19,11 @@ import {
   getAccountUser,
   clearSession,
 } from '../features/auth/account.service.js'
+import {
+  getProjects,
+  getProjectMembers,
+  setProjectMembers,
+} from '../features/projects/projects.service.js'
 
 const FONTS = ['Inter', 'Roboto', 'Open Sans', 'Lato', 'Source Sans 3', 'JetBrains Mono']
 const ROLES = ['owner', 'admin', 'member']
@@ -87,6 +92,13 @@ export default function Settings() {
   const [teamMsg, setTeamMsg] = useState(null)
   const [editingRole, setEditingRole] = useState(null)
 
+  // Project access
+  const [projects, setProjects] = useState([])
+  const [selectedProjectId, setSelectedProjectId] = useState('')
+  const [projMembers, setProjMembers] = useState([])
+  const [projMembersLoading, setProjMembersLoading] = useState(false)
+  const [projSaving, setProjSaving] = useState(false)
+
   // Notifications
   const [notifs, setNotifs] = useState({ assigned: true, comments: true, dueSoon: true, weekly: false })
 
@@ -144,6 +156,49 @@ export default function Settings() {
     if (tab === 'team') loadMembers()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab])
+
+  useEffect(() => {
+    if (tab !== 'team' || !ws) return
+    let alive = true
+    getProjects(ws.id)
+      .then((rows) => { if (alive) { setProjects(Array.isArray(rows) ? rows : []); if (!selectedProjectId && rows.length > 0) setSelectedProjectId(rows[0].id) } })
+      .catch(() => { if (alive) setProjects([]) })
+    return () => { alive = false }
+  }, [tab, ws?.id])
+
+  async function loadProjectMembers() {
+    if (!selectedProjectId) { setProjMembers([]); return }
+    setProjMembersLoading(true)
+    try {
+      const rows = await getProjectMembers(selectedProjectId)
+      setProjMembers(Array.isArray(rows) ? rows.map((m) => m.id) : [])
+    } catch {
+      setProjMembers([])
+    } finally {
+      setProjMembersLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (selectedProjectId && tab === 'team') loadProjectMembers()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedProjectId])
+
+  async function handleToggleProjectMember(memberId) {
+    if (!selectedProjectId || projSaving) return
+    const nextSet = projMembers.includes(memberId)
+      ? projMembers.filter((id) => id !== memberId)
+      : [...projMembers, memberId]
+    setProjMembers(nextSet)
+    setProjSaving(true)
+    try {
+      await setProjectMembers(selectedProjectId, nextSet)
+    } catch {
+      await loadProjectMembers()
+    } finally {
+      setProjSaving(false)
+    }
+  }
 
   async function handleInvite(e) {
     e.preventDefault()
@@ -459,6 +514,57 @@ export default function Settings() {
                 </div>
               )
             })}
+          </div>
+        )}
+
+        {tab === 'team' && (
+          <div className="settings-card" style={{ marginTop: '10px' }}>
+            <div className="settings-card-title">Project Access</div>
+            <p className="settings-card-desc">
+              Control which workspace members are allowed in a project. Checked members are the only ones who can see and be assigned in that project.
+            </p>
+            {projects.length > 0 && (
+              <div className="settings-field" style={{ marginBottom: '14px' }}>
+                <label className="settings-label">Select project</label>
+                <select
+                  className="settings-select"
+                  value={selectedProjectId}
+                  onChange={(e) => setSelectedProjectId(e.target.value)}
+                >
+                  {projects.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+            {selectedProjectId && (
+              projMembersLoading ? (
+                <div style={{ color: 'var(--muted2)', fontSize: '11px' }}>Loading…</div>
+              ) : members.length === 0 ? (
+                <div style={{ color: 'var(--muted2)', fontSize: '11px' }}>No workspace members yet.</div>
+              ) : members.map((m) => (
+                <label key={m.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 0', borderTop: '1px solid var(--border-soft)', cursor: 'pointer', opacity: projSaving ? 0.7 : 1, pointerEvents: projSaving ? 'none' : undefined }}>
+                  <input
+                    type="checkbox"
+                    checked={projMembers.includes(m.id)}
+                    onChange={() => handleToggleProjectMember(m.id)}
+                    style={{ accentColor: '#6e61ff', cursor: 'pointer' }}
+                  />
+                  <span className="avatar" style={{ width: '18px', height: '18px', fontSize: '8px', flexShrink: 0 }}>{(m.full_name || m.username || '?').slice(0, 2).toUpperCase()}</span>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-soft)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.full_name || m.username}</div>
+                    <div style={{ fontSize: '10px', color: 'var(--muted2)' }}>{m.email}</div>
+                  </div>
+                </label>
+              ))
+            )}
+            {selectedProjectId && !projMembersLoading && (
+              <p style={{ marginTop: '10px', fontSize: '10px', color: 'var(--muted2)' }}>
+                {projMembers.length === 0
+                  ? 'No restrictions — all workspace members have access.'
+                  : `${projMembers.length} member${projMembers.length === 1 ? '' : 's'} allowed`}
+              </p>
+            )}
           </div>
         )}
 

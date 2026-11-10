@@ -85,3 +85,15 @@ export async function addProject(workspaceId, { name, description, status, start
     }),
   })
 }
+
+export async function getProjectMembers(projectId) {
+  if (!projectId) return []
+  return apiRequest(`/projects/${encodeURIComponent(projectId)}/members`)
+}
+
+export async function setProjectMembers(projectId, memberIds) {
+  return apiRequest(`/projects/${encodeURIComponent(projectId)}/members`, {
+    method: 'PUT',
+    body: JSON.stringify({ member_ids: memberIds }),
+  })
+}

@@ -68,14 +68,24 @@ psql -U postgres -c "CREATE DATABASE thoth;"
 
 ### 3. Configure Environment
 
-Create `.env.local` in the project root:
-```env
-DB_USER=postgres
-DB_PASSWORD=your_password
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=thoth
+Copy the example file and fill in your own values:
+
+```bash
+cp .env.example .env
 ```
+
+`.env` and `.env.local` are git-ignored; `.env.local` overrides `.env` when present.
+
+```env
+NODE_ENV=development
+PORT=4000
+JWT_SECRET=<generate with: openssl rand -hex 32>
+DATABASE_URL=postgresql://postgres:your_password@127.0.0.1:5432/thoth
+```
+
+`DATABASE_URL` takes precedence over the discrete `DB_*` settings. `JWT_SECRET`
+must be unique and at least 32 characters — the server refuses to start in
+production without a strong secret.
 
 ### 4. Initialize Database
 
@@ -270,7 +280,7 @@ export default new NewEntityRepository();
 
 ### Database Won't Connect
 1. Verify PostgreSQL is running
-2. Check connection credentials in `.env.local`
+2. Check connection credentials in `.env` or `.env.local`
 3. Ensure database exists: `createdb thoth`
 4. Check PostgreSQL port (default 5432)
 

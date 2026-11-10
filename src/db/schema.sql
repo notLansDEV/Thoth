@@ -183,6 +183,14 @@ ALTER TABLE bugs ADD COLUMN IF NOT EXISTS milestone_id UUID REFERENCES milestone
 ALTER TABLE bugs ADD COLUMN IF NOT EXISTS start_date DATE;
 ALTER TABLE bugs ADD COLUMN IF NOT EXISTS due_date DATE;
 
+-- Project member access: which workspace members are allowed to work in a project
+CREATE TABLE IF NOT EXISTS project_members (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  UNIQUE(project_id, user_id)
+);
+
 -- Bug Comments Table
 CREATE TABLE IF NOT EXISTS bug_comments (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

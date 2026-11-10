@@ -1,13 +1,9 @@
+import { env } from './env.js'
 import express from 'express'
 import cors from 'cors'
-import dotenv from 'dotenv'
 import bcrypt from 'bcrypt'
 import jwt from 'jsonwebtoken'
 import path from 'path'
-
-dotenv.config()
-// .env.local overrides .env (mirrors Vite precedence); Node/dotenv does not load it by default.
-dotenv.config({ path: '.env.local', override: true })
 
 import { initializeDatabase, initializeSchema, getMany, getOne, query } from '../src/db/database.js'
 import userRepository from '../src/db/repositories/user.repository.js'
@@ -39,11 +35,10 @@ function notifyUser({ userId, workspaceId, entityType, entityId, title, body }) 
     .catch((err) => console.error('notification send failed:', err.message))
 }
 
-const PORT = process.env.PORT || 4000
-const JWT_SECRET = process.env.JWT_SECRET || 'devsecret'
+const { PORT, JWT_SECRET } = env
 
 // Initialize DB
-initializeDatabase()
+initializeDatabase(env.db)
 
 // Apply idempotent schema (CREATE TABLE IF NOT EXISTS / ADD COLUMN IF NOT EXISTS)
 initializeSchema().catch((err) => console.error('Schema init failed:', err.message))
@@ -781,6 +776,32 @@ app.delete('/api/projects/:id', auth, async (req, res) => {
     const deleted = await projectRepository.deleteById(req.params.id)
     if (!deleted) return res.status(404).json({ error: 'Project not found' })
     res.json({ ok: true })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
+app.get('/api/projects/:id/members', auth, async (req, res) => {
+  try {
+    const project = await projectRepository.findById(req.params.id)
+    if (!project) return res.status(404).json({ error: 'Project not found' })
+    const rows = await projectRepository.getMembers(req.params.id)
+    res.json(rows)
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
+app.put('/api/projects/:id/members', auth, async (req, res) => {
+  try {
+    const project = await projectRepository.findById(req.params.id)
+    if (!project) return res.status(404).json({ error: 'Project not found' })
+    const { member_ids } = req.body
+    const userIds = Array.isArray(member_ids) ? member_ids.filter(Boolean) : []
+    const rows = await projectRepository.setMembers(req.params.id, userIds)
+    res.json(rows)
   } catch (err) {
     console.error(err)
     res.status(500).json({ error: 'Server error' })

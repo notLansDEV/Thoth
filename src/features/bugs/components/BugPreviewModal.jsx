@@ -12,6 +12,7 @@ import {
   TASK_PRIORITIES,
   priorityStyle,
 } from '../../tasks/tasks.service.js'
+import { getProjectMembers } from '../../projects/projects.service.js'
 import CopyCode from '../../../components/CopyCode.jsx'
 
 const inputStyle = {
@@ -92,6 +93,7 @@ export default function BugPreviewModal({ bug, workspaceId, projectName, stages,
   const [expectedBehavior, setExpectedBehavior] = useState(bug.expected_behavior || '')
   const [actualBehavior, setActualBehavior] = useState(bug.actual_behavior || '')
   const [members, setMembers] = useState([])
+  const [projectMemberIds, setProjectMemberIds] = useState([])
   const [milestones, setMilestones] = useState([])
   const fileInputRef = useRef(null)
 
@@ -100,8 +102,11 @@ export default function BugPreviewModal({ bug, workspaceId, projectName, stages,
     getWorkspaceMembers(workspaceId)
       .then((rows) => { if (alive) setMembers(rows) })
       .catch(() => {})
+    getProjectMembers(bug.project_id)
+      .then((rows) => { if (alive) setProjectMemberIds(Array.isArray(rows) ? rows.map((r) => r.id) : []) })
+      .catch(() => { if (alive) setProjectMemberIds([]) })
     return () => { alive = false }
-  }, [workspaceId])
+  }, [workspaceId, bug.project_id])
 
   useEffect(() => {
     if (!bug.project_id) return
@@ -111,6 +116,10 @@ export default function BugPreviewModal({ bug, workspaceId, projectName, stages,
       .catch(() => {})
     return () => { alive = false }
   }, [bug.project_id])
+
+  const assignableMembers = projectMemberIds.length
+    ? members.filter((m) => projectMemberIds.includes(m.id))
+    : members
 
   useEffect(() => {
     let alive = true
@@ -499,7 +508,7 @@ export default function BugPreviewModal({ bug, workspaceId, projectName, stages,
               style={inputStyle}
             >
               <option value="">Unassigned</option>
-              {members.map((m) => (
+              {assignableMembers.map((m) => (
                 <option key={m.id} value={m.id}>{m.full_name || m.username}</option>
               ))}
             </select>

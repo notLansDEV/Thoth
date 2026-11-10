@@ -10,6 +10,7 @@ import {
   getWorkspaceMembers,
   getMilestones,
 } from '../tasks.service.js'
+import { getProjectMembers } from '../../projects/projects.service.js'
 import CopyCode from '../../../components/CopyCode.jsx'
 
 const inputStyle = {
@@ -91,6 +92,7 @@ export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated,
   const [milestoneId, setMilestoneId] = useState(task.milestone_id || '')
 
   const [members, setMembers] = useState([])
+  const [projectMemberIds, setProjectMemberIds] = useState([])
   const [milestones, setMilestones] = useState([])
 
   const [comments, setComments] = useState(task.meta?.comments || [])
@@ -111,8 +113,15 @@ export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated,
     getMilestones(task.project_id)
       .then((rows) => { if (alive) setMilestones(rows) })
       .catch(() => {})
+    getProjectMembers(task.project_id)
+      .then((rows) => { if (alive) setProjectMemberIds(Array.isArray(rows) ? rows.map((r) => r.id) : []) })
+      .catch(() => { if (alive) setProjectMemberIds([]) })
     return () => { alive = false }
   }, [workspaceId, task.project_id])
+
+  const assignableMembers = projectMemberIds.length
+    ? members.filter((m) => projectMemberIds.includes(m.id))
+    : members
 
   async function patch(data) {
     try {
@@ -607,7 +616,7 @@ export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated,
               style={inputStyle}
             >
               <option value="">Unassigned</option>
-              {members.map((m) => (
+              {assignableMembers.map((m) => (
                 <option key={m.id} value={m.id}>{m.full_name || m.username}</option>
               ))}
             </select>
