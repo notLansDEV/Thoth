@@ -74,6 +74,7 @@ export default function AttachmentsTab({ project, onUpdateProject }) {
   const [previewAtt, setPreviewAtt] = useState(null)
   const [confirmDelete, setConfirmDelete] = useState(null)
   const [deleting, setDeleting] = useState(false)
+  const [snackbar, setSnackbar] = useState(null)
 
   async function persist(next) {
     const updated = await updateProject(project.id, { meta: { attachments: next } })
@@ -88,30 +89,35 @@ export default function AttachmentsTab({ project, onUpdateProject }) {
       await persist(attachments.filter((a) => a.id !== confirmDelete.id))
       setConfirmDelete(null)
       setPreviewAtt(null)
+      setSnackbar({ type: 'success', message: 'Attachment removed' })
     } catch (err) {
-      window.alert(err.message || 'Could not delete attachment')
+      setSnackbar({ type: 'error', message: err.message || 'Could not delete attachment' })
     } finally {
       setDeleting(false)
     }
   }
 
-  async function handleAddComment(attId, text, parentIndex = null, replyToName = null) {
+  async function handleAddComment(attId, text, path = null) {
     const entry = {
       text,
       author: currentUser(),
       at: new Date().toISOString(),
-      ...(replyToName ? { replyToName } : {}),
+      replies: [],
+    }
+    function addAtPath(nodes, pathArr, depth = 0) {
+      if (!pathArr || depth >= pathArr.length) return [...(nodes || []), entry]
+      const idx = pathArr[depth]
+      return (nodes || []).map((n, i) => {
+        if (i !== idx) return n
+        if (depth === pathArr.length - 1) {
+          return { ...n, replies: [...(n.replies || []), entry] }
+        }
+        return { ...n, replies: addAtPath(n.replies || [], pathArr, depth + 1) }
+      })
     }
     const next = attachments.map((a) => {
       if (a.id !== attId) return a
-      const comments = a.comments || []
-      if (parentIndex == null) return { ...a, comments: [...comments, entry] }
-      return {
-        ...a,
-        comments: comments.map((c, i) => (
-          i === parentIndex ? { ...c, replies: [...(c.replies || []), entry] } : c
-        )),
-      }
+      return { ...a, comments: addAtPath(a.comments || [], path) }
     })
     await persist(next)
   }
@@ -189,8 +195,10 @@ export default function AttachmentsTab({ project, onUpdateProject }) {
       {showUpload && (
         <UploadAttachmentModal
           onClose={() => setShowUpload(false)}
+          onUploadStart={() => setSnackbar({ type: 'info', message: 'Uploading attachment…' })}
+          onUploadSuccess={() => setSnackbar({ type: 'success', message: 'Attachment uploaded' })}
+          onUploadError={(msg) => setSnackbar({ type: 'error', message: msg })}
           onSubmit={async ({ title, description, fileMeta, dataUrl }) => {
-            setShowUpload(false)
             await persist([...attachments, {
               id: crypto.randomUUID(),
               title,
@@ -208,8 +216,7 @@ export default function AttachmentsTab({ project, onUpdateProject }) {
       {previewAtt && (
         <AttachmentPreviewModal
           att={attachments.find((a) => a.id === previewAtt.id) || previewAtt}
-          onAddComment={(text) => handleAddComment(previewAtt.id, text)}
-          onAddReply={(index, text, replyToName) => handleAddComment(previewAtt.id, text, index, replyToName)}
+          onAddComment={(text, path) => handleAddComment(previewAtt.id, text, path)}
           onDelete={() => setConfirmDelete(previewAtt)}
           onClose={() => setPreviewAtt(null)}
         />
@@ -225,11 +232,19 @@ export default function AttachmentsTab({ project, onUpdateProject }) {
           onCancel={() => setConfirmDelete(null)}
         />
       )}
+
+      {snackbar && (
+        <Snackbar
+          message={snackbar.message}
+          type={snackbar.type}
+          onClose={() => setSnackbar(null)}
+        />
+      )}
     </div>
   )
 }
 
-function UploadAttachmentModal({ onSubmit, onClose }) {
+function UploadAttachmentModal({ onSubmit, onClose, onUploadStart, onUploadSuccess, onUploadError }) {
   const [file, setFile] = useState(null)
   const [previewUrl, setPreviewUrl] = useState(null)
   const [title, setTitle] = useState('')
@@ -263,9 +278,10 @@ function UploadAttachmentModal({ onSubmit, onClose }) {
     if (!title.trim()) return setError('Please enter a title.')
     setLoading(true)
     setError(null)
+    onUploadStart?.()
     try {
-      let dataUrl = null
-      if ((file.type || '').startsWith('image/')) {
+      let dataUrl = previewUrl
+      if (!dataUrl && (file.type || '').startsWith('image/')) {
         dataUrl = await readFileAsDataUrl(file)
       }
       await onSubmit({
@@ -274,8 +290,12 @@ function UploadAttachmentModal({ onSubmit, onClose }) {
         fileMeta: { name: file.name, size: file.size, type: file.type },
         dataUrl,
       })
+      onUploadSuccess?.()
+      onClose()
     } catch (err) {
-      setError(err.message || 'Could not upload attachment')
+      const msg = err.message || 'Could not upload attachment'
+      setError(msg)
+      onUploadError?.(msg)
       setLoading(false)
     }
   }
@@ -371,28 +391,89 @@ function UploadAttachmentModal({ onSubmit, onClose }) {
   )
 }
 
-function AttachmentPreviewModal({ att, onAddComment, onAddReply, onDelete, onClose }) {
+function pathKey(path) {
+  return Array.isArray(path) ? path.join('.') : ''
+}
+
+function AttachmentPreviewModal({ att, onAddComment, onDelete, onClose }) {
   const [commentText, setCommentText] = useState('')
-  // replyTarget: { index: top-level comment index, replyIndex?: number, name: string } | null
-  const [replyTarget, setReplyTarget] = useState(null)
+  const [replyTarget, setReplyTarget] = useState(null) // { path: number[], name: string }
   const [replyText, setReplyText] = useState('')
   const me = currentUser()
 
   async function postComment(e) {
     e.preventDefault()
     if (!commentText.trim()) return
-    await onAddComment(commentText.trim())
+    await onAddComment(commentText.trim(), null)
     setCommentText('')
   }
 
   async function postReply(e) {
     e.preventDefault()
     if (!replyText.trim() || !replyTarget) return
-    const replyToName = replyTarget.replyIndex != null ? replyTarget.name : null
-    await onAddReply(replyTarget.index, replyText.trim(), replyToName)
+    await onAddComment(replyText.trim(), replyTarget.path)
     setReplyText('')
     setReplyTarget(null)
   }
+
+  function CommentNode({ node, path, depth }) {
+    const replies = Array.isArray(node.replies) ? node.replies : []
+    const key = pathKey(path)
+    const isReplying = replyTarget && pathKey(replyTarget.path) === key
+    const avatarSize = depth === 0 ? 22 : 18
+    const fontSize = depth === 0 ? '11.5px' : '10.5px'
+    return (
+      <div style={{ display: 'flex', gap: depth === 0 ? '9px' : '7px', alignItems: 'flex-start' }}>
+        <span className="avatar" style={depth > 0 ? { width: `${avatarSize}px`, height: `${avatarSize}px`, fontSize: '8px' } : undefined}>
+          {(node.author || '?').slice(0, 2).toUpperCase()}
+        </span>
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', flexWrap: 'wrap' }}>
+            <span style={{ fontSize, fontWeight: 700, color: 'var(--text-soft)' }}>{node.author}</span>
+            <span style={{ fontSize: '9px', color: 'var(--muted2)' }}>
+              {node.at ? new Date(node.at).toLocaleDateString() : ''} · {node.at ? new Date(node.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+            </span>
+            <button
+              type="button"
+              onClick={() => { setReplyTarget({ path, name: node.author || 'comment' }); setReplyText('') }}
+              style={{
+                marginLeft: 'auto', background: 'transparent', border: 0, padding: 0,
+                color: isReplying ? '#6e61ff' : 'var(--muted)', cursor: 'pointer',
+                fontSize: depth === 0 ? '10px' : '9.5px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '3px',
+              }}
+            >
+              <Reply size={depth === 0 ? 10 : 9} /> Reply
+            </button>
+          </div>
+          <div style={{ fontSize: depth === 0 ? '11.5px' : '11px', color: 'var(--text-soft)', whiteSpace: 'pre-wrap', marginTop: '2px' }}>{node.text}</div>
+
+          {(replies.length > 0 || isReplying) && (
+            <div style={{ marginTop: '7px', marginLeft: '2px', paddingLeft: '12px', borderLeft: '2px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '7px' }}>
+              {replies.map((r, ri) => (
+                <CommentNode key={ri} node={r} path={[...path, ri]} depth={depth + 1} />
+              ))}
+              {isReplying && (
+                <form onSubmit={postReply} style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                  <input
+                    type="text"
+                    value={replyText}
+                    onChange={(e) => setReplyText(e.target.value)}
+                    placeholder={`Reply to ${replyTarget.name}…`}
+                    className="search"
+                    style={{ flex: 1 }}
+                    autoFocus
+                  />
+                  <button type="submit" className="btn primary" disabled={!replyText.trim()} style={{ cursor: 'pointer' }}>Reply</button>
+                </form>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  const comments = att.comments || []
 
   return (
     <div onClick={onClose} style={{
@@ -442,82 +523,12 @@ function AttachmentPreviewModal({ att, onAddComment, onAddReply, onDelete, onClo
 
           {/* Comments */}
           <div style={{ borderTop: '1px solid var(--border)', paddingTop: '13px' }}>
-            <div style={labelStyle}>Comments ({(att.comments || []).length})</div>
+            <div style={labelStyle}>Comments ({comments.length})</div>
 
-            {(att.comments || []).length > 0 && (
+            {comments.length > 0 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '9px', marginBottom: '11px' }}>
-                {att.comments.map((c, i) => (
-                  <div key={i} style={{ display: 'flex', gap: '9px', alignItems: 'flex-start' }}>
-                    <span className="avatar">{(c.author || '?').slice(0, 2).toUpperCase()}</span>
-                    <div style={{ minWidth: 0, flex: 1 }}>
-                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '7px', flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: '11.5px', fontWeight: 700, color: 'var(--text-soft)' }}>{c.author}</span>
-                        <span style={{ fontSize: '9.5px', color: 'var(--muted2)' }}>
-                          {new Date(c.at).toLocaleDateString()} · {new Date(c.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => { setReplyTarget({ index: i, name: c.author || 'comment' }); setReplyText('') }}
-                          style={{
-                            marginLeft: 'auto', background: 'transparent', border: 0, padding: 0,
-                            color: (replyTarget?.index === i && replyTarget?.replyIndex == null) ? '#6e61ff' : 'var(--muted)', cursor: 'pointer',
-                            fontSize: '10px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '3px',
-                          }}
-                        >
-                          <Reply size={10} /> Reply
-                        </button>
-                      </div>
-                      <div style={{ fontSize: '11.5px', color: 'var(--text-soft)', whiteSpace: 'pre-wrap', marginTop: '2px' }}>{c.text}</div>
-
-                      {(c.replies || []).length > 0 && (
-                        <div style={{ marginTop: '7px', display: 'flex', flexDirection: 'column', gap: '7px', borderLeft: '2px solid var(--border)', paddingLeft: '9px' }}>
-                          {c.replies.map((r, ri) => (
-                            <div key={ri} style={{ display: 'flex', gap: '7px', alignItems: 'flex-start' }}>
-                              <span className="avatar" style={{ width: '18px', height: '18px', fontSize: '8px' }}>
-                                {(r.author || '?').slice(0, 2).toUpperCase()}
-                              </span>
-                              <div style={{ minWidth: 0, flex: 1 }}>
-                                <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', flexWrap: 'wrap' }}>
-                                  <span style={{ fontSize: '10.5px', fontWeight: 700, color: 'var(--text-soft)' }}>{r.author}</span>
-                                  {r.replyToName && <span style={{ color: 'var(--muted2)', fontSize: '9px' }}>replying to {r.replyToName}</span>}
-                                  <span style={{ fontSize: '9px', color: 'var(--muted2)' }}>
-                                    {new Date(r.at).toLocaleDateString()} · {new Date(r.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                  </span>
-                                  <button
-                                    type="button"
-                                    onClick={() => { setReplyTarget({ index: i, replyIndex: ri, name: r.author || 'comment' }); setReplyText('') }}
-                                    style={{
-                                      marginLeft: 'auto', background: 'transparent', border: 0, padding: 0,
-                                      color: (replyTarget?.index === i && replyTarget?.replyIndex === ri) ? '#6e61ff' : 'var(--muted)', cursor: 'pointer',
-                                      fontSize: '9.5px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '3px',
-                                    }}
-                                  >
-                                    <Reply size={9} /> Reply
-                                  </button>
-                                </div>
-                                <div style={{ fontSize: '11px', color: 'var(--text-soft)', whiteSpace: 'pre-wrap', marginTop: '1px' }}>{r.text}</div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                      {replyTarget?.index === i && (
-                        <form onSubmit={postReply} style={{ display: 'flex', gap: '6px', alignItems: 'center', marginTop: '7px' }}>
-                          <input
-                            type="text"
-                            value={replyText}
-                            onChange={(e) => setReplyText(e.target.value)}
-                            placeholder={`Reply to ${replyTarget.name}…`}
-                            className="search"
-                            style={{ flex: 1 }}
-                            autoFocus
-                          />
-                          <button type="submit" className="btn primary" disabled={!replyText.trim()} style={{ cursor: 'pointer' }}>Reply</button>
-                        </form>
-                      )}
-                    </div>
-                  </div>
+                {comments.map((c, i) => (
+                  <CommentNode key={i} node={c} path={[i]} depth={0} />
                 ))}
               </div>
             )}

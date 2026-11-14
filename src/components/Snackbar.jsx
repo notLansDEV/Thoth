@@ -33,6 +33,7 @@ export default function Snackbar({ message, type = 'error', onClose, duration = 
     <div
       role="status"
       aria-live="polite"
+      className="snackbar snackbar-enter"
       style={{
         position: 'fixed', right: '18px', top: '18px', zIndex: 2000,
         display: 'flex', alignItems: 'center', gap: '10px',

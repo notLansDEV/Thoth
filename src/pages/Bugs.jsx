@@ -19,6 +19,7 @@ import ConfirmModal from '../components/ConfirmModal.jsx'
 import ListToolbar from '../components/ListToolbar.jsx'
 import ReportBugModal from '../features/bugs/components/ReportBugModal.jsx'
 import BugPreviewModal from '../features/bugs/components/BugPreviewModal.jsx'
+import Snackbar from '../components/Snackbar.jsx'
 
 function StatCard({ icon, label, value }) {
   return (
@@ -111,6 +112,7 @@ export default function Bugs({ subPage }) {
   const [deleting, setDeleting] = useState(false)
   const [showReport, setShowReport] = useState(false)
   const [preview, setPreview] = useState(null)
+  const [snackbar, setSnackbar] = useState(null)
   const dragId = useRef(null)
 
   const [query, setQuery] = useState('')
@@ -177,8 +179,9 @@ export default function Bugs({ subPage }) {
     try {
       await createStage(ws?.id, data.name, data.color)
       await refresh()
+      setSnackbar({ type: 'success', message: `Stage "${data.name}" added` })
     } catch (err) {
-      window.alert(err.message || 'Could not create stage')
+      setSnackbar({ type: 'error', message: err.message || 'Could not create stage' })
     }
   }
 
@@ -186,8 +189,9 @@ export default function Bugs({ subPage }) {
     try {
       await updateStageApi(id, data)
       await refresh()
+      setSnackbar({ type: 'success', message: `Stage "${data.name}" updated` })
     } catch (err) {
-      window.alert(err.message || 'Could not update stage')
+      setSnackbar({ type: 'error', message: err.message || 'Could not update stage' })
     }
   }
 
@@ -198,8 +202,10 @@ export default function Bugs({ subPage }) {
     })
     try {
       await reorderStages(orderIds)
+      setSnackbar({ type: 'success', message: 'Stages reordered' })
     } catch {
       await refresh()
+      setSnackbar({ type: 'error', message: 'Could not reorder stages' })
     }
   }
 
@@ -208,10 +214,12 @@ export default function Bugs({ subPage }) {
     setDeleting(true)
     try {
       await deleteStageApi(confirmDelete.id)
+      const name = confirmDelete.name
       setConfirmDelete(null)
       await refresh()
+      setSnackbar({ type: 'success', message: `Stage "${name}" removed` })
     } catch (err) {
-      window.alert(err.message || 'Could not delete stage')
+      setSnackbar({ type: 'error', message: err.message || 'Could not delete stage' })
     } finally {
       setDeleting(false)
     }
@@ -222,11 +230,13 @@ export default function Bugs({ subPage }) {
     setDeleting(true)
     try {
       await deleteBug(confirmDeleteBug.id)
+      const title = confirmDeleteBug.title || 'Bug'
       setBugs((cur) => cur.filter((b) => b.id !== confirmDeleteBug.id))
       setConfirmDeleteBug(null)
       if (preview?.id === confirmDeleteBug.id) setPreview(null)
+      setSnackbar({ type: 'success', message: `Bug "${title}" has been removed` })
     } catch (err) {
-      window.alert(err.message || 'Could not delete bug')
+      setSnackbar({ type: 'error', message: err.message || 'Could not delete bug' })
     } finally {
       setDeleting(false)
     }
@@ -380,6 +390,7 @@ export default function Bugs({ subPage }) {
           onCreated={(bug) => {
             setBugs((current) => [bug, ...current])
             setShowReport(false)
+            setSnackbar({ type: 'success', message: `Bug "${bug.title || 'Untitled'}" has been added` })
           }}
           onClose={() => setShowReport(false)}
         />
@@ -396,6 +407,14 @@ export default function Bugs({ subPage }) {
             setPreview(updated)
           }}
           onClose={() => setPreview(null)}
+        />
+      )}
+
+      {snackbar && (
+        <Snackbar
+          message={snackbar.message}
+          type={snackbar.type}
+          onClose={() => setSnackbar(null)}
         />
       )}
     </div>

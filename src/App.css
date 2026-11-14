@@ -145,6 +145,13 @@ button,input{font:inherit}
 .add-stage-btn:hover{border-color:#6e61ff;background:rgba(95,116,255,.22);color:#c3c9ff}
 html[data-theme="light"] .add-stage-btn{color:#5f74ff}
 html[data-theme="light"] .add-stage-btn:hover{background:rgba(95,116,255,.16);color:#3d4bbf}
+
+@keyframes snackbar-pop-in{
+  from{transform:translateX(120%);opacity:0}
+  to{transform:translateX(0);opacity:1}
+}
+.snackbar-enter{animation:snackbar-pop-in .28s ease-out}
+
 .sidebar{
   width:198px;flex:none;background:var(--panel2);border-right:1px solid var(--border);display:flex;flex-direction:column;
   overflow:hidden;
