@@ -122,9 +122,11 @@ CREATE TABLE IF NOT EXISTS bug_comments (
   author_id UUID NOT NULL,
   content TEXT NOT NULL,
   attachments JSONB DEFAULT '[]',
+  parent_comment_id UUID REFERENCES bug_comments(id) ON DELETE SET NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+ALTER TABLE bug_comments ADD COLUMN IF NOT EXISTS parent_comment_id UUID REFERENCES bug_comments(id) ON DELETE SET NULL;
 
 -- Kanban Columns
 CREATE TABLE IF NOT EXISTS kanban_columns (

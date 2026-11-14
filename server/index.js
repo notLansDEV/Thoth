@@ -989,14 +989,15 @@ app.get('/api/bugs/:id/comments', auth, async (req, res) => {
 
 app.post('/api/bugs/:id/comments', auth, async (req, res) => {
   try {
-    const { content } = req.body
+    const { content, parent_comment_id, parentCommentId } = req.body
     if (!content || !content.trim()) {
       return res.status(400).json({ error: 'content is required' })
     }
     const bug = await bugRepository.findById(req.params.id)
     if (!bug) return res.status(404).json({ error: 'Bug not found' })
 
-    const created = await bugRepository.addComment(bug.id, req.user.id, content.trim())
+    const parentId = parent_comment_id || parentCommentId || null
+    const created = await bugRepository.addComment(bug.id, req.user.id, content.trim(), [], parentId)
     const withAuthor = await getOne(
       `SELECT c.*, u.username AS author_name, u.full_name AS author_full_name
        FROM bug_comments c

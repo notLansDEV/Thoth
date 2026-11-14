@@ -894,7 +894,7 @@ function NoteCard({ page, authorName, myId, myName, patchPage, onDeleteConfirm, 
   const [reactOpen, setReactOpen] = useState(false)
   const [cText, setCText] = useState('')
   const [replyTo, setReplyTo] = useState(null)
-  const [collapsedReplies, setCollapsedReplies] = useState(new Set())
+  const [expandedReplies, setExpandedReplies] = useState(new Set())
   const [showAllComments, setShowAllComments] = useState(false)
   const [copied, setCopied] = useState(null)
   const [editing, setEditing] = useState(false)
@@ -947,7 +947,19 @@ function NoteCard({ page, authorName, myId, myName, patchPage, onDeleteConfirm, 
     const text = cText.trim()
     if (!text) return
     const comment = { text, author: myName, at: new Date().toISOString() }
-    if (replyTo) comment.replyTo = replyTo
+    if (replyTo != null) {
+      comment.replyTo = replyTo
+      setExpandedReplies((prev) => {
+        const next = new Set(prev)
+        let cur = replyTo
+        // expand ancestors so the replied-to comment and new reply are visible
+        while (cur != null) {
+          next.add(cur)
+          cur = comments[cur]?.replyTo
+        }
+        return next
+      })
+    }
     patchPage(page, { comments: [...comments, comment] })
     setCText('')
     setReplyTo(null)
@@ -1109,7 +1121,11 @@ function NoteCard({ page, authorName, myId, myName, patchPage, onDeleteConfirm, 
           return desc
         }
         const hidden = new Set()
-        collapsedReplies.forEach((ci) => { getDescendants(ci).forEach((d) => hidden.add(d)) })
+        comments.forEach((_, i) => {
+          if ((childrenMap[i] || []).length > 0 && !expandedReplies.has(i)) {
+            getDescendants(i).forEach((d) => hidden.add(d))
+          }
+        })
         const visible = comments.map((_, i) => !hidden.has(i))
         const visibleComments = comments.map((c, i) => ({ c, i })).filter(({ i }) => visible[i])
         const many = visibleComments.length >= 3
@@ -1120,7 +1136,7 @@ function NoteCard({ page, authorName, myId, myName, patchPage, onDeleteConfirm, 
             {shown.map(({ c, i }) => {
               const depth = depthMap[i] || 0
               const childCount = (childrenMap[i] || []).length
-              const isCollapsed = collapsedReplies.has(i)
+              const isExpanded = expandedReplies.has(i)
               const replyAuthor = c.replyTo != null && comments[c.replyTo] ? comments[c.replyTo].author : null
               return (
                 <div key={i} className={depth > 0 ? 'j-cmt-reply-thread' : undefined} style={depth > 0 ? { marginLeft: `${depth * 22}px` } : undefined}>
@@ -1147,13 +1163,13 @@ function NoteCard({ page, authorName, myId, myName, patchPage, onDeleteConfirm, 
                         </button>
                         {childCount > 0 && (
                           <button type="button" className="j-cmt-action j-cmt-thread-toggle" onClick={() => {
-                            setCollapsedReplies((prev) => {
+                            setExpandedReplies((prev) => {
                               const next = new Set(prev)
                               if (next.has(i)) next.delete(i); else next.add(i)
                               return next
                             })
                           }}>
-                            {isCollapsed ? `▸ ${childCount} ${childCount === 1 ? 'reply' : 'replies'}` : `▾ ${childCount} ${childCount === 1 ? 'reply' : 'replies'}`}
+                            {isExpanded ? '▾ Hide replies' : `▸ ${childCount} ${childCount === 1 ? 'reply' : 'replies'}`}
                           </button>
                         )}
                       </div>
@@ -1178,7 +1194,11 @@ function NoteCard({ page, authorName, myId, myName, patchPage, onDeleteConfirm, 
 
                   {/* inline reply form */}
                   {replyTo === i && (
-                    <div className="j-cmt-reply-form">
+                    <div className="j-cmt-reply-form" style={{ flexWrap: 'wrap' }}>
+                      <div style={{ width: '100%', fontSize: '10px', color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                        Replying to <strong style={{ color: 'var(--text-soft)' }}>{c.author}</strong>
+                        <button type="button" onClick={() => setReplyTo(null)} style={{ background: 'transparent', border: 0, color: 'var(--muted2)', cursor: 'pointer', padding: 0, display: 'inline-flex', marginLeft: 'auto' }} aria-label="Cancel reply">✕</button>
+                      </div>
                       <span className="avatar" style={{ background: myTint.bg, color: myTint.fg, width: '18px', height: '18px', fontSize: '8px', flexShrink: 0 }}>{myInitials}</span>
                       <input
                         className="j-cmt-input"
@@ -1189,7 +1209,6 @@ function NoteCard({ page, authorName, myId, myName, patchPage, onDeleteConfirm, 
                         onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); postComment(e) } }}
                       />
                       <button type="submit" className="j-send-btn" disabled={!cText.trim()} onClick={(e) => postComment(e)}>Send</button>
-                      <button type="button" className="icon-btn" onClick={() => setReplyTo(null)} style={{ fontSize: '10px', padding: '2px' }}>✕</button>
                     </div>
                   )}
                 </div>

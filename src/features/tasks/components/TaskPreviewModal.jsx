@@ -60,6 +60,82 @@ function taskProgress(checklist, stage) {
   return stage === 'Done' ? 100 : 0
 }
 
+function pathKey(path) {
+  return Array.isArray(path) ? path.join('.') : ''
+}
+
+function TaskCommentNode({ node, path, depth, replyTarget, setReplyTarget, expanded, setExpanded }) {
+  const name = node.author_name || 'Unknown'
+  const replies = Array.isArray(node.replies) ? node.replies : []
+  const key = pathKey(path)
+  const isReplying = replyTarget && pathKey(replyTarget.path) === key
+  const isExpanded = !!expanded[key]
+  return (
+    <div style={{ display: 'flex', gap: '8px', marginBottom: depth === 0 ? '9px' : '6px' }}>
+      <span className="avatar" style={{ width: depth === 0 ? '24px' : '20px', height: depth === 0 ? '24px' : '20px', fontSize: depth === 0 ? '9px' : '8px', flexShrink: 0 }}>
+        {name.slice(0, 2).toUpperCase()}
+      </span>
+      <div style={{
+        flex: 1, background: depth === 0 ? 'var(--panel3)' : 'transparent',
+        border: depth === 0 ? '1px solid var(--border-soft)' : 'none',
+        borderRadius: '4px', padding: depth === 0 ? '7px 9px' : '0',
+        minWidth: 0,
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', marginBottom: '3px', alignItems: 'baseline', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: depth === 0 ? '10.5px' : '10px', fontWeight: 700, color: 'var(--text-soft)' }}>{name}</span>
+          <span style={{ fontSize: depth === 0 ? '9px' : '8.5px', color: 'var(--muted2)' }}>
+            {node.at ? new Date(node.at).toLocaleString() : ''}
+          </span>
+        </div>
+        <div style={{ fontSize: depth === 0 ? '11px' : '10.5px', color: 'var(--text-soft)', lineHeight: 1.5 }}>{node.text}</div>
+        <div style={{ marginTop: '5px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <button
+            type="button"
+            onClick={() => { setReplyTarget({ path, name }); }}
+            style={{
+              background: 'transparent', border: 0, padding: 0,
+              color: isReplying ? '#6e61ff' : 'var(--muted)', cursor: 'pointer',
+              fontSize: '9.5px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '3px',
+            }}
+          >
+            <Reply size={depth === 0 ? 10 : 9} /> Reply
+          </button>
+          {replies.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setExpanded((prev) => ({ ...prev, [key]: !prev[key] }))}
+              style={{
+                background: 'transparent', border: 0, padding: 0,
+                color: 'var(--muted)', cursor: 'pointer',
+                fontSize: '9.5px', fontWeight: 600,
+              }}
+            >
+              {isExpanded ? `▾ Hide replies` : `▸ ${replies.length} ${replies.length === 1 ? 'reply' : 'replies'}`}
+            </button>
+          )}
+        </div>
+
+        {replies.length > 0 && isExpanded && (
+          <div style={{ marginTop: '7px', marginLeft: '2px', paddingLeft: '10px', borderLeft: '2px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            {replies.map((r, ri) => (
+              <TaskCommentNode
+                key={ri}
+                node={r}
+                path={[...path, ri]}
+                depth={depth + 1}
+                replyTarget={replyTarget}
+                setReplyTarget={setReplyTarget}
+                expanded={expanded}
+                setExpanded={setExpanded}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function formatSize(bytes) {
   const n = Number(bytes) || 0
   if (n < 1024) return `${n} B`
@@ -102,6 +178,7 @@ export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated,
   const [newComment, setNewComment] = useState('')
   const [replyTarget, setReplyTarget] = useState(null)
   const [replyText, setReplyText] = useState('')
+  const [expandedReplies, setExpandedReplies] = useState({})
   const [dragOver, setDragOver] = useState(false)
   const [newCheckItem, setNewCheckItem] = useState('')
   const [editCheckIndex, setEditCheckIndex] = useState(null)
@@ -151,12 +228,14 @@ export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated,
     e.preventDefault()
     if (!newComment.trim()) return
     const user = currentUser()
-    const next = [...comments, {
+    const entry = {
       text: newComment.trim(),
       at: new Date().toISOString(),
       author_id: user.id,
       author_name: user.name,
-    }]
+      replies: [],
+    }
+    const next = [...comments, entry]
     setComments(next)
     setNewComment('')
     const updated = await patch({ meta: { comments: next } })
@@ -172,11 +251,27 @@ export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated,
       at: new Date().toISOString(),
       author_id: user.id,
       author_name: user.name,
-      ...(replyTarget.replyIndex != null ? { reply_to_name: replyTarget.name } : {}),
+      replies: [],
     }
-    const next = comments.map((c, i) => (
-      i === replyTarget.index ? { ...c, replies: [...(c.replies || []), entry] } : c
-    ))
+    function addAtPath(nodes, pathArr, depth = 0) {
+      if (!pathArr || depth >= pathArr.length) return [...(nodes || []), entry]
+      const idx = pathArr[depth]
+      return (nodes || []).map((n, i) => {
+        if (i !== idx) return n
+        if (depth === pathArr.length - 1) return { ...n, replies: [...(n.replies || []), entry] }
+        return { ...n, replies: addAtPath(n.replies || [], pathArr, depth + 1) }
+      })
+    }
+    const next = addAtPath(comments, replyTarget.path)
+    // expand ancestors so the new reply is visible
+    setExpandedReplies((prev) => {
+      const nextExp = { ...prev }
+      const path = replyTarget.path || []
+      for (let i = 1; i <= path.length; i++) {
+        nextExp[path.slice(0, i).join('.')] = true
+      }
+      return nextExp
+    })
     setComments(next)
     setReplyText('')
     setReplyTarget(null)
@@ -503,88 +598,36 @@ export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated,
                 {comments.length === 0 && (
                   <div style={{ color: 'var(--muted2)', fontSize: '11px' }}>No comments yet</div>
                 )}
-                {comments.map((c, i) => {
-                  const name = c.author_name || 'Unknown'
-                  return (
-                    <div key={i} style={{ display: 'flex', gap: '8px', marginBottom: '9px' }}>
-                      <span className="avatar" style={{ width: '24px', height: '24px', fontSize: '9px', flexShrink: 0 }}>
-                        {name.slice(0, 2).toUpperCase()}
-                      </span>
-                      <div style={{
-                        flex: 1, background: 'var(--panel3)', border: '1px solid var(--border-soft)',
-                        borderRadius: '4px', padding: '7px 9px',
-                      }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', marginBottom: '3px' }}>
-                          <span style={{ fontSize: '10.5px', fontWeight: 700, color: 'var(--text-soft)' }}>{name}</span>
-                          <span style={{ fontSize: '9px', color: 'var(--muted2)' }}>
-                            {new Date(c.at).toLocaleString()}
-                          </span>
-                        </div>
-                        <div style={{ fontSize: '11px', color: 'var(--text-soft)', lineHeight: 1.5 }}>{c.text}</div>
-
-                        <button
-                          type="button"
-                          onClick={() => { setReplyTarget({ index: i, name }); setReplyText('') }}
-                          style={{
-                            marginTop: '5px', background: 'transparent', border: 0, padding: 0,
-                            color: (replyTarget?.index === i && replyTarget?.replyIndex == null) ? '#6e61ff' : 'var(--muted)', cursor: 'pointer',
-                            fontSize: '9.5px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '3px',
-                          }}
-                        >
-                          <Reply size={10} /> Reply
-                        </button>
-
-                        {(c.replies || []).length > 0 && (
-                          <div style={{ marginTop: '7px', display: 'flex', flexDirection: 'column', gap: '6px', borderLeft: '2px solid var(--border)', paddingLeft: '8px' }}>
-                            {c.replies.map((r, ri) => (
-                              <div key={ri}>
-                                <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', flexWrap: 'wrap' }}>
-                                  <span style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-soft)' }}>{r.author_name || 'Unknown'}</span>
-                                  {r.reply_to_name && <span style={{ color: 'var(--muted2)', fontSize: '8.5px' }}>replying to {r.reply_to_name}</span>}
-                                  <span style={{ fontSize: '8.5px', color: 'var(--muted2)' }}>{new Date(r.at).toLocaleString()}</span>
-                                  <button
-                                    type="button"
-                                    onClick={() => { setReplyTarget({ index: i, replyIndex: ri, name: r.author_name || 'Unknown' }); setReplyText('') }}
-                                    style={{
-                                      marginLeft: 'auto', background: 'transparent', border: 0, padding: 0,
-                                      color: (replyTarget?.index === i && replyTarget?.replyIndex === ri) ? '#6e61ff' : 'var(--muted)', cursor: 'pointer',
-                                      fontSize: '9px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '3px',
-                                    }}
-                                  >
-                                    <Reply size={9} /> Reply
-                                  </button>
-                                </div>
-                                <div style={{ fontSize: '10.5px', color: 'var(--text-soft)', lineHeight: 1.5, marginTop: '1px' }}>{r.text}</div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-
-                        {replyTarget?.index === i && (
-                          <form onSubmit={addReply} style={{ display: 'flex', gap: '5px', marginTop: '7px' }}>
-                            <input
-                              type="text" value={replyText}
-                              onChange={(e) => setReplyText(e.target.value)}
-                              placeholder={`Reply to ${replyTarget.name}…`}
-                              style={{ ...inputStyle, padding: '4px 7px' }}
-                              autoFocus
-                            />
-                            <button type="submit" className="btn primary" disabled={!replyText.trim()} style={{ cursor: 'pointer', flexShrink: 0 }}>Reply</button>
-                          </form>
-                        )}
-                      </div>
-                    </div>
-                  )
-                })}
+                {comments.map((c, i) => (
+                  <TaskCommentNode
+                    key={i}
+                    node={c}
+                    path={[i]}
+                    depth={0}
+                    replyTarget={replyTarget}
+                    setReplyTarget={setReplyTarget}
+                    expanded={expandedReplies}
+                    setExpanded={setExpandedReplies}
+                  />
+                ))}
               </div>
-              <form onSubmit={addComment} style={{ display: 'flex', gap: '6px', marginBottom: '18px' }}>
+              <form onSubmit={replyTarget ? addReply : addComment} style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '18px' }}>
+                {replyTarget && (
+                  <div style={{ width: '100%', fontSize: '10px', color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '-2px' }}>
+                    Replying to <strong style={{ color: 'var(--text-soft)' }}>{replyTarget.name}</strong>
+                    <button type="button" onClick={() => { setReplyTarget(null); setReplyText('') }} style={{ background: 'transparent', border: 0, color: 'var(--muted2)', cursor: 'pointer', padding: 0, display: 'inline-flex' }} aria-label="Cancel reply"><X size={11} /></button>
+                  </div>
+                )}
                 <input
-                  type="text" value={newComment}
-                  onChange={(e) => setNewComment(e.target.value)}
-                  placeholder={`Comment as ${currentUser().name}…`}
-                  style={{ ...inputStyle, padding: '5px 8px' }}
+                  type="text"
+                  value={replyTarget ? replyText : newComment}
+                  onChange={(e) => replyTarget ? setReplyText(e.target.value) : setNewComment(e.target.value)}
+                  placeholder={replyTarget ? `Reply to ${replyTarget.name}…` : `Comment as ${currentUser().name}…`}
+                  style={{ ...inputStyle, padding: '5px 8px', flex: 1 }}
                 />
-                <button type="submit" className="btn primary" style={{ cursor: 'pointer', flexShrink: 0 }}>Send</button>
+                <button type="submit" className="btn primary" disabled={replyTarget ? !replyText.trim() : !newComment.trim()} style={{ cursor: 'pointer', flexShrink: 0 }}>
+                  {replyTarget ? 'Reply' : 'Send'}
+                </button>
               </form>
             </>
           )}

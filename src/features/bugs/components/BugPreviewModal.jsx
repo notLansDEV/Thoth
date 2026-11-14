@@ -89,6 +89,7 @@ export default function BugPreviewModal({ bug, workspaceId, projectName, stages,
   const [comments, setComments] = useState([])
   const [newComment, setNewComment] = useState('')
   const [replyTarget, setReplyTarget] = useState(null)
+  const [expandedReplies, setExpandedReplies] = useState({})
   const [files, setFiles] = useState(bug.attachments || bug.meta?.attachments || [])
   const [stepsToReproduce, setStepsToReproduce] = useState(bug.steps_to_reproduce || '')
   const [expectedBehavior, setExpectedBehavior] = useState(bug.expected_behavior || '')
@@ -178,6 +179,7 @@ export default function BugPreviewModal({ bug, workspaceId, projectName, stages,
     const content = replyTarget
       ? `@${replyTarget.name}: ${newComment.trim()}`
       : newComment.trim()
+    const parentId = replyTarget?.id || null
     try {
       const res = await fetch(`/api/bugs/${bug.id}/comments`, {
         method: 'POST',
@@ -185,10 +187,14 @@ export default function BugPreviewModal({ bug, workspaceId, projectName, stages,
           'Content-Type': 'application/json',
           Authorization: `Bearer ${localStorage.getItem('token')}`,
         },
-        body: JSON.stringify({ content }),
+        body: JSON.stringify({ content, parent_comment_id: parentId }),
       })
       const created = await res.json()
-      setComments((cur) => [...cur, created])
+      setComments((cur) => [...cur, parentId ? { ...created, _replyToId: parentId, parent_comment_id: parentId } : created])
+      // auto-expand thread so the new reply is visible
+      if (parentId) {
+        setExpandedReplies((prev) => ({ ...prev, [parentId]: true }))
+      }
       setNewComment('')
       setReplyTarget(null)
     } catch { /* keep text for retry */ }
@@ -366,39 +372,100 @@ export default function BugPreviewModal({ bug, workspaceId, projectName, stages,
           {tab === 'comments' && (
             <>
               {comments.length > 0 && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '9px', marginBottom: '11px' }}>
-                  {comments.map((c) => {
-                    const author = c.author_full_name || c.author_name || 'Unknown'
-                    return (
-                      <div key={c.id} style={{ display: 'flex', gap: '9px', alignItems: 'flex-start' }}>
-                        <span className="avatar" title={author}>
-                          {author.slice(0, 2).toUpperCase()}
-                        </span>
-                        <div style={{ minWidth: 0, flex: 1 }}>
-                          <div style={{ display: 'flex', alignItems: 'baseline', gap: '7px', flexWrap: 'wrap' }}>
-                            <span style={{ fontSize: '11.5px', fontWeight: 700, color: 'var(--text-soft)' }}>
-                              {author}
-                            </span>
-                            <span style={{ fontSize: '9.5px', color: 'var(--muted2)' }}>
-                              {new Date(c.created_at).toLocaleDateString()} · {new Date(c.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => { setReplyTarget({ name: author }); setNewComment('') }}
-                              style={{
-                                marginLeft: 'auto', background: 'transparent', border: 0, padding: 0,
-                                color: replyTarget?.name === author ? '#6e61ff' : 'var(--muted)', cursor: 'pointer',
-                                fontSize: '10px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '3px',
-                              }}
-                            >
-                              <Reply size={10} /> Reply
-                            </button>
+                <div style={{ marginBottom: '11px' }}>
+                  {(() => {
+                    // Build hierarchy: prefer persisted/explicit parent id, else infer from "@Name:" prefix.
+                    const nodes = comments.map((c) => ({ ...c, children: [], _parent: null }))
+                    const byId = new Map(nodes.map((n) => [n.id, n]))
+                    const roots = []
+                    for (let i = 0; i < nodes.length; i++) {
+                      const n = nodes[i]
+                      const content = n.content || ''
+                      const m = content.match(/^@([^:]+):\s*/)
+                      const explicitParentId = n.parent_comment_id || n._replyToId
+                      let parent = null
+                      if (explicitParentId && byId.has(explicitParentId)) {
+                        parent = byId.get(explicitParentId)
+                      } else if (m) {
+                        const targetName = m[1].trim()
+                        for (let j = i - 1; j >= 0; j--) {
+                          const a = nodes[j].author_full_name || nodes[j].author_name || 'Unknown'
+                          if (a === targetName) { parent = nodes[j]; break }
+                        }
+                      }
+                      if (parent) {
+                        n._parent = parent
+                        n._displayContent = m ? content.slice(m[0].length) : content
+                        n._replyTo = m ? m[1].trim() : (parent.author_full_name || parent.author_name || 'Unknown')
+                        parent.children.push(n)
+                      } else {
+                        n._displayContent = content
+                        roots.push(n)
+                      }
+                    }
+
+                    function CommentNode({ node, depth }) {
+                      const author = node.author_full_name || node.author_name || 'Unknown'
+                      const text = node._displayContent != null ? node._displayContent : node.content
+                      const replies = Array.isArray(node.children) ? node.children : []
+                      const isReplying = replyTarget?.id === node.id
+                      const isExpanded = !!expandedReplies[node.id]
+                      return (
+                        <div style={{ display: 'flex', gap: '8px', marginBottom: depth === 0 ? '9px' : '6px' }}>
+                          <span className="avatar" title={author} style={{ width: depth === 0 ? '24px' : '20px', height: depth === 0 ? '24px' : '20px', fontSize: depth === 0 ? '9px' : '8px', flexShrink: 0 }}>
+                            {author.slice(0, 2).toUpperCase()}
+                          </span>
+                          <div style={{
+                            flex: 1, background: depth === 0 ? 'var(--panel3)' : 'transparent',
+                            border: depth === 0 ? '1px solid var(--border-soft)' : 'none',
+                            borderRadius: '4px', padding: depth === 0 ? '7px 9px' : '0',
+                            minWidth: 0,
+                          }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', marginBottom: '3px', alignItems: 'baseline', flexWrap: 'wrap' }}>
+                              <span style={{ fontSize: depth === 0 ? '10.5px' : '10px', fontWeight: 700, color: 'var(--text-soft)' }}>{author}</span>
+                              <span style={{ fontSize: depth === 0 ? '9px' : '8.5px', color: 'var(--muted2)' }}>
+                                {node.created_at ? new Date(node.created_at).toLocaleString() : ''}
+                              </span>
+                            </div>
+                            {node._replyTo && (
+                              <div style={{ fontSize: '8.5px', color: 'var(--muted2)', marginBottom: '2px' }}>replying to {node._replyTo}</div>
+                            )}
+                            <div style={{ fontSize: depth === 0 ? '11px' : '10.5px', color: 'var(--text-soft)', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{text}</div>
+                            <div style={{ marginTop: '5px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              <button
+                                type="button"
+                                onClick={() => { setReplyTarget({ id: node.id, name: author }); setNewComment('') }}
+                                style={{
+                                  background: 'transparent', border: 0, padding: 0,
+                                  color: isReplying ? '#6e61ff' : 'var(--muted)', cursor: 'pointer',
+                                  fontSize: '9.5px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '3px',
+                                }}
+                              >
+                                <Reply size={depth === 0 ? 10 : 9} /> Reply
+                              </button>
+                              {replies.length > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => setExpandedReplies((prev) => ({ ...prev, [node.id]: !prev[node.id] }))}
+                                  style={{ background: 'transparent', border: 0, padding: 0, color: 'var(--muted)', cursor: 'pointer', fontSize: '9.5px', fontWeight: 600 }}
+                                >
+                                  {isExpanded ? '▾ Hide replies' : `▸ ${replies.length} ${replies.length === 1 ? 'reply' : 'replies'}`}
+                                </button>
+                              )}
+                            </div>
+
+                            {replies.length > 0 && isExpanded && (
+                              <div style={{ marginTop: '7px', marginLeft: '12px', paddingLeft: '12px', borderLeft: '2px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                {replies.map((child) => <CommentNode key={child.id} node={child} depth={depth + 1} />)}
+                              </div>
+                            )}
                           </div>
-                          <div style={{ fontSize: '11.5px', color: 'var(--text-soft)', whiteSpace: 'pre-wrap', marginTop: '2px' }}>{c.content}</div>
                         </div>
-                      </div>
-                    )
-                  })}
+                      )
+                    }
+
+                    return roots.map((n) => <CommentNode key={n.id} node={n} depth={0} />)
+                  })()}
                 </div>
               )}
 

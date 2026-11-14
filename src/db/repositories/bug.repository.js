@@ -81,12 +81,12 @@ export class BugRepository extends BaseRepository {
   /**
    * Add comment to bug
    */
-  async addComment(bugId, authorId, content, attachments = []) {
+  async addComment(bugId, authorId, content, attachments = [], parentCommentId = null) {
     return getOne(
-      `INSERT INTO bug_comments (bug_id, author_id, content, attachments)
-       VALUES ($1, $2, $3, $4)
+      `INSERT INTO bug_comments (bug_id, author_id, content, attachments, parent_comment_id)
+       VALUES ($1, $2, $3, $4, $5)
        RETURNING *`,
-      [bugId, authorId, content, JSON.stringify(attachments)]
+      [bugId, authorId, content, JSON.stringify(attachments), parentCommentId || null]
     );
   }
 
