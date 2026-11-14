@@ -785,8 +785,14 @@ html[data-theme="light"] .icon-btn,.html[data-theme="light"] .collapse-btn{backg
 html[data-theme="light"] .search,.html[data-theme="light"] .search-input{background:#fff;border-color:var(--border);color:#333}
 html[data-theme="light"] .dropdown-menu{background:#fff;border-color:var(--border);box-shadow:0 8px 20px rgba(0,0,0,.12)}
 html[data-theme="light"] .dropdown-item{color:#333}
-html[data-theme="light"] .dropdown-item:hover,.html[data-theme="light"] .md-cal-day:hover{background:#f0f1f4;color:#111}
+html[data-theme="light"] .dropdown-item:hover,html[data-theme="light"] .md-cal-day:hover{background:#f0f1f4;color:#111}
 html[data-theme="light"] .dropdown-item.unread{background:#eef1ff;border-left-color:#5f74ff}
+html[data-theme="light"] .j-day.today .j-day-num{color:#3d5fd9}
+html[data-theme="light"] .j-day.active .j-day-num{color:#1f3fa8}
+html[data-theme="light"] .j-day.active .j-day-letter{color:#3d5fd9}
+html[data-theme="light"] .j-day.active .j-day-dot{background:#3d5fd9}
+html[data-theme="light"] .md-cal-day.today{color:#3d5fd9}
+html[data-theme="light"] .md-cal-day.active{color:#1f3fa8;background:rgba(91,141,255,.12)}
 html[data-theme="light"] .j-focus-overlay{background:rgba(244,245,247,.6)}
 html[data-theme="light"] .j-focus-close{background:rgba(255,255,255,.85);border-color:var(--border);color:#5f74ff}
 html[data-theme="light"] .j-focus-close:hover{background:#f0f1f4}
