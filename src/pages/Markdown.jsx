@@ -3,7 +3,7 @@ import {
   ChevronLeft, ChevronRight, ChevronDown, CalendarDays, FileText, Plus, Trash2, Clock,
   Heading1, Heading2, Bold, Italic, Code, FileCode2, Minus, List, ListTodo,
   PencilLine, Eye, Columns2, ArrowLeft, MoreHorizontal, Smile,
-  Paperclip, ImagePlus, Check, ListFilter, Pin, Copy, Archive,
+  Paperclip, Check, ListFilter, Pin, Copy, Archive,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { getPages, createPage, updatePage, deletePage } from '../features/markdown/markdown.service.js'
@@ -150,10 +150,12 @@ function escapeHtml(s) {
 function inlineMd(raw) {
   let s = escapeHtml(raw)
   s = s.replace(/`([^`]+)`/g, '<code>$1</code>')
+  // Images: allow data: URLs and http(s)
+  s = s.replace(/!\[([^\]]*)\]\(((?:data:image\/[a-zA-Z0-9.+-]+;base64,|https?:\/\/)[^)]+)\)/g, '<img src="$2" alt="$1" style="max-width:100%;border-radius:6px;margin:6px 0;display:block;" />')
   s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
   s = s.replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>')
   s = s.replace(/~~([^~]+)~~/g, '<del>$1</del>')
-  s = s.replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noreferrer">$1</a>')
+  s = s.replace(/\[([^\]]+)\]\(((?:https?:\/\/)[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noreferrer">$1</a>')
   return s
 }
 
@@ -903,7 +905,6 @@ function NoteCard({ page, authorName, myId, myName, patchPage, onDeleteConfirm, 
   const [editMenuOpen, setEditMenuOpen] = useState(false)
   const [editAtts, setEditAtts] = useState([])
   const editAttRef = useRef(null)
-  const editImgRef = useRef(null)
   const html = useMemo(() => renderMarkdown(page.content), [page.content])
   const isLong = (page.content || '').length > LONG_CHARS || (page.content || '').split('\n').length > LONG_LINES
   const reactions = page.reactions || {}
@@ -933,13 +934,6 @@ function NoteCard({ page, authorName, myId, myName, patchPage, onDeleteConfirm, 
     let dataUrl = null
     if ((f.type || '').startsWith('image/')) dataUrl = await readFileAsDataUrl(f)
     setEditAtts((prev) => [...prev, { id: crypto.randomUUID(), name: f.name, size: f.size, type: f.type, dataUrl }])
-  }
-
-  async function pickEditImg(e) {
-    const f = e.target.files?.[0]; e.target.value = ''
-    if (!f || f.size > MAX_FILE_BYTES) return
-    const dataUrl = await readFileAsDataUrl(f)
-    if (dataUrl) setEditAtts((prev) => [...prev, { id: crypto.randomUUID(), name: f.name, size: f.size, type: f.type, dataUrl }])
   }
 
   function postComment(e) {
@@ -1012,23 +1006,45 @@ function NoteCard({ page, authorName, myId, myName, patchPage, onDeleteConfirm, 
 
           {/* existing + new attachments */}
           {(page.attachments?.length > 0 || editAtts.length > 0) && (
-            <div className="j-att-row" style={{ marginTop: '6px' }}>
+            <div className="j-att-row" style={{ marginTop: '6px', flexWrap: 'wrap', gap: '8px' }}>
               {(page.attachments || []).map((a) => (
-                <span key={a.id || a.name} className="j-att-chip">
-                  {a.dataUrl && (a.type || '').startsWith('image/')
-                    ? <img src={a.dataUrl} alt="" style={{ width: '14px', height: '14px', objectFit: 'cover', borderRadius: '3px' }} />
-                    : <Paperclip size={9} />}
-                  {a.name}
-                </span>
+                a.dataUrl && (a.type || '').startsWith('image/') ? (
+                  <div key={a.id || a.name} style={{ position: 'relative', display: 'inline-block' }}>
+                    <img
+                      src={a.dataUrl}
+                      alt={a.name || 'image'}
+                      style={{ width: '96px', height: '72px', objectFit: 'cover', borderRadius: '6px', border: '1px solid var(--border)', display: 'block' }}
+                    />
+                  </div>
+                ) : (
+                  <span key={a.id || a.name} className="j-att-chip">
+                    <Paperclip size={9} />
+                    {a.name}
+                  </span>
+                )
               ))}
               {editAtts.map((a) => (
-                <span key={a.id} className="j-att-chip" style={{ borderStyle: 'dashed' }}>
-                  {a.dataUrl && (a.type || '').startsWith('image/')
-                    ? <img src={a.dataUrl} alt="" style={{ width: '14px', height: '14px', objectFit: 'cover', borderRadius: '3px' }} />
-                    : <Paperclip size={9} />}
-                  {a.name}
-                  <button type="button" onClick={() => setEditAtts((prev) => prev.filter((x) => x.id !== a.id))} style={{ background: 'none', border: 0, color: 'var(--muted)', cursor: 'pointer', padding: 0, marginLeft: 2, lineHeight: 1 }}>✕</button>
-                </span>
+                a.dataUrl && (a.type || '').startsWith('image/') ? (
+                  <div key={a.id} style={{ position: 'relative', display: 'inline-block' }}>
+                    <img
+                      src={a.dataUrl}
+                      alt={a.name || 'image'}
+                      style={{ width: '96px', height: '72px', objectFit: 'cover', borderRadius: '6px', border: '1px dashed var(--border)', display: 'block' }}
+                    />
+                    <button
+                      type="button"
+                      title="Remove"
+                      onClick={() => setEditAtts((prev) => prev.filter((x) => x.id !== a.id))}
+                      style={{ position: 'absolute', top: '4px', right: '4px', background: 'rgba(0,0,0,0.55)', color: '#fff', borderRadius: '999px', width: '18px', height: '18px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', border: 0, cursor: 'pointer', padding: 0, lineHeight: 1 }}
+                    >✕</button>
+                  </div>
+                ) : (
+                  <span key={a.id} className="j-att-chip" style={{ borderStyle: 'dashed' }}>
+                    <Paperclip size={9} />
+                    {a.name}
+                    <button type="button" onClick={() => setEditAtts((prev) => prev.filter((x) => x.id !== a.id))} style={{ background: 'none', border: 0, color: 'var(--muted)', cursor: 'pointer', padding: 0, marginLeft: 2, lineHeight: 1 }}>✕</button>
+                  </span>
+                )
               ))}
             </div>
           )}
@@ -1041,7 +1057,6 @@ function NoteCard({ page, authorName, myId, myName, patchPage, onDeleteConfirm, 
                   <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setEditMenuOpen(false)} />
                   <div className="j-menu" role="menu" style={{ top: 'auto', bottom: 'calc(100% + 4px)' }}>
                     <button className="j-menu-item" onClick={() => { setEditMenuOpen(false); editAttRef.current?.click() }}><Paperclip size={11} /> Add attachment</button>
-                    <button className="j-menu-item" onClick={() => { setEditMenuOpen(false); editImgRef.current?.click() }}><ImagePlus size={11} /> Insert image</button>
                     <div className="j-menu-sep" />
                     <button className="j-menu-item" onClick={() => { setEditMenuOpen(false); onFocusPage(page) }}>
                       <Columns2 size={11} /> Focus mode
@@ -1060,7 +1075,6 @@ function NoteCard({ page, authorName, myId, myName, patchPage, onDeleteConfirm, 
           </div>
 
           <input ref={editAttRef} type="file" onChange={pickEditAtt} style={{ display: 'none' }} />
-          <input ref={editImgRef} type="file" accept="image/*" onChange={pickEditImg} style={{ display: 'none' }} />
         </div>
       ) : (
         <>
@@ -1268,7 +1282,6 @@ function Composer({ dateStr, wsId, focusMode, showToolbar, onToggleFocus, onTogg
   const [error, setError] = useState(null)
   const taRef = useRef(null)
   const attFileRef = useRef(null)
-  const imgFileRef = useRef(null)
 
   useEffect(() => {
     if (editPage) {
@@ -1304,17 +1317,7 @@ function Composer({ dateStr, wsId, focusMode, showToolbar, onToggleFocus, onTogg
     setAtts((prev) => [...prev, { id: crypto.randomUUID(), name: f.name, size: f.size, type: f.type, dataUrl }])
   }
 
-  async function pickImage(e) {
-    const f = e.target.files?.[0]
-    e.target.value = ''
-    if (!f) return
-    if (f.size > MAX_FILE_BYTES) return setError('Image is too large (max 2 MB).')
-    const dataUrl = await readFileAsDataUrl(f)
-    if (!dataUrl) return setError('Could not read image.')
-    setError(null)
-    const res = mdInsert(taRef.current, 'img')
-    if (res) setText(res.next.replace(/!\[(.*)\]\(\)$/, `![$1](${dataUrl})`))
-  }
+
 
   async function save() {
     if (!wsId && !editPage) return setError('No workspace selected.')
@@ -1390,7 +1393,6 @@ function Composer({ dateStr, wsId, focusMode, showToolbar, onToggleFocus, onTogg
               <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setMenuOpen(false)} />
               <div className="j-menu" role="menu" style={{ top: 'auto', bottom: 'calc(100% + 4px)' }}>
                 <button className="j-menu-item" onClick={() => { setMenuOpen(false); attFileRef.current?.click() }}><Paperclip size={11} /> Add attachment</button>
-                <button className="j-menu-item" onClick={() => { setMenuOpen(false); imgFileRef.current?.click() }}><ImagePlus size={11} /> Insert image</button>
                 <div className="j-menu-sep" />
                 <button className="j-menu-item" onClick={() => { setMenuOpen(false); onToggleFocus() }}>
                   <Columns2 size={11} /> Focus mode
@@ -1409,15 +1411,30 @@ function Composer({ dateStr, wsId, focusMode, showToolbar, onToggleFocus, onTogg
 
       {/* attachments */}
       {atts.length > 0 && (
-        <div className="j-att-row">
+        <div className="j-att-row" style={{ flexWrap: 'wrap', gap: '8px' }}>
           {atts.map((a) => (
-            <span key={a.id} className="j-att-chip">
-              {a.dataUrl && (a.type || '').startsWith('image/')
-                ? <img src={a.dataUrl} alt="" style={{ width: '16px', height: '16px', objectFit: 'cover', borderRadius: '3px' }} />
-                : <Paperclip size={10} />}
-              {a.name}
-              <button type="button" className="j-att-x" title="Remove" onClick={() => setAtts((prev) => prev.filter((x) => x.id !== a.id))}>✕</button>
-            </span>
+            a.dataUrl && (a.type || '').startsWith('image/') ? (
+              <div key={a.id} style={{ position: 'relative', display: 'inline-block' }}>
+                <img
+                  src={a.dataUrl}
+                  alt={a.name || 'image'}
+                  style={{ width: '96px', height: '72px', objectFit: 'cover', borderRadius: '6px', border: '1px solid var(--border)', display: 'block' }}
+                />
+                <button
+                  type="button"
+                  className="j-att-x"
+                  title="Remove"
+                  onClick={() => setAtts((prev) => prev.filter((x) => x.id !== a.id))}
+                  style={{ position: 'absolute', top: '4px', right: '4px', background: 'rgba(0,0,0,0.55)', color: '#fff', borderRadius: '999px', width: '18px', height: '18px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', border: 0, cursor: 'pointer', padding: 0 }}
+                >✕</button>
+              </div>
+            ) : (
+              <span key={a.id} className="j-att-chip">
+                <Paperclip size={10} />
+                {a.name}
+                <button type="button" className="j-att-x" title="Remove" onClick={() => setAtts((prev) => prev.filter((x) => x.id !== a.id))}>✕</button>
+              </span>
+            )
           ))}
         </div>
       )}
@@ -1425,7 +1442,6 @@ function Composer({ dateStr, wsId, focusMode, showToolbar, onToggleFocus, onTogg
       {error && <div className="j-composer-error">{error}</div>}
 
       <input ref={attFileRef} type="file" onChange={pickAttachment} style={{ display: 'none' }} />
-      <input ref={imgFileRef} type="file" accept="image/*" onChange={pickImage} style={{ display: 'none' }} />
     </div>
   )
 }
