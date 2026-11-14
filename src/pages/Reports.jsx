@@ -10,6 +10,7 @@ import {
   getWorkspaceMembers,
   getStages,
   TASK_PRIORITIES,
+  priorityStyle,
 } from '../features/tasks/tasks.service.js'
 import { getCurrentWorkspace } from '../features/workspaces/workspaces.service.js'
 import EditProjectModal from '../features/projects/components/EditProjectModal.jsx'
@@ -527,7 +528,7 @@ function ReportDetail({ project, tasksAll, membersCount, onBack }) {
                       </span>
                     </td>
                     <td>
-                      <span className="badge" style={{ background: 'transparent', fontSize: '9px', color: 'var(--muted)', border: '1px solid #333' }}>
+                      <span className="badge" style={{ ...priorityStyle(t.priority || 'medium'), background: 'transparent', fontSize: '9px' }}>
                         {t.priority || 'medium'}
                       </span>
                     </td>

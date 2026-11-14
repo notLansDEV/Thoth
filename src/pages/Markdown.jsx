@@ -948,14 +948,16 @@ function NoteCard({ page, authorName, myId, myName, patchPage, onDeleteConfirm, 
     if (!text) return
     const comment = { text, author: myName, at: new Date().toISOString() }
     if (replyTo != null) {
-      comment.replyTo = replyTo
+      const target = Number(replyTo)
+      comment.replyTo = target
       setExpandedReplies((prev) => {
         const next = new Set(prev)
-        let cur = replyTo
+        let cur = target
         // expand ancestors so the replied-to comment and new reply are visible
-        while (cur != null) {
+        while (cur != null && comments[cur]) {
           next.add(cur)
-          cur = comments[cur]?.replyTo
+          const parent = comments[cur].replyTo
+          cur = parent == null ? null : Number(parent)
         }
         return next
       })
@@ -1101,124 +1103,118 @@ function NoteCard({ page, authorName, myId, myName, patchPage, onDeleteConfirm, 
         if (!comments.length) return null
         const depthMap = []
         const childrenMap = {}
+        const roots = []
         comments.forEach((c, i) => {
-          if (c.replyTo != null && comments[c.replyTo]) {
-            depthMap[i] = (depthMap[c.replyTo] ?? -1) + 1
-            if (!childrenMap[c.replyTo]) childrenMap[c.replyTo] = []
-            childrenMap[c.replyTo].push(i)
+          const parentIdx = c.replyTo == null ? null : Number(c.replyTo)
+          if (parentIdx != null && comments[parentIdx]) {
+            depthMap[i] = (depthMap[parentIdx] ?? -1) + 1
+            if (!childrenMap[parentIdx]) childrenMap[parentIdx] = []
+            childrenMap[parentIdx].push(i)
           } else {
             depthMap[i] = 0
+            roots.push(i)
           }
         })
-        const getDescendants = (idx) => {
-          const desc = []
-          const stack = [...(childrenMap[idx] || [])]
-          while (stack.length) {
-            const ci = stack.pop()
-            desc.push(ci)
-            if (childrenMap[ci]) stack.push(...childrenMap[ci])
+
+        // Build display order in threaded (tree) order so replies appear under their parent.
+        const display = []
+        function walk(idx) {
+          display.push(idx)
+          const kids = childrenMap[idx] || []
+          if (kids.length > 0 && expandedReplies.has(idx)) {
+            kids.forEach(walk)
           }
-          return desc
         }
-        const hidden = new Set()
-        comments.forEach((_, i) => {
-          if ((childrenMap[i] || []).length > 0 && !expandedReplies.has(i)) {
-            getDescendants(i).forEach((d) => hidden.add(d))
-          }
-        })
-        const visible = comments.map((_, i) => !hidden.has(i))
-        const visibleComments = comments.map((c, i) => ({ c, i })).filter(({ i }) => visible[i])
-        const many = visibleComments.length >= 3
-        const shown = !many || showAllComments ? visibleComments : visibleComments.slice(0, 2)
+        roots.forEach(walk)
+
+        const renderNode = (idx) => {
+          const c = comments[idx]
+          if (!c) return null
+          const depth = depthMap[idx] || 0
+          const childCount = (childrenMap[idx] || []).length
+          const isExpanded = expandedReplies.has(idx)
+          const parentIdx = c.replyTo == null ? null : Number(c.replyTo)
+          const replyAuthor = parentIdx != null && comments[parentIdx] ? comments[parentIdx].author : null
+          return (
+            <div key={idx} className={depth > 0 ? 'j-cmt-reply-thread' : undefined} style={depth > 0 ? { marginLeft: `${depth * 22}px` } : undefined}>
+              <div className="j-cmt">
+                <span className="avatar" style={{ ...avatarTint(c.author || '?'), width: '18px', height: '18px', fontSize: '8px' }}>
+                  {(c.author || '?').slice(0, 2).toUpperCase()}
+                </span>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <span style={{ fontWeight: 700, color: 'var(--text-soft)', marginRight: '6px', fontSize: '10.5px' }}>{c.author}</span>
+                  {replyAuthor && <span style={{ color: 'var(--muted2)', fontSize: '9.5px', marginRight: '4px' }}>replying to {replyAuthor}</span>}
+                  <span style={{ color: 'var(--muted)', fontSize: '11px', whiteSpace: 'pre-wrap' }}>{c.text}</span>
+                  <div className="j-cmt-actions">
+                    {c.emoji ? (
+                      <button type="button" className="j-cmt-action j-cmt-emoji-active" onClick={() => { setReactOpen(idx); setReplyTo(null) }}>
+                        {c.emoji}
+                      </button>
+                    ) : (
+                      <button type="button" className="j-cmt-action" onClick={() => { setReactOpen(idx); setReplyTo(null) }}>
+                        <Smile size={10} /> Emoji
+                      </button>
+                    )}
+                    <button type="button" className="j-cmt-action" onClick={() => { setReplyTo(idx); setCText(''); setReactOpen(false) }}>
+                      Reply
+                    </button>
+                    {childCount > 0 && (
+                      <button type="button" className="j-cmt-action j-cmt-thread-toggle" onClick={() => {
+                        setExpandedReplies((prev) => {
+                          const next = new Set(prev)
+                          if (next.has(idx)) next.delete(idx); else next.add(idx)
+                          return next
+                        })
+                      }}>
+                        {isExpanded ? '▾ Hide replies' : `▸ ${childCount} ${childCount === 1 ? 'reply' : 'replies'}`}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* inline emoji picker for this comment */}
+              {reactOpen === idx && (
+                <div className="j-cmt-emoji-row">
+                  <div className="j-emoji-pop up" role="menu" style={{ position: 'static', boxShadow: 'none', background: 'transparent', border: 0, padding: 0, display: 'inline-flex' }}>
+                    {EMOJIS.map((em) => (
+                      <button key={em} type="button" className="j-emoji" onClick={() => {
+                        const updated = [...comments]
+                        updated[idx] = { ...updated[idx], emoji: em }
+                        patchPage(page, { comments: updated })
+                        setReactOpen(false)
+                      }}>{em}</button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* inline reply form */}
+              {replyTo === idx && (
+                <div className="j-cmt-reply-form" style={{ flexWrap: 'wrap' }}>
+                  <div style={{ width: '100%', fontSize: '10px', color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                    Replying to <strong style={{ color: 'var(--text-soft)' }}>{c.author}</strong>
+                    <button type="button" onClick={() => setReplyTo(null)} style={{ background: 'transparent', border: 0, color: 'var(--muted2)', cursor: 'pointer', padding: 0, display: 'inline-flex', marginLeft: 'auto' }} aria-label="Cancel reply">✕</button>
+                  </div>
+                  <span className="avatar" style={{ background: myTint.bg, color: myTint.fg, width: '18px', height: '18px', fontSize: '8px', flexShrink: 0 }}>{myInitials}</span>
+                  <input
+                    className="j-cmt-input"
+                    value={cText}
+                    onChange={(e) => setCText(e.target.value)}
+                    placeholder={`Reply to ${c.author}…`}
+                    autoFocus
+                    onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); postComment(e) } }}
+                  />
+                  <button type="submit" className="j-send-btn" disabled={!cText.trim()} onClick={(e) => postComment(e)}>Send</button>
+                </div>
+              )}
+            </div>
+          )
+        }
 
         return (
           <div className="j-cmts">
-            {shown.map(({ c, i }) => {
-              const depth = depthMap[i] || 0
-              const childCount = (childrenMap[i] || []).length
-              const isExpanded = expandedReplies.has(i)
-              const replyAuthor = c.replyTo != null && comments[c.replyTo] ? comments[c.replyTo].author : null
-              return (
-                <div key={i} className={depth > 0 ? 'j-cmt-reply-thread' : undefined} style={depth > 0 ? { marginLeft: `${depth * 22}px` } : undefined}>
-                  <div className="j-cmt">
-                    <span className="avatar" style={{ ...avatarTint(c.author || '?'), width: '18px', height: '18px', fontSize: '8px' }}>
-                      {(c.author || '?').slice(0, 2).toUpperCase()}
-                    </span>
-                    <div style={{ minWidth: 0, flex: 1 }}>
-                      <span style={{ fontWeight: 700, color: 'var(--text-soft)', marginRight: '6px', fontSize: '10.5px' }}>{c.author}</span>
-                      {replyAuthor && <span style={{ color: 'var(--muted2)', fontSize: '9.5px', marginRight: '4px' }}>replying to {replyAuthor}</span>}
-                      <span style={{ color: 'var(--muted)', fontSize: '11px', whiteSpace: 'pre-wrap' }}>{c.text}</span>
-                      <div className="j-cmt-actions">
-                        {c.emoji ? (
-                          <button type="button" className="j-cmt-action j-cmt-emoji-active" onClick={() => { setReactOpen(i); setReplyTo(null) }}>
-                            {c.emoji}
-                          </button>
-                        ) : (
-                          <button type="button" className="j-cmt-action" onClick={() => { setReactOpen(i); setReplyTo(null) }}>
-                            <Smile size={10} /> Emoji
-                          </button>
-                        )}
-                        <button type="button" className="j-cmt-action" onClick={() => { setReplyTo(i); setCText(''); setReactOpen(false) }}>
-                          Reply
-                        </button>
-                        {childCount > 0 && (
-                          <button type="button" className="j-cmt-action j-cmt-thread-toggle" onClick={() => {
-                            setExpandedReplies((prev) => {
-                              const next = new Set(prev)
-                              if (next.has(i)) next.delete(i); else next.add(i)
-                              return next
-                            })
-                          }}>
-                            {isExpanded ? '▾ Hide replies' : `▸ ${childCount} ${childCount === 1 ? 'reply' : 'replies'}`}
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* inline emoji picker for this comment */}
-                  {reactOpen === i && (
-                    <div className="j-cmt-emoji-row">
-                      <div className="j-emoji-pop up" role="menu" style={{ position: 'static', boxShadow: 'none', background: 'transparent', border: 0, padding: 0, display: 'inline-flex' }}>
-                        {EMOJIS.map((em) => (
-                          <button key={em} type="button" className="j-emoji" onClick={() => {
-                            const updated = [...comments]
-                            updated[i] = { ...updated[i], emoji: em }
-                            patchPage(page, { comments: updated })
-                            setReactOpen(false)
-                          }}>{em}</button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* inline reply form */}
-                  {replyTo === i && (
-                    <div className="j-cmt-reply-form" style={{ flexWrap: 'wrap' }}>
-                      <div style={{ width: '100%', fontSize: '10px', color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-                        Replying to <strong style={{ color: 'var(--text-soft)' }}>{c.author}</strong>
-                        <button type="button" onClick={() => setReplyTo(null)} style={{ background: 'transparent', border: 0, color: 'var(--muted2)', cursor: 'pointer', padding: 0, display: 'inline-flex', marginLeft: 'auto' }} aria-label="Cancel reply">✕</button>
-                      </div>
-                      <span className="avatar" style={{ background: myTint.bg, color: myTint.fg, width: '18px', height: '18px', fontSize: '8px', flexShrink: 0 }}>{myInitials}</span>
-                      <input
-                        className="j-cmt-input"
-                        value={cText}
-                        onChange={(e) => setCText(e.target.value)}
-                        placeholder={`Reply to ${c.author}…`}
-                        autoFocus
-                        onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); postComment(e) } }}
-                      />
-                      <button type="submit" className="j-send-btn" disabled={!cText.trim()} onClick={(e) => postComment(e)}>Send</button>
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-            {many && (
-              <button type="button" className="j-cmt-thread-toggle" style={{ marginTop: '8px' }} onClick={() => setShowAllComments((v) => !v)}>
-                {showAllComments ? '▾ Hide comments' : `▸ Show all comments (${visibleComments.length})`}
-              </button>
-            )}
+            {display.map(renderNode)}
           </div>
         )
       })()}

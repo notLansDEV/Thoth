@@ -60,13 +60,13 @@ function StageForm({ initial, onSave, onCancel }) {
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            maxLength={64}
-            placeholder="e.g. QA Testing"
+            maxLength={10}
+            placeholder="e.g. QA"
             style={{ ...inputStyle, marginBottom: '14px' }}
             autoFocus
           />
           <div style={{ fontSize: '9.5px', color: 'var(--muted2)', marginTop: '-10px', marginBottom: '12px', textAlign: 'right' }}>
-            {name.length}/64
+            {name.length}/10
           </div>
 
           <label style={{ display: 'block', marginBottom: '6px', fontSize: '11px', fontWeight: 700, color: 'var(--muted)' }}>
