@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import {
-  X, Paperclip, Send, FileImage, FileText, FileArchive, FileType2, FileSpreadsheet,
+  X, Paperclip, Send, FileImage, FileText, FileArchive, FileType2, FileSpreadsheet, Reply,
 } from 'lucide-react'
 import {
   BUG_STAGES,
@@ -88,6 +88,7 @@ export default function BugPreviewModal({ bug, workspaceId, projectName, stages,
   const [tab, setTab] = useState('description')
   const [comments, setComments] = useState([])
   const [newComment, setNewComment] = useState('')
+  const [replyTarget, setReplyTarget] = useState(null)
   const [files, setFiles] = useState(bug.attachments || bug.meta?.attachments || [])
   const [stepsToReproduce, setStepsToReproduce] = useState(bug.steps_to_reproduce || '')
   const [expectedBehavior, setExpectedBehavior] = useState(bug.expected_behavior || '')
@@ -174,6 +175,9 @@ export default function BugPreviewModal({ bug, workspaceId, projectName, stages,
   async function addComment(e) {
     e.preventDefault()
     if (!newComment.trim()) return
+    const content = replyTarget
+      ? `@${replyTarget.name}: ${newComment.trim()}`
+      : newComment.trim()
     try {
       const res = await fetch(`/api/bugs/${bug.id}/comments`, {
         method: 'POST',
@@ -181,11 +185,12 @@ export default function BugPreviewModal({ bug, workspaceId, projectName, stages,
           'Content-Type': 'application/json',
           Authorization: `Bearer ${localStorage.getItem('token')}`,
         },
-        body: JSON.stringify({ content: newComment.trim() }),
+        body: JSON.stringify({ content }),
       })
       const created = await res.json()
       setComments((cur) => [...cur, created])
       setNewComment('')
+      setReplyTarget(null)
     } catch { /* keep text for retry */ }
   }
 
@@ -362,39 +367,59 @@ export default function BugPreviewModal({ bug, workspaceId, projectName, stages,
             <>
               {comments.length > 0 && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '9px', marginBottom: '11px' }}>
-                  {comments.map((c) => (
-                    <div key={c.id} style={{ display: 'flex', gap: '9px', alignItems: 'flex-start' }}>
-                      <span className="avatar" title={c.author_full_name || c.author_name}>
-                        {(c.author_full_name || c.author_name || '?').slice(0, 2).toUpperCase()}
-                      </span>
-                      <div style={{ minWidth: 0, flex: 1 }}>
-                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '7px', flexWrap: 'wrap' }}>
-                          <span style={{ fontSize: '11.5px', fontWeight: 700, color: 'var(--text-soft)' }}>
-                            {c.author_full_name || c.author_name || 'Unknown'}
-                          </span>
-                          <span style={{ fontSize: '9.5px', color: 'var(--muted2)' }}>
-                            {new Date(c.created_at).toLocaleDateString()} · {new Date(c.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </span>
+                  {comments.map((c) => {
+                    const author = c.author_full_name || c.author_name || 'Unknown'
+                    return (
+                      <div key={c.id} style={{ display: 'flex', gap: '9px', alignItems: 'flex-start' }}>
+                        <span className="avatar" title={author}>
+                          {author.slice(0, 2).toUpperCase()}
+                        </span>
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <div style={{ display: 'flex', alignItems: 'baseline', gap: '7px', flexWrap: 'wrap' }}>
+                            <span style={{ fontSize: '11.5px', fontWeight: 700, color: 'var(--text-soft)' }}>
+                              {author}
+                            </span>
+                            <span style={{ fontSize: '9.5px', color: 'var(--muted2)' }}>
+                              {new Date(c.created_at).toLocaleDateString()} · {new Date(c.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => { setReplyTarget({ name: author }); setNewComment('') }}
+                              style={{
+                                marginLeft: 'auto', background: 'transparent', border: 0, padding: 0,
+                                color: replyTarget?.name === author ? '#6e61ff' : 'var(--muted)', cursor: 'pointer',
+                                fontSize: '10px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '3px',
+                              }}
+                            >
+                              <Reply size={10} /> Reply
+                            </button>
+                          </div>
+                          <div style={{ fontSize: '11.5px', color: 'var(--text-soft)', whiteSpace: 'pre-wrap', marginTop: '2px' }}>{c.content}</div>
                         </div>
-                        <div style={{ fontSize: '11.5px', color: 'var(--text-soft)', whiteSpace: 'pre-wrap', marginTop: '2px' }}>{c.content}</div>
                       </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )}
 
-              <form onSubmit={addComment} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <form onSubmit={addComment} style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                {replyTarget && (
+                  <div style={{ width: '100%', fontSize: '10px', color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '-2px' }}>
+                    Replying to <strong style={{ color: 'var(--text-soft)' }}>{replyTarget.name}</strong>
+                    <button type="button" onClick={() => setReplyTarget(null)} style={{ background: 'transparent', border: 0, color: 'var(--muted2)', cursor: 'pointer', padding: 0, display: 'inline-flex' }} aria-label="Cancel reply"><X size={11} /></button>
+                  </div>
+                )}
                 <span className="avatar" title={currentUser().name}>{currentUser().name.slice(0, 2).toUpperCase()}</span>
                 <input
                   type="text"
                   value={newComment}
                   onChange={(e) => setNewComment(e.target.value)}
-                  placeholder="Write a comment…"
+                  placeholder={replyTarget ? `Reply to ${replyTarget.name}…` : 'Write a comment…'}
                   className="search"
                   style={{ flex: 1 }}
                 />
                 <button type="submit" className="btn primary" disabled={!newComment.trim()} style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-                  <Send size={11} /> Send
+                  <Send size={11} /> {replyTarget ? 'Reply' : 'Send'}
                 </button>
               </form>
             </>

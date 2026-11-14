@@ -95,8 +95,13 @@ export default function AttachmentsTab({ project, onUpdateProject }) {
     }
   }
 
-  async function handleAddComment(attId, text, parentIndex = null) {
-    const entry = { text, author: currentUser(), at: new Date().toISOString() }
+  async function handleAddComment(attId, text, parentIndex = null, replyToName = null) {
+    const entry = {
+      text,
+      author: currentUser(),
+      at: new Date().toISOString(),
+      ...(replyToName ? { replyToName } : {}),
+    }
     const next = attachments.map((a) => {
       if (a.id !== attId) return a
       const comments = a.comments || []
@@ -204,7 +209,7 @@ export default function AttachmentsTab({ project, onUpdateProject }) {
         <AttachmentPreviewModal
           att={attachments.find((a) => a.id === previewAtt.id) || previewAtt}
           onAddComment={(text) => handleAddComment(previewAtt.id, text)}
-          onAddReply={(index, text) => handleAddComment(previewAtt.id, text, index)}
+          onAddReply={(index, text, replyToName) => handleAddComment(previewAtt.id, text, index, replyToName)}
           onDelete={() => setConfirmDelete(previewAtt)}
           onClose={() => setPreviewAtt(null)}
         />
@@ -226,6 +231,7 @@ export default function AttachmentsTab({ project, onUpdateProject }) {
 
 function UploadAttachmentModal({ onSubmit, onClose }) {
   const [file, setFile] = useState(null)
+  const [previewUrl, setPreviewUrl] = useState(null)
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [error, setError] = useState(null)
@@ -233,7 +239,7 @@ function UploadAttachmentModal({ onSubmit, onClose }) {
   const [loading, setLoading] = useState(false)
   const fileRef = useRef(null)
 
-  function pickFile(e) {
+  async function pickFile(e) {
     const f = e.target.files?.[0]
     e.target.value = ''
     if (!f) return
@@ -244,6 +250,11 @@ function UploadAttachmentModal({ onSubmit, onClose }) {
     setError(null)
     setFile(f)
     if (!title.trim()) setTitle(f.name.replace(/\.[^.]+$/, ''))
+    if ((f.type || '').startsWith('image/')) {
+      setPreviewUrl(await readFileAsDataUrl(f))
+    } else {
+      setPreviewUrl(null)
+    }
   }
 
   async function handleSubmit(e) {
@@ -304,8 +315,25 @@ function UploadAttachmentModal({ onSubmit, onClose }) {
               <Paperclip size={12} /> Choose file
             </button>
             {file && (
-              <div style={{ fontSize: '10.5px', color: 'var(--muted)', marginTop: '6px' }}>
-                {file.name} · {formatSize(file.size)}
+              <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                {previewUrl ? (
+                  <img
+                    src={previewUrl}
+                    alt={file.name}
+                    style={{
+                      width: '64px', height: '64px', objectFit: 'cover',
+                      borderRadius: '4px', border: '1px solid var(--border)', flexShrink: 0,
+                    }}
+                  />
+                ) : (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '64px', height: '64px', borderRadius: '4px', border: '1px solid var(--border)', background: 'var(--panel3)', color: 'var(--muted)', flexShrink: 0 }}>
+                    {fileIcon(file.name)}
+                  </span>
+                )}
+                <div style={{ fontSize: '10.5px', color: 'var(--muted)', minWidth: 0 }}>
+                  <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-soft)' }}>{file.name}</div>
+                  <div>{formatSize(file.size)}</div>
+                </div>
               </div>
             )}
           </div>
@@ -345,7 +373,8 @@ function UploadAttachmentModal({ onSubmit, onClose }) {
 
 function AttachmentPreviewModal({ att, onAddComment, onAddReply, onDelete, onClose }) {
   const [commentText, setCommentText] = useState('')
-  const [replyTo, setReplyTo] = useState(null)
+  // replyTarget: { index: top-level comment index, replyIndex?: number, name: string } | null
+  const [replyTarget, setReplyTarget] = useState(null)
   const [replyText, setReplyText] = useState('')
   const me = currentUser()
 
@@ -356,12 +385,13 @@ function AttachmentPreviewModal({ att, onAddComment, onAddReply, onDelete, onClo
     setCommentText('')
   }
 
-  async function postReply(e, index) {
+  async function postReply(e) {
     e.preventDefault()
-    if (!replyText.trim()) return
-    await onAddReply(index, replyText.trim())
+    if (!replyText.trim() || !replyTarget) return
+    const replyToName = replyTarget.replyIndex != null ? replyTarget.name : null
+    await onAddReply(replyTarget.index, replyText.trim(), replyToName)
     setReplyText('')
-    setReplyTo(null)
+    setReplyTarget(null)
   }
 
   return (
@@ -427,10 +457,10 @@ function AttachmentPreviewModal({ att, onAddComment, onAddReply, onDelete, onClo
                         </span>
                         <button
                           type="button"
-                          onClick={() => { setReplyTo(replyTo === i ? null : i); setReplyText('') }}
+                          onClick={() => { setReplyTarget({ index: i, name: c.author || 'comment' }); setReplyText('') }}
                           style={{
                             marginLeft: 'auto', background: 'transparent', border: 0, padding: 0,
-                            color: replyTo === i ? '#6e61ff' : 'var(--muted)', cursor: 'pointer',
+                            color: (replyTarget?.index === i && replyTarget?.replyIndex == null) ? '#6e61ff' : 'var(--muted)', cursor: 'pointer',
                             fontSize: '10px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '3px',
                           }}
                         >
@@ -449,9 +479,21 @@ function AttachmentPreviewModal({ att, onAddComment, onAddReply, onDelete, onClo
                               <div style={{ minWidth: 0, flex: 1 }}>
                                 <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', flexWrap: 'wrap' }}>
                                   <span style={{ fontSize: '10.5px', fontWeight: 700, color: 'var(--text-soft)' }}>{r.author}</span>
+                                  {r.replyToName && <span style={{ color: 'var(--muted2)', fontSize: '9px' }}>replying to {r.replyToName}</span>}
                                   <span style={{ fontSize: '9px', color: 'var(--muted2)' }}>
                                     {new Date(r.at).toLocaleDateString()} · {new Date(r.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                   </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => { setReplyTarget({ index: i, replyIndex: ri, name: r.author || 'comment' }); setReplyText('') }}
+                                    style={{
+                                      marginLeft: 'auto', background: 'transparent', border: 0, padding: 0,
+                                      color: (replyTarget?.index === i && replyTarget?.replyIndex === ri) ? '#6e61ff' : 'var(--muted)', cursor: 'pointer',
+                                      fontSize: '9.5px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '3px',
+                                    }}
+                                  >
+                                    <Reply size={9} /> Reply
+                                  </button>
                                 </div>
                                 <div style={{ fontSize: '11px', color: 'var(--text-soft)', whiteSpace: 'pre-wrap', marginTop: '1px' }}>{r.text}</div>
                               </div>
@@ -460,13 +502,13 @@ function AttachmentPreviewModal({ att, onAddComment, onAddReply, onDelete, onClo
                         </div>
                       )}
 
-                      {replyTo === i && (
-                        <form onSubmit={(e) => postReply(e, i)} style={{ display: 'flex', gap: '6px', alignItems: 'center', marginTop: '7px' }}>
+                      {replyTarget?.index === i && (
+                        <form onSubmit={postReply} style={{ display: 'flex', gap: '6px', alignItems: 'center', marginTop: '7px' }}>
                           <input
                             type="text"
                             value={replyText}
                             onChange={(e) => setReplyText(e.target.value)}
-                            placeholder={`Reply to ${c.author || 'comment'}…`}
+                            placeholder={`Reply to ${replyTarget.name}…`}
                             className="search"
                             style={{ flex: 1 }}
                             autoFocus

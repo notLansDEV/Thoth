@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { createBug, getWorkspaceMembers, getMilestones } from '../bugs.service.js'
 import { TASK_PRIORITIES } from '../../tasks/tasks.service.js'
-import { Paperclip, X } from 'lucide-react'
+import { Paperclip, X, FileImage, FileText, FileArchive, FileType2, FileSpreadsheet } from 'lucide-react'
+import Snackbar from '../../../components/Snackbar.jsx'
 
 const inputStyle = {
   width: '100%',
@@ -34,6 +35,24 @@ function readFileAsDataUrl(file) {
   })
 }
 
+function formatSize(bytes) {
+  if (bytes == null) return ''
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function fileIcon(name) {
+  if (!name) return <Paperclip size={13} />
+  const ext = name.split('.').pop().toLowerCase()
+  if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'].includes(ext)) return <FileImage size={13} />
+  if (['pdf'].includes(ext)) return <FileText size={13} />
+  if (['zip', 'rar', '7z', 'tar', 'gz'].includes(ext)) return <FileArchive size={13} />
+  if (['doc', 'docx'].includes(ext)) return <FileType2 size={13} />
+  if (['xls', 'xlsx', 'csv'].includes(ext)) return <FileSpreadsheet size={13} />
+  return <Paperclip size={13} />
+}
+
 export default function ReportBugModal({ projects, workspaceId, stages, defaultStageName, onCreated, onClose }) {
   const [projectId, setProjectId] = useState(projects[0]?.id || '')
   const [milestoneId, setMilestoneId] = useState('')
@@ -54,6 +73,7 @@ export default function ReportBugModal({ projects, workspaceId, stages, defaultS
     : ['New']
   const [stage, setStage] = useState(defaultStageName || stageOptions[0] || 'New')
   const [error, setError] = useState(null)
+  const [snackbar, setSnackbar] = useState(null)
   const [loading, setLoading] = useState(false)
   const fileInputRef = useRef(null)
 
@@ -77,14 +97,19 @@ export default function ReportBugModal({ projects, workspaceId, stages, defaultS
   async function onFilesPicked(e) {
     const picked = Array.from(e.target.files || [])
     e.target.value = ''
+    let tooLarge = false
     for (const file of picked) {
-      if (file.size > MAX_FILE_BYTES) continue
+      if (file.size > MAX_FILE_BYTES) {
+        tooLarge = true
+        continue
+      }
       const entry = { name: file.name, size: file.size, type: file.type }
       if ((file.type || '').startsWith('image/') && file.size <= MAX_FILE_BYTES) {
         entry.dataUrl = await readFileAsDataUrl(file)
       }
       setAttachments((cur) => [...cur, entry])
     }
+    if (tooLarge) setSnackbar('File is too large (max 2 MB).')
   }
 
   async function handleSubmit(e) {
@@ -280,15 +305,28 @@ export default function ReportBugModal({ projects, workspaceId, stages, defaultS
               <Paperclip size={12} /> Attach files
             </button>
             {attachments.length > 0 && (
-              <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '5px' }}>
+              <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 {attachments.map((f, i) => (
                   <span key={`${f.name}-${i}`} style={{
-                    display: 'flex', alignItems: 'center', gap: '7px',
+                    display: 'flex', alignItems: 'center', gap: '8px',
                     fontSize: '10.5px', color: 'var(--muted)', background: 'var(--panel3)',
-                    border: '1px solid var(--hover)', borderRadius: '3px', padding: '4px 7px',
+                    border: '1px solid var(--hover)', borderRadius: '4px', padding: '5px 7px',
                   }}>
-                    <Paperclip size={11} style={{ flexShrink: 0 }} />
-                    <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
+                    {f.dataUrl && (f.type || '').startsWith('image/') ? (
+                      <img
+                        src={f.dataUrl}
+                        alt={f.name}
+                        style={{ width: '34px', height: '34px', objectFit: 'cover', borderRadius: '3px', border: '1px solid var(--border)', flexShrink: 0 }}
+                      />
+                    ) : (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '34px', height: '34px', borderRadius: '3px', border: '1px solid var(--border)', flexShrink: 0, color: 'var(--muted2)' }}>
+                        {fileIcon(f.name)}
+                      </span>
+                    )}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-soft)' }}>{f.name}</div>
+                      <div style={{ fontSize: '9.5px', color: 'var(--muted2)' }}>{formatSize(f.size)}</div>
+                    </div>
                     <button
                       type="button" className="icon-btn" title="Remove"
                       onClick={() => setAttachments((cur) => cur.filter((_, x) => x !== i))}
@@ -321,6 +359,7 @@ export default function ReportBugModal({ projects, workspaceId, stages, defaultS
           </div>
         </form>
       </div>
+      {snackbar && <Snackbar message={snackbar} type="error" onClose={() => setSnackbar(null)} />}
     </div>
   )
 }

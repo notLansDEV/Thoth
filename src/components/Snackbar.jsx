@@ -1,13 +1,20 @@
 import { useEffect } from 'react'
 import { X } from 'lucide-react'
 
+const PALETTES = {
+  error: { border: 'rgba(255,64,64,0.45)', background: 'rgba(255,64,64,0.14)', color: '#ff8a8a' },
+  success: { border: 'rgba(32,217,107,0.45)', background: 'rgba(32,217,107,0.14)', color: '#20d96b' },
+  warning: { border: 'rgba(255,185,0,0.45)', background: 'rgba(255,185,0,0.14)', color: '#ffcf66' },
+  info: { border: 'rgba(95,116,255,0.5)', background: 'rgba(95,116,255,0.16)', color: '#9eb0ff' },
+}
+
 /**
- * Lightweight snackbar/toast shown in the bottom-right corner.
+ * Lightweight snackbar/toast shown in the top-right corner.
  * Auto-dismisses after `duration` ms (default 3.5s).
  *
  * props:
  *  - message: string | null  (null hides the snackbar)
- *  - type: 'error' | 'success'
+ *  - type: 'error' | 'success' | 'warning' | 'info'
  *  - onClose(): called when dismissed or after the timeout
  *  - duration: ms before auto-dismiss
  */
@@ -20,18 +27,16 @@ export default function Snackbar({ message, type = 'error', onClose, duration = 
 
   if (!message) return null
 
-  const palette = type === 'success'
-    ? { border: 'rgba(32,217,107,0.45)', background: 'rgba(32,217,107,0.12)', color: '#20d96b' }
-    : { border: 'rgba(255,64,64,0.45)', background: 'rgba(255,64,64,0.12)', color: '#ff8a8a' }
+  const palette = PALETTES[type] || PALETTES.info
 
   return (
     <div
       role="status"
       aria-live="polite"
       style={{
-        position: 'fixed', right: '18px', bottom: '18px', zIndex: 2000,
+        position: 'fixed', right: '18px', top: '18px', zIndex: 2000,
         display: 'flex', alignItems: 'center', gap: '10px',
-        maxWidth: '340px', padding: '10px 12px', borderRadius: '5px',
+        maxWidth: '360px', padding: '10px 12px', borderRadius: '5px',
         border: `1px solid ${palette.border}`, background: palette.background,
         color: palette.color, fontSize: '11.5px', fontWeight: 600,
         boxShadow: '0 12px 28px rgba(0,0,0,0.35)',

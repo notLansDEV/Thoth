@@ -100,7 +100,7 @@ export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated,
   const [files, setFiles] = useState(task.meta?.files || [])
   const [tab, setTab] = useState('description')
   const [newComment, setNewComment] = useState('')
-  const [replyingTo, setReplyingTo] = useState(null)
+  const [replyTarget, setReplyTarget] = useState(null)
   const [replyText, setReplyText] = useState('')
   const [dragOver, setDragOver] = useState(false)
   const [newCheckItem, setNewCheckItem] = useState('')
@@ -163,22 +163,23 @@ export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated,
     if (!updated) setComments(comments)
   }
 
-  async function addReply(e, index) {
+  async function addReply(e) {
     e.preventDefault()
-    if (!replyText.trim()) return
+    if (!replyText.trim() || !replyTarget) return
     const user = currentUser()
     const entry = {
       text: replyText.trim(),
       at: new Date().toISOString(),
       author_id: user.id,
       author_name: user.name,
+      ...(replyTarget.replyIndex != null ? { reply_to_name: replyTarget.name } : {}),
     }
     const next = comments.map((c, i) => (
-      i === index ? { ...c, replies: [...(c.replies || []), entry] } : c
+      i === replyTarget.index ? { ...c, replies: [...(c.replies || []), entry] } : c
     ))
     setComments(next)
     setReplyText('')
-    setReplyingTo(null)
+    setReplyTarget(null)
     const updated = await patch({ meta: { comments: next } })
     if (!updated) setComments(comments)
   }
@@ -523,10 +524,10 @@ export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated,
 
                         <button
                           type="button"
-                          onClick={() => { setReplyingTo(replyingTo === i ? null : i); setReplyText('') }}
+                          onClick={() => { setReplyTarget({ index: i, name }); setReplyText('') }}
                           style={{
                             marginTop: '5px', background: 'transparent', border: 0, padding: 0,
-                            color: replyingTo === i ? '#6e61ff' : 'var(--muted)', cursor: 'pointer',
+                            color: (replyTarget?.index === i && replyTarget?.replyIndex == null) ? '#6e61ff' : 'var(--muted)', cursor: 'pointer',
                             fontSize: '9.5px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '3px',
                           }}
                         >
@@ -539,20 +540,32 @@ export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated,
                               <div key={ri}>
                                 <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', flexWrap: 'wrap' }}>
                                   <span style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-soft)' }}>{r.author_name || 'Unknown'}</span>
+                                  {r.reply_to_name && <span style={{ color: 'var(--muted2)', fontSize: '8.5px' }}>replying to {r.reply_to_name}</span>}
                                   <span style={{ fontSize: '8.5px', color: 'var(--muted2)' }}>{new Date(r.at).toLocaleString()}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => { setReplyTarget({ index: i, replyIndex: ri, name: r.author_name || 'Unknown' }); setReplyText('') }}
+                                    style={{
+                                      marginLeft: 'auto', background: 'transparent', border: 0, padding: 0,
+                                      color: (replyTarget?.index === i && replyTarget?.replyIndex === ri) ? '#6e61ff' : 'var(--muted)', cursor: 'pointer',
+                                      fontSize: '9px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '3px',
+                                    }}
+                                  >
+                                    <Reply size={9} /> Reply
+                                  </button>
                                 </div>
-                                <div style={{ fontSize: '10.5px', color: 'var(--text-soft)', lineHeight: 1.5 }}>{r.text}</div>
+                                <div style={{ fontSize: '10.5px', color: 'var(--text-soft)', lineHeight: 1.5, marginTop: '1px' }}>{r.text}</div>
                               </div>
                             ))}
                           </div>
                         )}
 
-                        {replyingTo === i && (
-                          <form onSubmit={(e) => addReply(e, i)} style={{ display: 'flex', gap: '5px', marginTop: '7px' }}>
+                        {replyTarget?.index === i && (
+                          <form onSubmit={addReply} style={{ display: 'flex', gap: '5px', marginTop: '7px' }}>
                             <input
                               type="text" value={replyText}
                               onChange={(e) => setReplyText(e.target.value)}
-                              placeholder={`Reply to ${name}…`}
+                              placeholder={`Reply to ${replyTarget.name}…`}
                               style={{ ...inputStyle, padding: '4px 7px' }}
                               autoFocus
                             />
