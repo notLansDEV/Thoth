@@ -5,6 +5,7 @@ import {
   PencilLine, Eye, Columns2, ArrowLeft, MoreHorizontal, Smile,
   Paperclip, ImagePlus, Check, ListFilter, Pin, Copy, Archive,
 } from 'lucide-react'
+import { toast } from 'sonner'
 import { getPages, createPage, updatePage, deletePage } from '../features/markdown/markdown.service.js'
 import { getCurrentWorkspace } from '../features/workspaces/workspaces.service.js'
 import { getWorkspaceMembers } from '../features/tasks/tasks.service.js'
@@ -297,7 +298,7 @@ export default function Markdown({ subPage }) {
 
   async function handleNewPage(title) {
     if (!wsId) {
-      window.alert('No workspace selected — please pick a workspace first.')
+      toast.error('No workspace selected — please pick a workspace first.')
       setShowNewPage(false)
       return
     }
@@ -307,7 +308,7 @@ export default function Markdown({ subPage }) {
       setOpenPage(page)
       setShowNewPage(false)
     } catch (err) {
-      window.alert(err.message || 'Could not create page')
+      toast.error(err.message || 'Could not create page')
     }
   }
 
@@ -319,7 +320,7 @@ export default function Markdown({ subPage }) {
       if (openPage?.id === confirmDelete.id) setOpenPage(null)
       setConfirmDelete(null)
     } catch (err) {
-      window.alert(err.message || 'Could not delete page')
+      toast.error(err.message || 'Could not delete page')
     }
   }
 

@@ -19,7 +19,7 @@ import ConfirmModal from '../components/ConfirmModal.jsx'
 import ListToolbar from '../components/ListToolbar.jsx'
 import ReportBugModal from '../features/bugs/components/ReportBugModal.jsx'
 import BugPreviewModal from '../features/bugs/components/BugPreviewModal.jsx'
-import Snackbar from '../components/Snackbar.jsx'
+import { toast } from 'sonner'
 
 function StatCard({ icon, label, value }) {
   return (
@@ -112,7 +112,6 @@ export default function Bugs({ subPage }) {
   const [deleting, setDeleting] = useState(false)
   const [showReport, setShowReport] = useState(false)
   const [preview, setPreview] = useState(null)
-  const [snackbar, setSnackbar] = useState(null)
   const dragId = useRef(null)
 
   const [query, setQuery] = useState('')
@@ -179,9 +178,9 @@ export default function Bugs({ subPage }) {
     try {
       await createStage(ws?.id, data.name, data.color)
       await refresh()
-      setSnackbar({ type: 'success', message: `Stage "${data.name}" added` })
+      toast.success(`Stage "${data.name}" added`)
     } catch (err) {
-      setSnackbar({ type: 'error', message: err.message || 'Could not create stage' })
+      toast.error(err.message || 'Could not create stage')
     }
   }
 
@@ -189,9 +188,9 @@ export default function Bugs({ subPage }) {
     try {
       await updateStageApi(id, data)
       await refresh()
-      setSnackbar({ type: 'success', message: `Stage "${data.name}" updated` })
+      toast.success(`Stage "${data.name}" updated`)
     } catch (err) {
-      setSnackbar({ type: 'error', message: err.message || 'Could not update stage' })
+      toast.error(err.message || 'Could not update stage')
     }
   }
 
@@ -202,10 +201,10 @@ export default function Bugs({ subPage }) {
     })
     try {
       await reorderStages(orderIds)
-      setSnackbar({ type: 'success', message: 'Stages reordered' })
+      toast.success('Stages reordered')
     } catch {
       await refresh()
-      setSnackbar({ type: 'error', message: 'Could not reorder stages' })
+      toast.error('Could not reorder stages')
     }
   }
 
@@ -217,9 +216,9 @@ export default function Bugs({ subPage }) {
       const name = confirmDelete.name
       setConfirmDelete(null)
       await refresh()
-      setSnackbar({ type: 'success', message: `Stage "${name}" removed` })
+      toast.success(`Stage "${name}" removed`)
     } catch (err) {
-      setSnackbar({ type: 'error', message: err.message || 'Could not delete stage' })
+      toast.error(err.message || 'Could not delete stage')
     } finally {
       setDeleting(false)
     }
@@ -234,9 +233,9 @@ export default function Bugs({ subPage }) {
       setBugs((cur) => cur.filter((b) => b.id !== confirmDeleteBug.id))
       setConfirmDeleteBug(null)
       if (preview?.id === confirmDeleteBug.id) setPreview(null)
-      setSnackbar({ type: 'success', message: `Bug "${title}" has been removed` })
+      toast.success(`Bug "${title}" has been removed`)
     } catch (err) {
-      setSnackbar({ type: 'error', message: err.message || 'Could not delete bug' })
+      toast.error(err.message || 'Could not delete bug')
     } finally {
       setDeleting(false)
     }
@@ -390,7 +389,7 @@ export default function Bugs({ subPage }) {
           onCreated={(bug) => {
             setBugs((current) => [bug, ...current])
             setShowReport(false)
-            setSnackbar({ type: 'success', message: `Bug "${bug.title || 'Untitled'}" has been added` })
+            toast.success(`Bug "${bug.title || 'Untitled'}" has been added`)
           }}
           onClose={() => setShowReport(false)}
         />
@@ -410,13 +409,6 @@ export default function Bugs({ subPage }) {
         />
       )}
 
-      {snackbar && (
-        <Snackbar
-          message={snackbar.message}
-          type={snackbar.type}
-          onClose={() => setSnackbar(null)}
-        />
-      )}
     </div>
   )
 }

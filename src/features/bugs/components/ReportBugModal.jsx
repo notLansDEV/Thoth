@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createBug, getWorkspaceMembers, getMilestones } from '../bugs.service.js'
 import { TASK_PRIORITIES } from '../../tasks/tasks.service.js'
 import { Paperclip, X, FileImage, FileText, FileArchive, FileType2, FileSpreadsheet } from 'lucide-react'
-import Snackbar from '../../../components/Snackbar.jsx'
+import { toast } from 'sonner'
 
 const inputStyle = {
   width: '100%',
@@ -73,7 +73,6 @@ export default function ReportBugModal({ projects, workspaceId, stages, defaultS
     : ['New']
   const [stage, setStage] = useState(defaultStageName || stageOptions[0] || 'New')
   const [error, setError] = useState(null)
-  const [snackbar, setSnackbar] = useState(null)
   const [loading, setLoading] = useState(false)
   const fileInputRef = useRef(null)
 
@@ -109,7 +108,7 @@ export default function ReportBugModal({ projects, workspaceId, stages, defaultS
       }
       setAttachments((cur) => [...cur, entry])
     }
-    if (tooLarge) setSnackbar('File is too large (max 2 MB).')
+    if (tooLarge) toast.error('File is too large (max 2 MB).')
   }
 
   async function handleSubmit(e) {
@@ -138,7 +137,9 @@ export default function ReportBugModal({ projects, workspaceId, stages, defaultS
       })
       onCreated(bug)
     } catch (err) {
-      setError(err.message || 'Could not report bug')
+      const msg = err.message || 'Could not report bug'
+      setError(msg)
+      toast.error(msg)
       setLoading(false)
     }
   }
@@ -359,7 +360,6 @@ export default function ReportBugModal({ projects, workspaceId, stages, defaultS
           </div>
         </form>
       </div>
-      {snackbar && <Snackbar message={snackbar} type="error" onClose={() => setSnackbar(null)} />}
     </div>
   )
 }

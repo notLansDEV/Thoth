@@ -3,9 +3,9 @@ import {
   Paperclip, FileImage, FileText, FileArchive, FileType2, FileSpreadsheet,
   MessageSquare, Trash2, Upload, Reply,
 } from 'lucide-react'
+import { toast } from 'sonner'
 import { updateProject } from '../projects.service.js'
 import ConfirmModal from '../../../components/ConfirmModal.jsx'
-import Snackbar from '../../../components/Snackbar.jsx'
 
 const inputStyle = {
   width: '100%',
@@ -74,7 +74,6 @@ export default function AttachmentsTab({ project, onUpdateProject }) {
   const [previewAtt, setPreviewAtt] = useState(null)
   const [confirmDelete, setConfirmDelete] = useState(null)
   const [deleting, setDeleting] = useState(false)
-  const [snackbar, setSnackbar] = useState(null)
 
   async function persist(next) {
     const updated = await updateProject(project.id, { meta: { attachments: next } })
@@ -89,9 +88,9 @@ export default function AttachmentsTab({ project, onUpdateProject }) {
       await persist(attachments.filter((a) => a.id !== confirmDelete.id))
       setConfirmDelete(null)
       setPreviewAtt(null)
-      setSnackbar({ type: 'success', message: 'Attachment removed' })
+      toast.success('Attachment removed')
     } catch (err) {
-      setSnackbar({ type: 'error', message: err.message || 'Could not delete attachment' })
+      toast.error(err.message || 'Could not delete attachment')
     } finally {
       setDeleting(false)
     }
@@ -195,9 +194,9 @@ export default function AttachmentsTab({ project, onUpdateProject }) {
       {showUpload && (
         <UploadAttachmentModal
           onClose={() => setShowUpload(false)}
-          onUploadStart={() => setSnackbar({ type: 'info', message: 'Uploading attachment…' })}
-          onUploadSuccess={() => setSnackbar({ type: 'success', message: 'Attachment uploaded' })}
-          onUploadError={(msg) => setSnackbar({ type: 'error', message: msg })}
+          onUploadStart={() => toast.info('Uploading attachment…')}
+          onUploadSuccess={() => toast.success('Attachment uploaded')}
+          onUploadError={(msg) => toast.error(msg)}
           onSubmit={async ({ title, description, fileMeta, dataUrl }) => {
             await persist([...attachments, {
               id: crypto.randomUUID(),
@@ -233,13 +232,6 @@ export default function AttachmentsTab({ project, onUpdateProject }) {
         />
       )}
 
-      {snackbar && (
-        <Snackbar
-          message={snackbar.message}
-          type={snackbar.type}
-          onClose={() => setSnackbar(null)}
-        />
-      )}
     </div>
   )
 }
@@ -250,7 +242,6 @@ function UploadAttachmentModal({ onSubmit, onClose, onUploadStart, onUploadSucce
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [error, setError] = useState(null)
-  const [snackbar, setSnackbar] = useState(null)
   const [loading, setLoading] = useState(false)
   const fileRef = useRef(null)
 
@@ -259,7 +250,7 @@ function UploadAttachmentModal({ onSubmit, onClose, onUploadStart, onUploadSucce
     e.target.value = ''
     if (!f) return
     if (f.size > MAX_FILE_BYTES) {
-      setSnackbar('File is too large (max 2 MB).')
+      toast.error('File is too large (max 2 MB).')
       return
     }
     setError(null)
@@ -386,7 +377,6 @@ function UploadAttachmentModal({ onSubmit, onClose, onUploadStart, onUploadSucce
           </div>
         </form>
       </div>
-      {snackbar && <Snackbar message={snackbar} type="error" onClose={() => setSnackbar(null)} />}
     </div>
   )
 }

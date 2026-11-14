@@ -146,11 +146,45 @@ button,input{font:inherit}
 html[data-theme="light"] .add-stage-btn{color:#5f74ff}
 html[data-theme="light"] .add-stage-btn:hover{background:rgba(95,116,255,.16);color:#3d4bbf}
 
-@keyframes snackbar-pop-in{
-  from{transform:translateX(120%);opacity:0}
-  to{transform:translateX(0);opacity:1}
+/* Sonner toasts — solid, situation-based */
+[data-sonner-toaster]{
+  --normal-bg:#1f2937;--normal-border:#374151;--normal-text:#fff;
+  font-family:var(--font-family),ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
 }
-.snackbar-enter{animation:snackbar-pop-in .28s ease-out}
+[data-sonner-toast].app-toast{
+  border:none !important;
+  font-weight:600;
+  font-size:12px;
+}
+[data-sonner-toast].app-toast [data-icon]{
+  color:currentColor;
+}
+[data-sonner-toast].app-toast-success{
+  background:#16a34a !important;
+  color:#fff !important;
+}
+[data-sonner-toast].app-toast-error{
+  background:#dc2626 !important;
+  color:#fff !important;
+}
+[data-sonner-toast].app-toast-warning{
+  background:#d97706 !important;
+  color:#111827 !important;
+}
+[data-sonner-toast].app-toast-info{
+  background:#2563eb !important;
+  color:#fff !important;
+}
+[data-sonner-toast].app-toast .app-toast-close,
+[data-sonner-toast].app-toast [data-close-button]{
+  background:rgba(255,255,255,0.18) !important;
+  border-color:rgba(255,255,255,0.25) !important;
+  color:inherit !important;
+}
+[data-sonner-toast].app-toast-warning [data-close-button]{
+  background:rgba(0,0,0,0.12) !important;
+  border-color:rgba(0,0,0,0.2) !important;
+}
 
 .sidebar{
   width:198px;flex:none;background:var(--panel2);border-right:1px solid var(--border);display:flex;flex-direction:column;

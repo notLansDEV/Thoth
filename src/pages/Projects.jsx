@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { toast } from 'sonner'
 import { getProjects, addProject, deleteProject } from '../features/projects/projects.service.js'
 import { getCurrentWorkspace } from '../features/workspaces/workspaces.service.js'
 import ProjectForm from '../features/projects/components/ProjectForm.jsx'
@@ -65,7 +66,7 @@ export default function Projects({ workspace, projectId }) {
       await deleteProject(project.id)
       setProjects((current) => current.filter((p) => p.id !== project.id))
     } catch {
-      window.alert('Could not delete project')
+      toast.error('Could not delete project')
     }
   }
 

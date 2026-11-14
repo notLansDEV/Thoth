@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { toast } from 'sonner'
 import {
   Settings2, Palette, Users, Bell, Database, Info, Monitor, Moon, Sun, Save,
   User, LogOut, Trash2, UserPlus, Check, X,
@@ -602,7 +603,7 @@ export default function Settings() {
                 <h4>Export workspace data</h4>
                 <p>Download all tasks, bugs, notes and milestones as JSON.</p>
               </div>
-              <button type="button" className="btn" onClick={() => window.alert('Export coming soon.')}>Export</button>
+              <button type="button" className="btn" onClick={() => toast.info('Export coming soon.')}>Export</button>
             </div>
             <div className="settings-row">
               <div className="settings-row-info">

@@ -19,7 +19,7 @@ import TaskPreviewModal from '../features/tasks/components/TaskPreviewModal.jsx'
 import StageBoard from '../components/StageBoard.jsx'
 import ConfirmModal from '../components/ConfirmModal.jsx'
 import ListToolbar from '../components/ListToolbar.jsx'
-import Snackbar from '../components/Snackbar.jsx'
+import { toast } from 'sonner'
 
 function isOverdue(task) {
   if (!task.due_date || task.status === 'Done') return false
@@ -141,7 +141,6 @@ export default function Tasks({ subPage }) {
   const [confirmDelete, setConfirmDelete] = useState(null)
   const [confirmDeleteTask, setConfirmDeleteTask] = useState(null)
   const [deleting, setDeleting] = useState(false)
-  const [snackbar, setSnackbar] = useState(null)
   const dragId = useRef(null)
 
   const [query, setQuery] = useState('')
@@ -212,7 +211,7 @@ export default function Tasks({ subPage }) {
       project_name: projects.find((p) => p.id === task.project_id)?.name,
     }, ...current])
     setShowCreate(false)
-    setSnackbar({ type: 'success', message: `Task "${task.title || 'Untitled'}" has been added` })
+    toast.success(`Task "${task.title || 'Untitled'}" has been added`)
   }
 
   function onUpdated(updated) {
@@ -224,9 +223,9 @@ export default function Tasks({ subPage }) {
     try {
       await createStage(ws?.id, data.name, data.color)
       await refresh()
-      setSnackbar({ type: 'success', message: `Stage "${data.name}" added` })
+      toast.success(`Stage "${data.name}" added`)
     } catch (err) {
-      setSnackbar({ type: 'error', message: err.message || 'Could not create stage' })
+      toast.error(err.message || 'Could not create stage')
     }
   }
 
@@ -234,9 +233,9 @@ export default function Tasks({ subPage }) {
     try {
       await updateStageApi(id, data)
       await refresh()
-      setSnackbar({ type: 'success', message: `Stage "${data.name}" updated` })
+      toast.success(`Stage "${data.name}" updated`)
     } catch (err) {
-      setSnackbar({ type: 'error', message: err.message || 'Could not update stage' })
+      toast.error(err.message || 'Could not update stage')
     }
   }
 
@@ -247,10 +246,10 @@ export default function Tasks({ subPage }) {
     })
     try {
       await reorderStages(orderIds)
-      setSnackbar({ type: 'success', message: 'Stages reordered' })
+      toast.success('Stages reordered')
     } catch {
       await refresh()
-      setSnackbar({ type: 'error', message: 'Could not reorder stages' })
+      toast.error('Could not reorder stages')
     }
   }
 
@@ -262,9 +261,9 @@ export default function Tasks({ subPage }) {
       const name = confirmDelete.name
       setConfirmDelete(null)
       await refresh()
-      setSnackbar({ type: 'success', message: `Stage "${name}" removed` })
+      toast.success(`Stage "${name}" removed`)
     } catch (err) {
-      setSnackbar({ type: 'error', message: err.message || 'Could not delete stage' })
+      toast.error(err.message || 'Could not delete stage')
     } finally {
       setDeleting(false)
     }
@@ -279,9 +278,9 @@ export default function Tasks({ subPage }) {
       setTasks((cur) => cur.filter((t) => t.id !== confirmDeleteTask.id))
       setConfirmDeleteTask(null)
       if (preview?.id === confirmDeleteTask.id) setPreview(null)
-      setSnackbar({ type: 'success', message: `Task "${title}" has been removed` })
+      toast.success(`Task "${title}" has been removed`)
     } catch (err) {
-      setSnackbar({ type: 'error', message: err.message || 'Could not delete task' })
+      toast.error(err.message || 'Could not delete task')
     } finally {
       setDeleting(false)
     }
@@ -445,13 +444,6 @@ export default function Tasks({ subPage }) {
         />
       )}
 
-      {snackbar && (
-        <Snackbar
-          message={snackbar.message}
-          type={snackbar.type}
-          onClose={() => setSnackbar(null)}
-        />
-      )}
     </div>
   )
 }
