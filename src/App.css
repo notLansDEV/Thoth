@@ -186,6 +186,26 @@ html[data-theme="light"] .add-stage-btn:hover{background:rgba(95,116,255,.16);co
   border-color:rgba(0,0,0,0.2) !important;
 }
 
+/* Better pop/slide animation for top-right toasts */
+@keyframes toast-slide-pop-in{
+  0%{transform:translate3d(110%,0,0) scale(.96);opacity:0}
+  60%{transform:translate3d(-6px,0,0) scale(1.02);opacity:1}
+  100%{transform:translate3d(0,0,0) scale(1);opacity:1}
+}
+@keyframes toast-slide-pop-out{
+  0%{transform:translate3d(0,0,0) scale(1);opacity:1}
+  100%{transform:translate3d(110%,0,0) scale(.96);opacity:0}
+}
+[data-sonner-toaster][data-x-position="right"] [data-sonner-toast][data-mounted="true"]{
+  animation:toast-slide-pop-in .35s cubic-bezier(.22,1,.36,1) !important;
+}
+[data-sonner-toaster][data-x-position="right"] [data-sonner-toast][data-removed="true"]{
+  animation:toast-slide-pop-out .22s ease-in forwards !important;
+}
+[data-sonner-toaster][data-x-position="right"] [data-sonner-toast][data-swiping="true"]{
+  transition:transform .2s ease-out;
+}
+
 .sidebar{
   width:198px;flex:none;background:var(--panel2);border-right:1px solid var(--border);display:flex;flex-direction:column;
   overflow:hidden;
