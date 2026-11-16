@@ -905,3 +905,16 @@ html[data-theme="light"] .cal-today-btn:hover{color:#111;border-color:#5f74ff}
 .compact-mode .nav-item{height:25px}
 .compact-mode .cal-cell{min-height:84px}
 .compact-mode .content{padding:0}
+
+/* ============ Print / Export PDF ============ */
+@media print{
+  html,body{height:auto;overflow:visible;background:#fff !important;color:#111 !important}
+  .app{height:auto;display:block}
+  .sidebar,.topbar,[data-sonner-toaster],.no-print{display:none !important}
+  .app-main{height:auto;display:block}
+  .content,.main,.page-body{overflow:visible !important;height:auto !important}
+  .card,.report-detail{box-shadow:none}
+  .report-detail{color:#111}
+  .report-detail .card{break-inside:avoid;page-break-inside:avoid}
+  .report-detail .page-title,.report-detail h1,.report-detail h2,.report-detail h3{color:#111 !important}
+}

@@ -1,5 +1,5 @@
 ﻿import { useEffect, useState } from 'react'
-import { FolderKanban, CircleDot, CircleCheckBig, PauseCircle, TriangleAlert, Eye, Pencil, ArrowLeft } from 'lucide-react'
+import { FolderKanban, CircleDot, CircleCheckBig, PauseCircle, TriangleAlert, Eye, ArrowLeft, FileDown } from 'lucide-react'
 import {
   getProjects,
   PROJECT_STATUSES,
@@ -13,7 +13,6 @@ import {
   priorityStyle,
 } from '../features/tasks/tasks.service.js'
 import { getCurrentWorkspace } from '../features/workspaces/workspaces.service.js'
-import EditProjectModal from '../features/projects/components/EditProjectModal.jsx'
 
 function fmtDate(value) {
   if (!value) return '—'
@@ -96,8 +95,6 @@ export default function Reports() {
   const [membersCount, setMembersCount] = useState(0)
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState(null)
-  const [editing, setEditing] = useState(null)
-  const [refreshKey, setRefreshKey] = useState(0)
 
   useEffect(() => {
     let alive = true
@@ -125,7 +122,7 @@ export default function Reports() {
   if (selected) {
     return (
       <ReportDetail
-        key={refreshKey}
+        key={typeof selected === 'string' ? selected : selected?.id}
         project={projects.find((p) => p.id === selected) || selected}
         tasksAll={tasks}
         membersCount={membersCount}
@@ -155,15 +152,6 @@ export default function Reports() {
       if (t.project_id === project.id && t.assignee_name) names.add(t.assignee_name)
     }
     return Array.from(names)
-  }
-
-  async function handleUpdated() {
-    setEditing(null)
-    setRefreshKey((k) => k + 1)
-    try {
-      const fresh = await getProjects(ws?.id)
-      setProjects(fresh)
-    } catch { /* keep old */ }
   }
 
   return (
@@ -267,8 +255,7 @@ export default function Reports() {
                       </span>
                     </td>
                     <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                      <button className="icon-btn" title="View report" onClick={() => setSelected(project.id)}><Eye size={12} /></button>{' '}
-                      <button className="icon-btn" title="Edit project" onClick={() => setEditing(project)} style={{ marginLeft: '4px' }}><Pencil size={12} /></button>
+                      <button className="icon-btn" title="View report" onClick={() => setSelected(project.id)}><Eye size={12} /></button>
                     </td>
                   </tr>
                 )
@@ -278,13 +265,6 @@ export default function Reports() {
         </div>
       )}
 
-      {editing && (
-        <EditProjectModal
-          project={editing}
-          onSaved={handleUpdated}
-          onClose={() => setEditing(null)}
-        />
-      )}
     </div>
   )
 }
@@ -357,17 +337,26 @@ function ReportDetail({ project, tasksAll, membersCount, onBack }) {
   const statusMeta = PROJECT_STATUSES.find((s) => s.value === project.status)
 
   return (
-    <div>
-      <div className="page-head">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <button className="collapse-btn" onClick={onBack} title="Back to reports" style={{ width: '27px', height: '27px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><ArrowLeft size={13} /></button>
-          <div>
+    <div className="report-detail">
+      <div className="page-head" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+          <button className="collapse-btn no-print" onClick={onBack} title="Back to reports" style={{ width: '27px', height: '27px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><ArrowLeft size={13} /></button>
+          <div style={{ minWidth: 0 }}>
             <h1 className="page-title">{project.name} — Report</h1>
             <span className={`badge${project.status === 'active' ? '' : ' paused'}`}>
               {project.status === 'active' ? 'Active' : (statusMeta?.label || project.status)}
             </span>
           </div>
         </div>
+        <button
+          type="button"
+          className="btn no-print"
+          onClick={() => window.print()}
+          title="Export to PDF"
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer', flexShrink: 0 }}
+        >
+          <FileDown size={13} /> Export PDF
+        </button>
       </div>
 
       {/* Row 1: three cards */}
