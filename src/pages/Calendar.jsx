@@ -120,23 +120,24 @@ export default function Calendar({ workspace }) {
     })
   }
 
-  function renderPills(items, max, onMore) {
+  function renderPills(items, max, onMore, large = false) {
     const shown = max ? items.slice(0, max) : items
     const rest = max && items.length > max ? items.length - max : 0
+    const iconSize = large ? 13 : 9
     return (
       <>
         {shown.map((item) => (
           <button
             key={`${item.kind}-${item.id}`}
             type="button"
-            className="cal-pill"
+            className={`cal-pill${large ? ' cal-pill-lg' : ''}`}
             style={{ background: `${item.color}1f`, color: item.color, borderColor: `${item.color}55` }}
             onMouseEnter={(e) => { e.currentTarget.style.background = `${item.color}33` }}
             onMouseLeave={(e) => { e.currentTarget.style.background = `${item.color}1f` }}
             onClick={() => setSelected({ kind: item.kind, raw: item.raw })}
             title={`${item.kind === 'task' ? 'Task' : 'Bug'}: ${item.title}`}
           >
-            {item.kind === 'task' ? <ListTodo size={9} /> : <Bug size={9} />}
+            {item.kind === 'task' ? <ListTodo size={iconSize} /> : <Bug size={iconSize} />}
             <span>{item.title}</span>
           </button>
         ))}
@@ -208,6 +209,19 @@ export default function Calendar({ workspace }) {
             </>
           )}
           <button type="button" className="cal-today-btn" onClick={goToday}>Today</button>
+          {VIEWS.map((v) => {
+            const Icon = v.Icon
+            return (
+              <button
+                key={v.key}
+                type="button"
+                className={`cal-view-btn${view === v.key ? ' active' : ''}`}
+                onClick={() => setView(v.key)}
+              >
+                <Icon size={12} /> {v.label}
+              </button>
+            )
+          })}
         </div>
         <div className="cal-toolbar-right">
           <div style={{ position: 'relative' }}>
@@ -256,20 +270,6 @@ export default function Calendar({ workspace }) {
               </div>
             )}
           </div>
-
-          {VIEWS.map((v) => {
-            const Icon = v.Icon
-            return (
-              <button
-                key={v.key}
-                type="button"
-                className={`cal-view-btn${view === v.key ? ' active' : ''}`}
-                onClick={() => setView(v.key)}
-              >
-                <Icon size={12} /> {v.label}
-              </button>
-            )
-          })}
         </div>
       </div>
 
@@ -307,7 +307,7 @@ export default function Calendar({ workspace }) {
               </div>
             </div>
           ) : (
-            <div className="cal-list-wrap" style={{ ['--cal-cols']: gridDays.length }}>
+            <div className={`cal-list-wrap${view === 'day' ? ' day-view' : ''}`} style={{ ['--cal-cols']: gridDays.length }}>
               <div className="cal-list-head">
                 {gridDays.map((date) => {
                   const key = toDateKey(date)
@@ -331,7 +331,7 @@ export default function Calendar({ workspace }) {
                       {items.length === 0 ? (
                         <div className="cal-list-empty">—</div>
                       ) : (
-                        <div className="cal-pills col">{renderPills(items)}</div>
+                        <div className="cal-pills col">{renderPills(items, undefined, undefined, view === 'day')}</div>
                       )}
                     </div>
                   )

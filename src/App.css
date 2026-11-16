@@ -675,6 +675,16 @@ html[data-theme="light"] .add-stage-btn:hover{background:rgba(95,116,255,.16);co
   overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-family:inherit;
 }
 .cal-pill span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cal-pill.cal-pill-lg{
+  gap:8px;padding:8px 10px;border-radius:6px;
+  font-size:12px;line-height:1.35;
+}
+.cal-pill.cal-pill-lg span{white-space:normal;overflow:visible;text-overflow:clip;word-break:break-word}
+.cal-list-wrap.day-view .cal-list-col{padding:14px 16px}
+.cal-list-wrap.day-view .cal-pills.col{gap:8px}
+.cal-list-wrap.day-view .cal-list-day-head{padding:12px 14px}
+.cal-list-wrap.day-view .cal-list-day-name{font-size:11px}
+.cal-list-wrap.day-view .cal-list-day-month{font-size:10px}
 .cal-more{font-size:9.5px;color:var(--muted);padding-left:2px}
 .cal-more-btn{
   background:none;border:0;padding:0 0 0 2px;margin:0;cursor:pointer;
