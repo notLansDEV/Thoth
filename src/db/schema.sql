@@ -315,9 +315,11 @@ CREATE TABLE IF NOT EXISTS users (
   avatar_url VARCHAR(255),
   bio TEXT,
   status VARCHAR(50) DEFAULT 'active',
+  account_hint TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+ALTER TABLE users ADD COLUMN IF NOT EXISTS account_hint TEXT;
 
 -- Workspace Members Table
 CREATE TABLE IF NOT EXISTS workspace_members (

@@ -17,6 +17,7 @@
   --dot: rgba(34, 151, 155, 0.62);
 
   min-height: 100vh;
+  height: 100vh;
 
   display: flex;
   align-items: center;
@@ -43,7 +44,8 @@
   background-size: 80px 80px;
   background-position: 24px 22px;
 
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 /* Soft black vignette over the dot pattern */
@@ -128,6 +130,8 @@
   display: flex;
   flex-direction: column;
   align-items: center;
+
+  margin: auto 0;
 }
 
 /* =========================================================

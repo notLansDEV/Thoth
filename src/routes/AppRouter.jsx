@@ -12,9 +12,10 @@ import Settings from '../pages/Settings'
 import Workspaces from '../pages/Workspaces'
 import Login from '../auth/Login'
 import Signup from '../auth/Signup'
+import ForgotPassword from '../auth/ForgotPassword'
 import { getCurrentWorkspace } from '../features/workspaces/workspaces.service.js'
 
-const AUTH_PAGES = ['login', 'signup']
+const AUTH_PAGES = ['login', 'signup', 'forgot-password']
 
 function parsePath(){
   const parts = window.location.pathname.split('/').filter(Boolean)
@@ -56,7 +57,7 @@ export default function AppRouter(){
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
 
   // If not authenticated and not on auth pages, show login by default
-  if(!token && page !== 'login' && page !== 'signup'){
+  if(!token && !AUTH_PAGES.includes(page)){
     page = 'login'
   }
 
@@ -73,6 +74,7 @@ export default function AppRouter(){
   switch(page){
     case 'login': return render(<Login />)
     case 'signup': return render(<Signup />)
+    case 'forgot-password': return render(<ForgotPassword />)
     case 'dashboard': return render(<Dashboard workspace={workspace} />)
     case 'projects': return render(<Projects workspace={workspace} projectId={routeId} />)
     case 'tasks': return render(<Tasks workspace={workspace} subPage={routeId} />)

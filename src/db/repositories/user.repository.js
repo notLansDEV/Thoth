@@ -5,9 +5,9 @@ class UserRepository {
     this.table = 'users';
   }
 
-  async create({ username, email, password_hash, full_name }) {
-    const text = `INSERT INTO users (username, email, password_hash, full_name) VALUES ($1,$2,$3,$4) RETURNING *`;
-    const res = await query(text, [username, email, password_hash, full_name]);
+  async create({ username, email, password_hash, full_name, account_hint = null }) {
+    const text = `INSERT INTO users (username, email, password_hash, full_name, account_hint) VALUES ($1,$2,$3,$4,$5) RETURNING *`;
+    const res = await query(text, [username, email, password_hash, full_name, account_hint]);
     return res.rows[0];
   }
 

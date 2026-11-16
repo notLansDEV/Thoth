@@ -109,9 +109,9 @@ export default function Login() {
                 <div className="label-row">
                   <label htmlFor="login-password">Password</label>
                   <a
-                    href="#"
+                    href="/forgot-password"
                     className="auth-link"
-                    onClick={(e) => e.preventDefault()}
+                    onClick={(e) => { e.preventDefault(); navigate('/forgot-password') }}
                   >
                     Forgot password?
                   </a>

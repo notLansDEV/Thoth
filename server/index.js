@@ -66,14 +66,23 @@ app.get('/api/health', async (req, res) => {
 
 app.post('/api/auth/signup', async (req, res) => {
   try {
-    const { username, email, password, full_name } = req.body
+    const { username, email, password, full_name, account_hint } = req.body
     if(!email || !password || !username) return res.status(400).json({ error: 'Missing fields' })
+
+    const strongPassword = typeof password === 'string'
+      && password.length >= 8
+      && /[A-Za-z]/.test(password)
+      && /\d/.test(password)
+    if (!strongPassword) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters and include letters and numbers' })
+    }
 
     const existing = await userRepository.findByEmail(email)
     if(existing) return res.status(409).json({ error: 'User already exists' })
 
+    const hint = typeof account_hint === 'string' && account_hint.trim() ? account_hint.trim().slice(0, 255) : null
     const hash = await bcrypt.hash(password, 10)
-    const user = await userRepository.create({ username, email, password_hash: hash, full_name })
+    const user = await userRepository.create({ username, email, password_hash: hash, full_name, account_hint: hint })
 
     const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '7d' })
     res.json({ token, user: { id: user.id, username: user.username, email: user.email, full_name: user.full_name } })
@@ -96,6 +105,21 @@ app.post('/api/auth/login', async (req, res) => {
 
     const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '7d' })
     res.json({ token, user: { id: user.id, username: user.username, email: user.email, full_name: user.full_name } })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
+app.post('/api/auth/password-hint', async (req, res) => {
+  try {
+    const email = String(req.body?.email || '').trim().toLowerCase()
+    if (!email) return res.status(400).json({ error: 'Email is required' })
+
+    const user = await userRepository.findByEmail(email)
+    if (!user) return res.status(404).json({ error: 'No account found' })
+
+    res.json({ hint: user.account_hint || null })
   } catch (err) {
     console.error(err)
     res.status(500).json({ error: 'Server error' })
