@@ -72,7 +72,7 @@ export default function ListToolbar({
           <div
             className="dropdown-menu"
             style={{
-              top: 'calc(100% + 6px)', right: 0, minWidth: '200px',
+              top: 'calc(100% + 8px)', right: 0, minWidth: '200px',
               padding: '10px', display: 'flex', flexDirection: 'column', gap: '9px', zIndex: 900,
             }}
           >

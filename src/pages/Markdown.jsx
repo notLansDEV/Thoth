@@ -633,7 +633,7 @@ function AllPagesGrid({ pages, loaded, onOpen, onDelete }) {
           {filterOpen && (
             <>
               <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setFilterOpen(false)} />
-              <div className="j-menu" style={{ left: 0, right: 'auto' }} role="menu">
+              <div className="j-menu" style={{ left: 0, right: 'auto', top: 'calc(100% + 8px)', bottom: 'auto' }} role="menu">
                 {[
                   ['all', 'All'],
                   ['page', 'Pages only'],

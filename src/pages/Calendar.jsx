@@ -246,7 +246,7 @@ export default function Calendar({ workspace }) {
               <SlidersHorizontal size={11} /> Filter{typeFilter !== 'all' ? ' •' : ''}
             </button>
             {filterOpen && (
-              <div className="dropdown-menu" style={{ top: 'calc(100% + 6px)', right: 0, minWidth: '170px', padding: '10px' }}>
+              <div className="dropdown-menu" style={{ top: 'calc(100% + 8px)', left: 'auto', right: 0, minWidth: '170px', padding: '10px' }}>
                 <label style={{ display: 'block', fontSize: '10px', fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>Type</label>
                 <select
                   value={typeFilter}

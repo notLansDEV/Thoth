@@ -111,7 +111,7 @@ button,input{font:inherit}
 .modal-scroll{scrollbar-width:thin;scrollbar-color:var(--muted2) transparent}
 .dropdown-item.unread{background:#1a1d2b;border-left:2px solid #5f74ff}
 .dropdown-menu{
-  position:absolute;top:calc(100% + 6px);left:0;min-width:190px;z-index:60;
+  position:absolute;top:calc(100% + 8px);left:0;min-width:190px;z-index:60;
   background:var(--panel2);border:1px solid var(--border);border-radius:5px;
   box-shadow:0 12px 24px rgba(0,0,0,.45);padding:4px;
 }
