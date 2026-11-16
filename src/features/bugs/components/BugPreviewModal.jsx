@@ -213,7 +213,16 @@ export default function BugPreviewModal({ bug, workspaceId, projectName, stages,
 
   async function addFiles(picked) {
     if (!picked || picked.length === 0) return
-    const additions = await Promise.all(picked.map(async (f) => {
+    const MAX_FILE_BYTES = 2 * 1024 * 1024
+    const valid = []
+    let tooLarge = false
+    for (const f of picked) {
+      if (f.size > MAX_FILE_BYTES) { tooLarge = true; continue }
+      valid.push(f)
+    }
+    if (tooLarge) toast.error('File is too large (max 2 MB).')
+    if (valid.length === 0) return
+    const additions = await Promise.all(valid.map(async (f) => {
       const entry = {
         name: f.name,
         size: f.size,
@@ -221,7 +230,7 @@ export default function BugPreviewModal({ bug, workspaceId, projectName, stages,
         added_at: new Date().toISOString(),
         added_by: currentUser().name,
       }
-      if ((f.type || '').startsWith('image/') && f.size <= 2 * 1024 * 1024) {
+      if ((f.type || '').startsWith('image/')) {
         entry.dataUrl = await readFileAsDataUrl(f)
       }
       return entry
