@@ -1,5 +1,5 @@
 ﻿import { describeActivity, actorName } from '../../activity/activity.service.js'
-import { FolderPlus, ListChecks, Bug as BugIcon } from 'lucide-react'
+import { ArrowRightLeft, Bug } from 'lucide-react'
 
 function relTime(value) {
   if (!value) return ''
@@ -15,52 +15,71 @@ function relTime(value) {
   return new Date(value).toLocaleDateString()
 }
 
-const TYPE_ICONS = {
-  project: FolderPlus,
-  task: ListChecks,
-  bug: BugIcon,
-  milestone: FolderPlus,
+function renderSentence(a) {
+  const c = a.changes || {}
+  const actor = actorName(a)
+  const code = c.task_code || c.bug_id || null
+  if (a.action === 'status_changed' && code) {
+    return (
+      <>
+        <span className="dash-tl-actor">{actor}</span>
+        <span> moved </span>
+        <span className="dash-tl-code">{code}</span>
+        <span className="dash-tl-transition">{String(c.from || '—')} → {String(c.to || '—')}</span>
+      </>
+    )
+  }
+  if (a.entity_type === 'bug' && a.action === 'created' && code) {
+    return (
+      <>
+        <span className="dash-tl-actor">{actor}</span>
+        <span> reported </span>
+        <span className="dash-tl-code">{code}</span>
+        {c.title ? <span className="dash-tl-extra">“{c.title}”</span> : null}
+      </>
+    )
+  }
+  return (
+    <>
+      <span className="dash-tl-actor">{actor}</span>
+      <span className="dash-tl-extra">{describeActivity(a)}</span>
+    </>
+  )
 }
 
 export default function RecentActivity({ activities = [] }) {
+  const items = activities.slice(0, 8)
   return (
-    <div className="card">
-      <div className="card-head"><div className="name">Recent activity</div></div>
-      {activities.length === 0 ? (
-        <div style={{ padding: '12px 0 4px', fontSize: 11, color: 'var(--muted2)' }}>Nothing has happened yet.</div>
+    <section className="card dash-panel">
+      <div className="dash-panel-head">
+        <div className="dash-panel-title">
+          <span>Recent activity</span>
+          <span className="dash-count">{activities.length}</span>
+        </div>
+      </div>
+
+      {items.length === 0 ? (
+        <div className="dash-empty">Nothing has happened yet.</div>
       ) : (
-        <ul style={{ marginTop: 10, listStyle: 'none', paddingLeft: 0 }}>
-          {activities.slice(0, 8).map((a) => {
-            const Icon = TYPE_ICONS[a.entity_type] || ListChecks
-            return (
-              <li key={a.id} style={{ padding: 8, borderBottom: '1px solid var(--hover)', display: 'flex', gap: 9, alignItems: 'flex-start' }}>
-                {a.actor_avatar_url ? (
-                  <img
-                    src={a.actor_avatar_url}
-                    alt={actorName(a)}
-                    title={actorName(a)}
-                    style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '1px solid #333' }}
-                  />
-                ) : (
-                  <span className="avatar" title={actorName(a)} style={{ flexShrink: 0 }}>
-                    {actorName(a).slice(0, 2).toUpperCase()}
-                  </span>
-                )}
-                <div style={{ minWidth: 0, flex: 1 }}>
-                  <div style={{ fontSize: 12, color: 'var(--text-soft)', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                    <span style={{ fontWeight: 700, color: 'var(--text-soft)' }}>{actorName(a)}</span>
-                    <span style={{
-                      display: 'inline-flex', color: 'var(--muted2)',
-                    }}><Icon size={11} /></span>
-                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{describeActivity(a)}</span>
+        <div className="dash-timeline">
+          <ul className="dash-timeline-list">
+            {items.map((a) => {
+              const isBug = a.entity_type === 'bug'
+              return (
+                <li key={a.id} className="dash-timeline-item">
+                  <div className={`dash-timeline-dot ${isBug ? 'is-bug' : 'is-task'}`}>
+                    {isBug ? <Bug size={10} /> : <ArrowRightLeft size={10} />}
                   </div>
-                  <div style={{ fontSize: 10, color: 'var(--muted2)' }}>{relTime(a.created_at)}</div>
-                </div>
-              </li>
-            )
-          })}
-        </ul>
+                  <div className="dash-timeline-content">
+                    <div className="dash-timeline-line">{renderSentence(a)}</div>
+                    <div className="dash-timeline-time">{relTime(a.created_at)}</div>
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+        </div>
       )}
-    </div>
+    </section>
   )
 }

@@ -1,30 +1,64 @@
-﻿export default function ProjectOverview({ projects = [], tasks = [], loading }) {
+﻿export default function ProjectOverview({ projects = [], tasks = [], bugs = [], loading }) {
+  function navigate(path) {
+    window.history.pushState({}, '', path)
+    window.dispatchEvent(new PopStateEvent('popstate'))
+  }
+
+  const statusMeta = (status) => {
+    const s = String(status || 'active').toLowerCase()
+    if (s === 'completed') return { label: 'Completed', cls: 'dash-pill dash-pill-complete' }
+    if (s === 'on_hold') return { label: 'On Hold', cls: 'dash-pill dash-pill-hold' }
+    if (s === 'planning') return { label: 'Planning', cls: 'dash-pill dash-pill-planning' }
+    if (s === 'cancelled') return { label: 'Cancelled', cls: 'dash-pill dash-pill-cancelled' }
+    return { label: 'In Progress', cls: 'dash-pill dash-pill-active' }
+  }
+
+  const openBugStages = ['fixed', 'closed', 'archived']
+
   return (
-    <section className="card">
-      <div className="card-head">
-        <div className="name">Projects</div>
+    <section className="card dash-panel">
+      <div className="dash-panel-head">
+        <div className="dash-panel-title">
+          <span>Projects</span>
+          <span className="dash-count">{projects.length}</span>
+        </div>
+        <button type="button" className="dash-action" onClick={() => navigate('/projects')}>
+          + New Project
+        </button>
       </div>
 
-      {!loading && projects.length === 0 ? (
-        <div style={{ padding: '14px 0 4px', fontSize: 12, color: 'var(--muted2)' }}>
-          No projects yet — create one from the Projects page.
-        </div>
+      {loading ? (
+        <div className="dash-empty">Loading projects…</div>
+      ) : projects.length === 0 ? (
+        <div className="dash-empty">No projects yet — create one from the Projects page.</div>
       ) : (
-        <div style={{ display: 'grid', gap: 12, marginTop: 10 }}>
+        <div className="dash-project-list">
           {projects.map((p) => {
             const pt = tasks.filter((t) => t.project_id === p.id)
-            const done = pt.filter((t) => t.status === 'Done').length
+            const done = pt.filter((t) => String(t.status || '').toLowerCase() === 'done').length
             const percent = pt.length > 0 ? Math.round((done / pt.length) * 100) : 0
+            const pb = bugs.filter((b) => b.project_id === p.id)
+            const openBugs = pb.filter((b) => !openBugStages.includes((b.kanban_column || b.status || '').toLowerCase())).length
+            const sm = statusMeta(p.status)
+            const allDone = pt.length > 0 && done === pt.length
             return (
-              <div key={p.id} style={{ display: 'grid', gridTemplateColumns: '1fr 80px', alignItems: 'center', gap: 8 }}>
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-strong)' }}>{p.name}</div>
-                  <div style={{ fontSize: 12, color: 'var(--muted)' }}>{p.description || 'No description yet.'}</div>
+              <div key={p.id} className="dash-project-row" onClick={() => navigate(`/projects/${p.id}`)} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') navigate(`/projects/${p.id}`) }}>
+                <div className="dash-project-info">
+                  <div className="dash-project-title-line">
+                    <span className="dash-project-name">{p.name}</span>
+                    <span className={sm.cls}>{sm.label}</span>
+                  </div>
+                  <div className="dash-project-desc">{p.description || 'No description yet.'}</div>
+                  <div className="dash-project-meta">
+                    <span>{pt.length > 0 ? `${done}/${pt.length} Tasks${allDone ? ' Done' : ''}` : '0 Tasks'}</span>
+                    <span>•</span>
+                    <span>{openBugs} Open Bug{openBugs === 1 ? '' : 's'}</span>
+                  </div>
                 </div>
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: 12, color: 'var(--muted)' }}>{percent}%</div>
-                  <div style={{ height: 6, background: 'var(--border)', borderRadius: 4, overflow: 'hidden', marginTop: 6 }}>
-                    <div style={{ width: `${percent}%`, height: '100%', background: p.color || '#6e61ff' }} />
+                <div className="dash-project-progress">
+                  <span className="dash-progress-pct">{percent}%</span>
+                  <div className="dash-progress-track">
+                    <div className={`dash-progress-fill ${percent === 100 ? 'is-done' : ''}`} style={{ width: `${percent}%` }} />
                   </div>
                 </div>
               </div>

@@ -1,33 +1,63 @@
 ﻿export default function RecentBugs({ bugs = [], projects = [] }) {
+  function navigate(path) {
+    window.history.pushState({}, '', path)
+    window.dispatchEvent(new PopStateEvent('popstate'))
+  }
+
   const recent = [...bugs]
-    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+    .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))
     .slice(0, 5)
 
+  const sevClass = (p) => {
+    const v = String(p || 'medium').toLowerCase()
+    if (v === 'critical') return 'dash-sev dash-sev-critical'
+    if (v === 'high') return 'dash-sev dash-sev-high'
+    if (v === 'medium') return 'dash-sev dash-sev-medium'
+    return 'dash-sev dash-sev-low'
+  }
+
+  const statusClass = (s) => {
+    const v = String(s || 'new').toLowerCase()
+    if (v === 'fixed' || v === 'closed' || v === 'archived') return 'dash-bug-status dash-bug-status-fixed'
+    if (v === 'in progress') return 'dash-bug-status dash-bug-status-progress'
+    return 'dash-bug-status dash-bug-status-new'
+  }
+
   return (
-    <div className="card">
-      <div className="card-head"><div className="name">Recent bugs</div></div>
+    <section className="card dash-panel">
+      <div className="dash-panel-head">
+        <div className="dash-panel-title">
+          <span>Recent bugs</span>
+          <span className="dash-count">{bugs.length}</span>
+        </div>
+        <button type="button" className="dash-action" onClick={() => navigate('/bugs')}>
+          All Bugs →
+        </button>
+      </div>
+
       {recent.length === 0 ? (
-        <div style={{ padding: '12px 0 4px', fontSize: 11, color: 'var(--muted2)' }}>No bugs reported — your projects are healthy.</div>
+        <div className="dash-empty">No bugs reported — your projects are healthy.</div>
       ) : (
-        <ul style={{ marginTop: 10, listStyle: 'none', paddingLeft: 0 }}>
+        <div className="dash-bug-list">
           {recent.map((b) => {
             const project = projects.find((p) => p.id === b.project_id)
+            const stage = b.kanban_column || b.status || 'New'
             return (
-              <li key={b.id} style={{ padding: 8, borderBottom: '1px solid var(--hover)', display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-soft)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {b.title}
-                  </div>
-                  <div style={{ fontSize: 10, color: 'var(--muted2)' }}>
-                    {project?.name || 'Project'} • {b.priority || 'medium'}
+              <div key={b.id} className="dash-bug-row">
+                <div className="dash-bug-info">
+                  <div className="dash-bug-title">{b.title || b.bug_id || 'Untitled bug'}</div>
+                  <div className="dash-bug-meta">
+                    <span>{project?.name || 'Project'}</span>
+                    <span>•</span>
+                    <span className={sevClass(b.priority)}>{String(b.priority || 'medium')}</span>
                   </div>
                 </div>
-                <div style={{ fontSize: 10, color: 'var(--muted)', whiteSpace: 'nowrap' }}>{b.kanban_column || b.status || 'New'}</div>
-              </li>
+                <span className={statusClass(stage)}>{stage}</span>
+              </div>
             )
           })}
-        </ul>
+        </div>
       )}
-    </div>
+    </section>
   )
 }
