@@ -204,7 +204,7 @@ export default function Workspaces() {
           <button
             className={`btn${panel === 'invite' ? ' primary' : ''}`}
             onClick={() => setPanel(panel === 'invite' ? null : 'invite')}
-            style={{ cursor: 'pointer' }}
+            style={{ cursor: 'pointer', height: '30px', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
           ><UserPlus size={12} /> Invite members</button>
         </div>
 
