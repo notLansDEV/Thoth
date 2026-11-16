@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
-  ChevronLeft, ChevronRight, ListTodo, Bug, CalendarDays, CalendarRange, CalendarClock, Search, SlidersHorizontal,
+  ChevronLeft, ChevronRight, ListTodo, Bug, CalendarDays, CalendarRange, CalendarClock, Search, SlidersHorizontal, X,
 } from 'lucide-react'
 import { getCurrentWorkspace } from '../features/workspaces/workspaces.service.js'
 import {
@@ -36,6 +36,26 @@ export default function Calendar({ workspace }) {
   const [query, setQuery] = useState('')
   const [typeFilter, setTypeFilter] = useState('all')
   const [filterOpen, setFilterOpen] = useState(false)
+  const [dayDrawer, setDayDrawer] = useState(null) // { key, date }
+  const [dayDrawerClosing, setDayDrawerClosing] = useState(false)
+
+  function openDayDrawer(date, key) {
+    setDayDrawerClosing(false)
+    setDayDrawer({ date, key })
+  }
+
+  function closeDayDrawer(onClosed) {
+    if (!dayDrawer || dayDrawerClosing) {
+      if (typeof onClosed === 'function') onClosed()
+      return
+    }
+    setDayDrawerClosing(true)
+    setTimeout(() => {
+      setDayDrawer(null)
+      setDayDrawerClosing(false)
+      if (typeof onClosed === 'function') onClosed()
+    }, 220)
+  }
 
   useEffect(() => {
     let alive = true
@@ -100,7 +120,7 @@ export default function Calendar({ workspace }) {
     })
   }
 
-  function renderPills(items, max) {
+  function renderPills(items, max, onMore) {
     const shown = max ? items.slice(0, max) : items
     const rest = max && items.length > max ? items.length - max : 0
     return (
@@ -120,7 +140,15 @@ export default function Calendar({ workspace }) {
             <span>{item.title}</span>
           </button>
         ))}
-        {rest > 0 && <div className="cal-more">+{rest} more</div>}
+        {rest > 0 && (
+          onMore ? (
+            <button type="button" className="cal-more cal-more-btn" onClick={onMore} title={`View ${rest} more items`}>
+              +{rest} more
+            </button>
+          ) : (
+            <div className="cal-more">+{rest} more</div>
+          )
+        )}
       </>
     )
   }
@@ -272,7 +300,7 @@ export default function Calendar({ workspace }) {
                       style={{ background: isToday ? 'rgba(95,116,255,0.08)' : undefined }}
                     >
                       <div className={`cal-day-num${isToday ? ' today' : ''}`}>{date.getDate()}</div>
-                      <div className="cal-pills">{renderPills(items, 3)}</div>
+                      <div className="cal-pills">{renderPills(items, 3, () => openDayDrawer(new Date(date), key))}</div>
                     </div>
                   )
                 })}
@@ -331,6 +359,59 @@ export default function Calendar({ workspace }) {
           onClose={() => setSelected(null)}
         />
       )}
+
+      {dayDrawer && (() => {
+        const items = dayItems(dayDrawer.date)
+        const label = dayDrawer.date.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
+        const isToday = dayDrawer.key === today
+        return (
+          <>
+            <div className={`day-drawer-overlay${dayDrawerClosing ? ' closing' : ''}`} onClick={() => closeDayDrawer()} />
+            <aside className={`day-drawer${dayDrawerClosing ? ' closing' : ''}`} role="dialog" aria-label={`Items for ${label}`}>
+              <div className="day-drawer-head">
+                <div>
+                  <div className="day-drawer-title">
+                    {label}
+                    {isToday && <span className="day-drawer-today">Today</span>}
+                  </div>
+                  <div className="day-drawer-sub">{items.length} item{items.length === 1 ? '' : 's'}</div>
+                </div>
+                <button type="button" className="icon-btn" onClick={() => closeDayDrawer()} aria-label="Close drawer">
+                  <X size={14} />
+                </button>
+              </div>
+              <div className="day-drawer-body">
+                {items.length === 0 ? (
+                  <div className="cal-empty" style={{ padding: '20px 0' }}>No tasks or bugs for this day.</div>
+                ) : (
+                  <div className="day-drawer-list">
+                    {items.map((item) => (
+                      <button
+                        key={`${item.kind}-${item.id}`}
+                        type="button"
+                        className="day-drawer-item"
+                        onClick={() => closeDayDrawer(() => setSelected({ kind: item.kind, raw: item.raw }))}
+                      >
+                        <span className="day-drawer-icon" style={{ color: item.color, background: `${item.color}1f`, borderColor: `${item.color}55` }}>
+                          {item.kind === 'task' ? <ListTodo size={12} /> : <Bug size={12} />}
+                        </span>
+                        <span className="day-drawer-item-main">
+                          <span className="day-drawer-item-title">{item.title}</span>
+                          <span className="day-drawer-item-meta">
+                            <span className="day-drawer-kind" style={{ color: item.color }}>{item.kind === 'task' ? 'Task' : 'Bug'}</span>
+                            {item.raw?.status ? <span>· {item.raw.status}</span> : null}
+                            {item.raw?.priority ? <span>· {item.raw.priority}</span> : null}
+                          </span>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </aside>
+          </>
+        )
+      })()}
     </section>
   )
 }
