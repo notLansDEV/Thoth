@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import {
   Check, X, Pencil, Paperclip, FileImage, FileText, FileArchive, FileType2, FileSpreadsheet, Reply,
 } from 'lucide-react'
+import { toast } from 'sonner'
 import {
   TASK_STAGES,
   TASK_PRIORITIES,
@@ -356,7 +357,12 @@ export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated,
     const next = [...files, ...additions]
     setFiles(next)
     patch({ meta: { files: next } }).then((updated) => {
-      if (!updated) setFiles(files)
+      if (!updated) {
+        setFiles(files)
+        toast.error('Could not upload attachment')
+      } else {
+        toast.success(additions.length > 1 ? 'Attachments uploaded successfully' : 'Attachment uploaded successfully')
+      }
     })
   }
 
@@ -712,6 +718,7 @@ export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated,
               >
                 <Paperclip size={12} /> Attach files
               </button>
+              <div style={{ fontSize: '9.5px', color: 'var(--muted2)', marginTop: '6px' }}>Max 2 MB per file</div>
             </>
           )}
         </div>

@@ -301,7 +301,7 @@ export default function ReportBugModal({ projects, workspaceId, stages, defaultS
               type="button"
               className="btn"
               onClick={() => fileInputRef.current?.click()}
-              style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+              style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '7px 10px', width: 'fit-content' }}
             >
               <Paperclip size={12} /> Attach files
             </button>

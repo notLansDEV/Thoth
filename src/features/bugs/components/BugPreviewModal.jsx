@@ -8,6 +8,7 @@ import {
   getWorkspaceMembers,
   getMilestones,
 } from '../bugs.service.js'
+import { toast } from 'sonner'
 import {
   TASK_PRIORITIES,
   priorityStyle,
@@ -97,6 +98,7 @@ export default function BugPreviewModal({ bug, workspaceId, projectName, stages,
   const [members, setMembers] = useState([])
   const [projectMemberIds, setProjectMemberIds] = useState([])
   const [milestones, setMilestones] = useState([])
+  const [dragOver, setDragOver] = useState(false)
   const fileInputRef = useRef(null)
 
   useEffect(() => {
@@ -209,10 +211,8 @@ export default function BugPreviewModal({ bug, workspaceId, projectName, stages,
     })
   }
 
-  async function onFilesPicked(e) {
-    const picked = Array.from(e.target.files || [])
-    e.target.value = ''
-    if (picked.length === 0) return
+  async function addFiles(picked) {
+    if (!picked || picked.length === 0) return
     const additions = await Promise.all(picked.map(async (f) => {
       const entry = {
         name: f.name,
@@ -229,8 +229,38 @@ export default function BugPreviewModal({ bug, workspaceId, projectName, stages,
     const next = [...files, ...additions]
     setFiles(next)
     patch({ meta: { attachments: next } }).then((updated) => {
-      if (!updated) setFiles(files)
+      if (!updated) {
+        setFiles(files)
+        toast.error('Could not upload attachment')
+      } else {
+        toast.success(additions.length > 1 ? 'Attachments uploaded successfully' : 'Attachment uploaded successfully')
+      }
     })
+  }
+
+  function onFilesPicked(e) {
+    const picked = Array.from(e.target.files || [])
+    e.target.value = ''
+    addFiles(picked)
+  }
+
+  function onFileDragOver(e) {
+    e.preventDefault()
+    e.stopPropagation()
+    setDragOver(true)
+  }
+
+  function onFileDragLeave(e) {
+    e.preventDefault()
+    e.stopPropagation()
+    setDragOver(false)
+  }
+
+  function onFileDrop(e) {
+    e.preventDefault()
+    e.stopPropagation()
+    setDragOver(false)
+    addFiles(Array.from(e.dataTransfer.files || []))
   }
 
   async function removeFile(index) {
@@ -494,9 +524,34 @@ export default function BugPreviewModal({ bug, workspaceId, projectName, stages,
 
           {tab === 'files' && (
             <>
-              {files.length === 0 ? (
-                <div style={{ color: 'var(--muted2)', fontSize: '11px', marginBottom: '8px' }}>No files attached yet</div>
-              ) : (
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept=".png,.jpg,.jpeg,.gif,.webp,.svg,.pdf,.txt,.md,.log,.doc,.docx,.xls,.xlsx,.csv,.zip"
+                style={{ display: 'none' }}
+                onChange={onFilesPicked}
+              />
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                onDragOver={onFileDragOver}
+                onDragEnter={onFileDragOver}
+                onDragLeave={onFileDragLeave}
+                onDrop={onFileDrop}
+                style={{
+                  border: `1px dashed ${dragOver ? '#6e61ff' : 'var(--border)'}`,
+                  background: dragOver ? 'rgba(95,116,255,0.1)' : 'transparent',
+                  borderRadius: '4px', padding: '22px', textAlign: 'center',
+                  color: dragOver ? '#8f9bff' : 'var(--muted2)', fontSize: '11px', cursor: 'pointer',
+                  marginBottom: '10px', transition: 'border-color .15s, background .15s, color .15s',
+                }}
+              >
+                <Paperclip size={12} style={{ verticalAlign: '-2px', marginRight: '4px' }} />
+                {dragOver ? 'Drop files to attach' : 'Drag & drop files here, or click to browse'}<br />
+                <span style={{ fontSize: '9px', color: 'var(--muted2)' }}>PNG, JPG, PDF, TXT, DOC, XLS, ZIP…</span>
+              </div>
+
+              {files.length > 0 && (
                 <div style={{ marginBottom: '10px' }}>
                   {files.map((f, i) => (
                     <div
@@ -542,11 +597,11 @@ export default function BugPreviewModal({ bug, workspaceId, projectName, stages,
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 className="btn"
-                style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+                style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '7px 10px', width: 'fit-content' }}
               >
                 <Paperclip size={12} /> Attach files
               </button>
-              <input ref={fileInputRef} type="file" multiple hidden onChange={onFilesPicked} />
+              <div style={{ fontSize: '9.5px', color: 'var(--muted2)', marginTop: '6px' }}>Max 2 MB per file</div>
             </>
           )}
         </div>
