@@ -925,7 +925,7 @@ html[data-theme="light"] .confirm-note{color:#b45309}
 .dash-kpi-icon-red{background:rgba(255,64,64,.14);color:#f87171}
 .dash-kpi-value{font-size:26px;font-weight:700;color:var(--text-strong);line-height:1.1}
 .dash-kpi-sub{font-size:12px;color:var(--muted2);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
-.dash-kpi-sub.dash-kpi-sub-stack{flex-direction:column;align-items:flex-start;gap:2px}
+.dash-kpi-sub.dash-kpi-sub-stack{display:grid;grid-template-columns:auto auto;column-gap:18px;row-gap:2px;align-items:start}
 .dash-kpi-sub-alert{color:#f87171;font-weight:600}
 .dash-kpi-sep{color:var(--muted2)}
 .dash-kpi-sev{font-weight:600}

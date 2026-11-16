@@ -26,8 +26,8 @@ export default function StatsCards({ tasks = [], bugs = [], members = [] }) {
       note: (
         <>
           <span className={`dash-kpi-sev ${lowBugs.length > 0 ? 'is-low' : ''}`}>Low: {lowBugs.length}</span>
-          <span className={`dash-kpi-sev ${mediumBugs.length > 0 ? 'is-medium' : ''}`}>Medium: {mediumBugs.length}</span>
           <span className={`dash-kpi-sev ${highBugs.length > 0 ? 'is-high' : ''}`}>High: {highBugs.length}</span>
+          <span className={`dash-kpi-sev ${mediumBugs.length > 0 ? 'is-medium' : ''}`}>Medium: {mediumBugs.length}</span>
           <span className={`dash-kpi-sev ${criticalBugs.length > 0 ? 'is-critical' : ''}`}>Critical: {criticalBugs.length}</span>
         </>
       ),
