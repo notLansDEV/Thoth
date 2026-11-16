@@ -15,7 +15,7 @@ export default function ConfirmModal({ title, message, note, confirmLabel = 'Del
           <p style={{ margin: '0 0 6px', fontSize: '12px', color: 'var(--text-soft)', lineHeight: 1.5 }}>{message}</p>
         )}
         {note && (
-          <p style={{ margin: '0 0 4px', fontSize: '11px', color: '#e8c547' }}>{note}</p>
+          <p className="confirm-note" style={{ margin: '0 0 4px', fontSize: '11px', color: '#f59e0b', fontWeight: 600, lineHeight: 1.5 }}>{note}</p>
         )}
 
         <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '18px' }}>

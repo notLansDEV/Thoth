@@ -906,6 +906,9 @@ html[data-theme="light"] .cal-today-btn:hover{color:#111;border-color:#5f74ff}
 .compact-mode .cal-cell{min-height:84px}
 .compact-mode .content{padding:0}
 
+.confirm-note{color:#f59e0b}
+html[data-theme="light"] .confirm-note{color:#b45309}
+
 /* ============ Print / Export PDF ============ */
 @media print{
   html,body{height:auto;overflow:visible;background:#fff !important;color:#111 !important}
