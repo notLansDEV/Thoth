@@ -13,7 +13,7 @@ import {
   reorderStages,
 } from '../features/tasks/tasks.service.js'
 import { getProjects } from '../features/projects/projects.service.js'
-import { getCurrentWorkspace, canWriteModule, canDeleteModule, canWriteProjectModule, canDeleteProjectModule, canAccessProject, getSelectedProjectId } from '../features/workspaces/workspaces.service.js'
+import { getCurrentWorkspace, canWriteModule, canDeleteModule, canWriteProjectModule, canDeleteProjectModule, canAccessProject, getSelectedProjectId, setSelectedProjectId } from '../features/workspaces/workspaces.service.js'
 import CreateTaskModal from '../features/tasks/components/CreateTaskModal.jsx'
 import TaskPreviewModal from '../features/tasks/components/TaskPreviewModal.jsx'
 import StageBoard from '../components/StageBoard.jsx'
@@ -235,6 +235,13 @@ export default function Tasks({ subPage }) {
       project_name: projects.find((p) => p.id === task.project_id)?.name,
     }, ...current])
     setShowCreate(false)
+    const wsId = getCurrentWorkspace()?.id
+    if (task?.project_id && String(selectedProjectId || '') !== String(task.project_id)) {
+      setSelectedProjectId(task.project_id, wsId)
+      setSelectedProjectIdState(task.project_id)
+      setProjectFilter(task.project_id)
+      window.dispatchEvent(new CustomEvent('thoth:project-changed', { detail: { projectId: task.project_id, workspaceId: wsId } }))
+    }
     toast.success(`Task "${task.title || 'Untitled'}" has been added`)
   }
 
@@ -402,8 +409,8 @@ export default function Tasks({ subPage }) {
                   <TaskCard
                     key={task.id}
                     task={task}
-                    canWriteTask={canWriteTaskProject(task.project_id)}
-                    canDeleteTask={canDeleteTaskProject(task.project_id)}
+                    canWrite={canWriteTaskProject(task.project_id)}
+                    canDelete={canDeleteTaskProject(task.project_id)}
                     onOpen={setPreview}
                     onDelete={(t) => { if (canDeleteTaskProject(t.project_id)) setConfirmDeleteTask(t) }}
                     onDragStart={(e, id) => { dragId.current = id; e.dataTransfer.effectAllowed = 'move' }}
@@ -439,10 +446,10 @@ export default function Tasks({ subPage }) {
 
       {showCreate && (
         <CreateTaskModal
-          projects={projects.filter(p => canWriteTaskProject(p.id))}
+          projects={accessibleProjects.filter(p => canWriteTaskProject(p.id))}
           workspaceId={ws?.id}
           stages={stages}
-          defaultProjectId={projects[0]?.id}
+          defaultProjectId={activeProjectId || accessibleProjects[0]?.id}
           onCreated={onCreated}
           onClose={() => setShowCreate(false)}
         />
