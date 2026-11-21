@@ -8,7 +8,7 @@ import { getProjects } from '../projects/projects.service.js'
 import { getTasks, getWorkspaceMembers } from '../tasks/tasks.service.js'
 import { getBugs } from '../bugs/bugs.service.js'
 import { getActivity } from '../activity/activity.service.js'
-import { getCurrentWorkspace } from '../../features/workspaces/workspaces.service.js'
+import { getCurrentWorkspace } from '../workspaces/workspaces.service.js'
 
 export default function Dashboard() {
   const ws = getCurrentWorkspace()

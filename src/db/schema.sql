@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS projects (
   start_date TIMESTAMP,
   deadline TIMESTAMP,
   priority VARCHAR(50) DEFAULT 'medium',
+  created_by UUID,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   UNIQUE(workspace_id, slug)
@@ -41,6 +42,8 @@ ALTER TABLE projects ADD COLUMN IF NOT EXISTS start_date TIMESTAMP;
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS deadline TIMESTAMP;
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS priority VARCHAR(50) DEFAULT 'medium';
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS meta JSONB DEFAULT '{}';
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS created_by UUID;
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP;
 
 -- Markdown Pages Table (Logseq-style journal + pages)
 CREATE TABLE IF NOT EXISTS md_pages (
@@ -108,6 +111,7 @@ CREATE TABLE IF NOT EXISTS tasks (
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS progress INTEGER DEFAULT 0;
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS meta JSONB DEFAULT '{}';
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS task_code VARCHAR(50);
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP;
 
 -- Backfill human-readable codes for tasks created before the column existed
 WITH numbered AS (
@@ -176,6 +180,7 @@ CREATE TABLE IF NOT EXISTS bugs (
 
 -- Ensure new columns on existing installs
 ALTER TABLE bugs ADD COLUMN IF NOT EXISTS attachments JSONB DEFAULT '[]';
+ALTER TABLE bugs ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP;
 ALTER TABLE bugs ADD COLUMN IF NOT EXISTS steps_to_reproduce TEXT;
 ALTER TABLE bugs ADD COLUMN IF NOT EXISTS expected_behavior TEXT;
 ALTER TABLE bugs ADD COLUMN IF NOT EXISTS actual_behavior TEXT;
@@ -188,8 +193,10 @@ CREATE TABLE IF NOT EXISTS project_members (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  role VARCHAR(50) DEFAULT 'member',
   UNIQUE(project_id, user_id)
 );
+ALTER TABLE project_members ADD COLUMN IF NOT EXISTS role VARCHAR(50) DEFAULT 'member';
 
 -- Bug Comments Table
 CREATE TABLE IF NOT EXISTS bug_comments (

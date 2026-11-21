@@ -35,6 +35,23 @@ function notifyUser({ userId, workspaceId, entityType, entityId, title, body }) 
     .catch((err) => console.error('notification send failed:', err.message))
 }
 
+async function getWorkspaceRequester(workspaceId, userId) {
+  const members = await workspaceRepository.getMembers(workspaceId)
+  return members.find((m) => String(m.id) === String(userId)) || null
+}
+
+async function userCanAccessProject(project, userId) {
+  if (!project || !userId) return false
+  const requester = await getWorkspaceRequester(project.workspace_id, userId)
+  if (!requester) return false
+  if (requester.role === 'owner') return true
+  const row = await getOne(
+    `SELECT 1 AS ok FROM project_members WHERE project_id = $1 AND user_id = $2 LIMIT 1`,
+    [project.id, userId]
+  )
+  return !!row
+}
+
 const { PORT, JWT_SECRET } = env
 
 // Initialize DB
@@ -188,15 +205,17 @@ app.get('/api/workspaces', auth, async (req, res) => {
 app.post('/api/workspaces', auth, async (req, res) => {
   try {
     const { name } = req.body
-    if (!name || !name.trim()) return res.status(400).json({ error: 'Workspace name is required' })
+    const trimmedName = String(name || '').trim()
+    if (!trimmedName) return res.status(400).json({ error: 'Workspace name is required' })
+    if (trimmedName.length > 16) return res.status(400).json({ error: 'Workspace name must be 16 characters or less' })
 
-    const base = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'workspace'
+    const base = trimmedName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'workspace'
     let slug = base
     let created = null
 
     for (let attempt = 0; attempt < 5 && !created; attempt++) {
       try {
-        created = await workspaceRepository.create({ name: name.trim(), slug })
+        created = await workspaceRepository.create({ name: trimmedName, slug })
       } catch (err) {
         if (err.code === '23505') {
           slug = `${base}-${Date.now().toString(36)}`
@@ -221,7 +240,23 @@ app.get('/api/projects', auth, async (req, res) => {
     const { workspace_id } = req.query
     if (!workspace_id) return res.status(400).json({ error: 'workspace_id is required' })
 
-    const rows = await projectRepository.findByWorkspace(workspace_id)
+    const wsMembers = await workspaceRepository.getMembers(workspace_id)
+    const requester = wsMembers.find((m) => String(m.id) === String(req.user?.id))
+    if (!requester) return res.status(403).json({ error: 'Not a workspace member' })
+
+    let rows = await projectRepository.findByWorkspace(workspace_id)
+    if (requester.role !== 'owner') {
+      const assigned = await getMany(
+        `SELECT pm.project_id
+         FROM project_members pm
+         JOIN projects p ON p.id = pm.project_id
+         WHERE p.workspace_id = $1 AND pm.user_id = $2 AND p.deleted_at IS NULL`,
+        [workspace_id, req.user.id]
+      )
+      const allowed = new Set((assigned || []).map((r) => String(r.project_id)))
+      rows = (rows || []).filter((p) => allowed.has(String(p.id)))
+    }
+
     res.json(rows)
   } catch (err) {
     console.error(err)
@@ -232,9 +267,11 @@ app.get('/api/projects', auth, async (req, res) => {
 app.post('/api/projects', auth, async (req, res) => {
   try {
     const { workspace_id, name, description, slug, status, priority, start_date, deadline } = req.body
-    if (!workspace_id || !name) return res.status(400).json({ error: 'Missing fields' })
+    const trimmedName = String(name || '').trim()
+    if (!workspace_id || !trimmedName) return res.status(400).json({ error: 'Missing fields' })
+    if (trimmedName.length > 16) return res.status(400).json({ error: 'Project name must be 16 characters or less' })
 
-    const baseSlug = slug || `${name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')}-${Date.now().toString(36)}`
+    const baseSlug = slug || `${trimmedName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')}-${Date.now().toString(36)}`
     let currentSlug = baseSlug || `project-${Date.now().toString(36)}`
     let created = null
 
@@ -242,13 +279,14 @@ app.post('/api/projects', auth, async (req, res) => {
       try {
         created = await projectRepository.create({
           workspace_id,
-          name,
+          name: trimmedName,
           slug: currentSlug,
           description: description || null,
           status: status || 'active',
           priority: priority || 'medium',
           start_date: start_date || null,
           deadline: deadline || null,
+          created_by: req.user?.id || null,
         })
       } catch (err) {
         if (err.code === '23505') {
@@ -290,10 +328,25 @@ app.get('/api/workspaces/:id/members', auth, async (req, res) => {
 
 app.patch('/api/workspaces/:id', auth, async (req, res) => {
   try {
-    const { name } = req.body
-    if (!name || !name.trim()) return res.status(400).json({ error: 'Workspace name is required' })
-    const updated = await workspaceRepository.updateById(req.params.id, { name: name.trim() })
+    const { name, settings } = req.body
+    if ((name == null || !String(name).trim()) && settings == null) {
+      return res.status(400).json({ error: 'Nothing to update' })
+    }
+
+    let updated = await workspaceRepository.findById(req.params.id)
     if (!updated) return res.status(404).json({ error: 'Workspace not found' })
+
+    if (name != null) {
+      const trimmedName = String(name).trim()
+      if (!trimmedName) return res.status(400).json({ error: 'Workspace name is required' })
+      if (trimmedName.length > 16) return res.status(400).json({ error: 'Workspace name must be 16 characters or less' })
+      updated = await workspaceRepository.updateById(req.params.id, { name: trimmedName })
+    }
+
+    if (settings != null && typeof settings === 'object' && !Array.isArray(settings)) {
+      updated = await workspaceRepository.updateSettings(req.params.id, settings)
+    }
+
     res.json(updated)
   } catch (err) {
     console.error(err)
@@ -612,7 +665,21 @@ app.get('/api/tasks', auth, async (req, res) => {
   try {
     const { workspace_id } = req.query
     if (!workspace_id) return res.status(400).json({ error: 'workspace_id is required' })
-    const rows = await taskRepository.findByWorkspace(workspace_id)
+    const requester = await getWorkspaceRequester(workspace_id, req.user.id)
+    if (!requester) return res.status(403).json({ error: 'Not a workspace member' })
+
+    let rows = await taskRepository.findByWorkspace(workspace_id)
+    if (requester.role !== 'owner') {
+      const assigned = await getMany(
+        `SELECT pm.project_id
+         FROM project_members pm
+         JOIN projects p ON p.id = pm.project_id
+         WHERE p.workspace_id = $1 AND pm.user_id = $2`,
+        [workspace_id, req.user.id]
+      )
+      const allowed = new Set((assigned || []).map((r) => String(r.project_id)))
+      rows = (rows || []).filter((t) => allowed.has(String(t.project_id)))
+    }
     res.json(rows)
   } catch (err) {
     console.error(err)
@@ -632,6 +699,12 @@ app.post('/api/tasks', auth, async (req, res) => {
       return res.status(400).json({ error: 'project_id and title are required' })
     }
 
+    const project = await projectRepository.findById(project_id)
+    if (!project) return res.status(404).json({ error: 'Project not found' })
+    if (!(await userCanAccessProject(project, req.user.id))) {
+      return res.status(403).json({ error: 'You do not have access to this project' })
+    }
+
     const data = {}
     for (const field of TASK_ALLOWED_FIELDS) {
       if (req.body[field] !== undefined) data[field] = req.body[field]
@@ -649,7 +722,6 @@ app.post('/api/tasks', auth, async (req, res) => {
       ...data,
     })
 
-    const project = await projectRepository.findById(project_id)
     logActivity(project?.workspace_id, 'task', 'created', created.id, req.user.id, { task_code: created.task_code, title: created.title }, project_id)
     if (created.assigned_to) {
       notifyUser({
@@ -684,6 +756,11 @@ app.patch('/api/tasks/:id', auth, async (req, res) => {
 
     const existing = await taskRepository.findById(req.params.id)
     if (!existing) return res.status(404).json({ error: 'Task not found' })
+    const project = await projectRepository.findById(existing.project_id)
+    if (!project) return res.status(404).json({ error: 'Project not found' })
+    if (!(await userCanAccessProject(project, req.user.id))) {
+      return res.status(403).json({ error: 'You do not have access to this project' })
+    }
 
     // Merge meta instead of overwriting so comments/checklist/files persist independently
     let toUpdate = data
@@ -734,7 +811,13 @@ app.delete('/api/tasks/:id', auth, async (req, res) => {
   try {
     const existing = await taskRepository.findById(req.params.id)
     if (!existing) return res.status(404).json({ error: 'Task not found' })
-    await taskRepository.deleteById(req.params.id)
+    const project = await projectRepository.findById(existing.project_id)
+    if (!project) return res.status(404).json({ error: 'Project not found' })
+    if (!(await userCanAccessProject(project, req.user.id))) {
+      return res.status(403).json({ error: 'You do not have access to this project' })
+    }
+    const deleted = await taskRepository.softDeleteById(req.params.id)
+    if (!deleted) return res.status(404).json({ error: 'Task not found' })
     res.json({ success: true })
   } catch (err) {
     console.error(err)
@@ -745,7 +828,11 @@ app.delete('/api/tasks/:id', auth, async (req, res) => {
 app.get('/api/projects/:id', auth, async (req, res) => {
   try {
     const project = await projectRepository.findById(req.params.id)
-    if (!project) return res.status(404).json({ error: 'Project not found' })
+    if (!project || project.deleted_at) return res.status(404).json({ error: 'Project not found' })
+
+    if (!(await userCanAccessProject(project, req.user.id))) {
+      return res.status(403).json({ error: 'You do not have access to this project' })
+    }
 
     const stats = await projectRepository.getStats(project.id)
     const members = await workspaceRepository.getMembers(project.workspace_id)
@@ -775,7 +862,11 @@ app.patch('/api/projects/:id', auth, async (req, res) => {
     }
 
     const existing = await projectRepository.findById(req.params.id)
-    if (!existing) return res.status(404).json({ error: 'Project not found' })
+    if (!existing || existing.deleted_at) return res.status(404).json({ error: 'Project not found' })
+
+    if (!(await userCanAccessProject(existing, req.user.id))) {
+      return res.status(403).json({ error: 'You do not have access to this project' })
+    }
 
     // Merge meta instead of overwriting so attachments persist independently
     let toUpdate = data
@@ -784,6 +875,12 @@ app.patch('/api/projects/:id', auth, async (req, res) => {
         ...data,
         meta: { ...(existing.meta || {}), ...data.meta },
       }
+    }
+    if (toUpdate.name !== undefined) {
+      const trimmedName = String(toUpdate.name || '').trim()
+      if (!trimmedName) return res.status(400).json({ error: 'Project name is required' })
+      if (trimmedName.length > 16) return res.status(400).json({ error: 'Project name must be 16 characters or less' })
+      toUpdate.name = trimmedName
     }
 
     const updated = await projectRepository.updateById(req.params.id, toUpdate)
@@ -797,9 +894,50 @@ app.patch('/api/projects/:id', auth, async (req, res) => {
 
 app.delete('/api/projects/:id', auth, async (req, res) => {
   try {
-    const deleted = await projectRepository.deleteById(req.params.id)
-    if (!deleted) return res.status(404).json({ error: 'Project not found' })
-    res.json({ ok: true })
+    const project = await projectRepository.findById(req.params.id)
+    if (!project) return res.status(404).json({ error: 'Project not found' })
+
+    if (!(await userCanAccessProject(project, req.user.id))) {
+      return res.status(403).json({ error: 'You do not have access to this project' })
+    }
+
+    const requesterId = String(req.user?.id || '')
+    const members = await workspaceRepository.getMembers(project.workspace_id)
+    const requester = members.find((m) => String(m.id) === requesterId)
+    const requesterRole = requester?.role || null
+
+    // Workspace owner can delete all projects in the workspace (including legacy)
+    if (requesterRole === 'owner') {
+      const deleted = await projectRepository.softDeleteById(req.params.id)
+      if (!deleted) return res.status(404).json({ error: 'Project not found' })
+      return res.json({ ok: true })
+    }
+
+    // Determine if this is an owner's project
+    let isOwnersProject = false
+    if (project.created_by) {
+      const creator = members.find((m) => String(m.id) === String(project.created_by))
+      isOwnersProject = creator?.role === 'owner'
+    } else {
+      // Legacy projects without creator: treat as owner-managed projects by default
+      isOwnersProject = true
+    }
+
+    // Admin can create/delete projects, but cannot delete owner's projects
+    if (requesterRole === 'admin' && !isOwnersProject) {
+      const deleted = await projectRepository.softDeleteById(req.params.id)
+      if (!deleted) return res.status(404).json({ error: 'Project not found' })
+      return res.json({ ok: true })
+    }
+
+    // Members (or others): allow deleting only projects they created, but never owner's projects
+    if (project.created_by && String(project.created_by) === requesterId && !isOwnersProject) {
+      const deleted = await projectRepository.softDeleteById(req.params.id)
+      if (!deleted) return res.status(404).json({ error: 'Project not found' })
+      return res.json({ ok: true })
+    }
+
+    return res.status(403).json({ error: "You don't have permission to delete this project" })
   } catch (err) {
     console.error(err)
     res.status(500).json({ error: 'Server error' })
@@ -810,6 +948,9 @@ app.get('/api/projects/:id/members', auth, async (req, res) => {
   try {
     const project = await projectRepository.findById(req.params.id)
     if (!project) return res.status(404).json({ error: 'Project not found' })
+    if (!(await userCanAccessProject(project, req.user.id))) {
+      return res.status(403).json({ error: 'You do not have access to this project' })
+    }
     const rows = await projectRepository.getMembers(req.params.id)
     res.json(rows)
   } catch (err) {
@@ -822,10 +963,79 @@ app.put('/api/projects/:id/members', auth, async (req, res) => {
   try {
     const project = await projectRepository.findById(req.params.id)
     if (!project) return res.status(404).json({ error: 'Project not found' })
-    const { member_ids } = req.body
-    const userIds = Array.isArray(member_ids) ? member_ids.filter(Boolean) : []
-    const rows = await projectRepository.setMembers(req.params.id, userIds)
+    if (!(await userCanAccessProject(project, req.user.id))) {
+      return res.status(403).json({ error: 'You do not have access to this project' })
+    }
+    const { member_ids, members } = req.body
+    // Backward compatible: member_ids = [userId,...]; new: members = [{user_id, role}, ...]
+    const entries = Array.isArray(members) ? members : (Array.isArray(member_ids) ? member_ids.filter(Boolean) : [])
+    const rows = await projectRepository.setMembers(req.params.id, entries)
     res.json(rows)
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
+app.get('/api/workspaces/:id/project-memberships', auth, async (req, res) => {
+  try {
+    const workspace = await workspaceRepository.findById(req.params.id)
+    if (!workspace) return res.status(404).json({ error: 'Workspace not found' })
+    const requester = (await workspaceRepository.getMembers(req.params.id)).find(m => String(m.id) === String(req.user?.id))
+    if (!requester || requester.role !== 'owner') {
+      return res.status(403).json({ error: 'Only workspace owner can manage project access' })
+    }
+    const rows = await projectRepository.getMemberProjectsForWorkspace(req.params.id)
+    res.json(rows)
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
+app.put('/api/workspaces/:id/members/:userId/project-memberships', auth, async (req, res) => {
+  try {
+    const workspace = await workspaceRepository.findById(req.params.id)
+    if (!workspace) return res.status(404).json({ error: 'Workspace not found' })
+    const wsMembers = await workspaceRepository.getMembers(req.params.id)
+    const requester = wsMembers.find(m => String(m.id) === String(req.user?.id))
+    if (!requester || requester.role !== 'owner') {
+      return res.status(403).json({ error: 'Only workspace owner can manage project access' })
+    }
+    const target = wsMembers.find(m => String(m.id) === String(req.params.userId))
+    if (!target) return res.status(404).json({ error: 'Member not found in workspace' })
+
+    const assignments = Array.isArray(req.body?.assignments) ? req.body.assignments : []
+    // Optional: prevent stripping owner's own access? not required, but keep simple
+    const rows = await projectRepository.setUserProjectMemberships(req.params.id, req.params.userId, assignments)
+    res.json(rows)
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
+app.get('/api/workspaces/:id/my-project-memberships', auth, async (req, res) => {
+  try {
+    const workspace = await workspaceRepository.findById(req.params.id)
+    if (!workspace) return res.status(404).json({ error: 'Workspace not found' })
+    const wsMembers = await workspaceRepository.getMembers(req.params.id)
+    const requester = wsMembers.find(m => String(m.id) === String(req.user?.id))
+    if (!requester) return res.status(403).json({ error: 'Not a workspace member' })
+
+    if (requester.role === 'owner') {
+      const projects = await projectRepository.findByWorkspace(req.params.id)
+      return res.json((projects || []).map(p => ({ project_id: p.id, user_id: req.user.id, project_role: 'owner' })))
+    }
+
+    const rows = await getMany(
+      `SELECT pm.project_id, pm.user_id, pm.role AS project_role
+       FROM project_members pm
+       JOIN projects p ON p.id = pm.project_id
+       WHERE p.workspace_id = $1 AND pm.user_id = $2`,
+      [req.params.id, req.user.id]
+    )
+    res.json(rows || [])
   } catch (err) {
     console.error(err)
     res.status(500).json({ error: 'Server error' })
@@ -845,6 +1055,9 @@ app.post('/api/bugs', auth, async (req, res) => {
     }
     const project = await projectRepository.findById(project_id)
     if (!project) return res.status(404).json({ error: 'Project not found' })
+    if (!(await userCanAccessProject(project, req.user.id))) {
+      return res.status(403).json({ error: 'You do not have access to this project' })
+    }
 
     // Client may send files under `meta.attachments` (task-style) or `attachments`
     const fileAttachments = Array.isArray(attachments)
@@ -897,14 +1110,32 @@ app.get('/api/bugs', auth, async (req, res) => {
   try {
     const { project_id, workspace_id } = req.query
     if (project_id) {
-      const rows = await bugRepository.findByCondition('project_id = $1', [project_id])
+      const project = await projectRepository.findById(project_id)
+      if (!project || project.deleted_at) return res.status(404).json({ error: 'Project not found' })
+      if (!(await userCanAccessProject(project, req.user.id))) {
+        return res.status(403).json({ error: 'You do not have access to this project' })
+      }
+      const rows = await bugRepository.findByCondition('project_id = $1 AND deleted_at IS NULL', [project_id])
       return res.json(rows)
     }
     if (workspace_id) {
-      const projects = await projectRepository.findByCondition('workspace_id = $1', [workspace_id])
+      const requester = await getWorkspaceRequester(workspace_id, req.user.id)
+      if (!requester) return res.status(403).json({ error: 'Not a workspace member' })
+      let projects = await projectRepository.findByCondition('workspace_id = $1 AND deleted_at IS NULL', [workspace_id])
+      if (requester.role !== 'owner') {
+        const assigned = await getMany(
+          `SELECT pm.project_id
+           FROM project_members pm
+           JOIN projects p ON p.id = pm.project_id
+           WHERE p.workspace_id = $1 AND pm.user_id = $2 AND p.deleted_at IS NULL`,
+          [workspace_id, req.user.id]
+        )
+        const allowed = new Set((assigned || []).map((r) => String(r.project_id)))
+        projects = (projects || []).filter((p) => allowed.has(String(p.id)))
+      }
       if (projects.length === 0) return res.json([])
       const rows = await bugRepository.findByCondition(
-        'project_id = ANY($1::uuid[])',
+        'project_id = ANY($1::uuid[]) AND deleted_at IS NULL',
         [projects.map((p) => p.id)]
       )
       return res.json(rows)
@@ -945,6 +1176,11 @@ app.patch('/api/bugs/:id', auth, async (req, res) => {
 
     const existing = await bugRepository.findById(req.params.id)
     if (!existing) return res.status(404).json({ error: 'Bug not found' })
+    const project = await projectRepository.findById(existing.project_id)
+    if (!project) return res.status(404).json({ error: 'Project not found' })
+    if (!(await userCanAccessProject(project, req.user.id))) {
+      return res.status(403).json({ error: 'You do not have access to this project' })
+    }
 
     const updated = await bugRepository.updateById(req.params.id, data)
     if (!updated) return res.status(404).json({ error: 'Bug not found' })
@@ -986,7 +1222,13 @@ app.delete('/api/bugs/:id', auth, async (req, res) => {
   try {
     const existing = await bugRepository.findById(req.params.id)
     if (!existing) return res.status(404).json({ error: 'Bug not found' })
-    await bugRepository.deleteById(req.params.id)
+    const project = await projectRepository.findById(existing.project_id)
+    if (!project) return res.status(404).json({ error: 'Project not found' })
+    if (!(await userCanAccessProject(project, req.user.id))) {
+      return res.status(403).json({ error: 'You do not have access to this project' })
+    }
+    const deleted = await bugRepository.softDeleteById(req.params.id)
+    if (!deleted) return res.status(404).json({ error: 'Bug not found' })
     res.json({ success: true })
   } catch (err) {
     console.error(err)
@@ -996,6 +1238,13 @@ app.delete('/api/bugs/:id', auth, async (req, res) => {
 
 app.get('/api/bugs/:id/comments', auth, async (req, res) => {
   try {
+    const bug = await bugRepository.findById(req.params.id)
+    if (!bug) return res.status(404).json({ error: 'Bug not found' })
+    const project = await projectRepository.findById(bug.project_id)
+    if (!project) return res.status(404).json({ error: 'Project not found' })
+    if (!(await userCanAccessProject(project, req.user.id))) {
+      return res.status(403).json({ error: 'You do not have access to this project' })
+    }
     const rows = await getMany(
       `SELECT c.*, u.username AS author_name, u.full_name AS author_full_name
        FROM bug_comments c
@@ -1019,6 +1268,11 @@ app.post('/api/bugs/:id/comments', auth, async (req, res) => {
     }
     const bug = await bugRepository.findById(req.params.id)
     if (!bug) return res.status(404).json({ error: 'Bug not found' })
+    const project = await projectRepository.findById(bug.project_id)
+    if (!project) return res.status(404).json({ error: 'Project not found' })
+    if (!(await userCanAccessProject(project, req.user.id))) {
+      return res.status(403).json({ error: 'You do not have access to this project' })
+    }
 
     const parentId = parent_comment_id || parentCommentId || null
     const created = await bugRepository.addComment(bug.id, req.user.id, content.trim(), [], parentId)
@@ -1210,6 +1464,119 @@ app.delete('/api/bug-stages/:id', auth, async (req, res) => {
     res.status(500).json({ error: 'Server error' })
   }
 })
+
+// --- Archive (soft-deleted items) ---
+app.get('/api/archive/projects', auth, async (req, res) => {
+  try {
+    const { workspace_id } = req.query
+    if (!workspace_id) return res.status(400).json({ error: 'workspace_id is required' })
+    const requester = await getWorkspaceRequester(workspace_id, req.user.id)
+    if (!requester) return res.status(403).json({ error: 'Not a workspace member' })
+    let rows = await projectRepository.findDeletedByWorkspace(workspace_id)
+    if (requester.role !== 'owner') {
+      const assigned = await getMany(
+        `SELECT pm.project_id FROM project_members pm JOIN projects p ON p.id = pm.project_id WHERE p.workspace_id = $1 AND pm.user_id = $2`,
+        [workspace_id, req.user.id]
+      )
+      const allowed = new Set((assigned || []).map(r => String(r.project_id)))
+      rows = (rows || []).filter(p => allowed.has(String(p.id)))
+    }
+    res.json(rows)
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
+app.get('/api/archive/projects/:id/details', auth, async (req, res) => {
+  try {
+    const { workspace_id } = req.query
+    const projectId = req.params.id
+    if (!workspace_id) return res.status(400).json({ error: 'workspace_id is required' })
+    const requester = await getWorkspaceRequester(workspace_id, req.user.id)
+    if (!requester) return res.status(403).json({ error: 'Not a workspace member' })
+
+    const project = await projectRepository.findById(projectId)
+    if (!project || String(project.workspace_id) !== String(workspace_id)) {
+      return res.status(404).json({ error: 'Project not found' })
+    }
+    if (requester.role !== 'owner') {
+      const row = await getOne(
+        `SELECT 1 AS ok FROM project_members WHERE project_id = $1 AND user_id = $2 LIMIT 1`,
+        [projectId, req.user.id]
+      )
+      if (!row) return res.status(403).json({ error: 'You do not have access to this project' })
+    }
+
+    const tasks = await getMany(
+      `SELECT t.*, u.username AS assignee_name
+       FROM tasks t
+       LEFT JOIN users u ON u.id = t.assigned_to
+       WHERE t.project_id = $1
+       ORDER BY t.created_at DESC`,
+      [projectId]
+    )
+    const bugs = await getMany(
+      `SELECT b.*, u.username AS assignee_name
+       FROM bugs b
+       LEFT JOIN users u ON u.id = b.assigned_to
+       WHERE b.project_id = $1
+       ORDER BY b.created_at DESC`,
+      [projectId]
+    )
+    res.json({ project, tasks: tasks || [], bugs: bugs || [] })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
+app.get('/api/archive/tasks', auth, async (req, res) => {
+  try {
+    const { workspace_id, project_id } = req.query
+    if (!workspace_id) return res.status(400).json({ error: 'workspace_id is required' })
+    const requester = await getWorkspaceRequester(workspace_id, req.user.id)
+    if (!requester) return res.status(403).json({ error: 'Not a workspace member' })
+    let rows = await taskRepository.findDeletedByWorkspace(workspace_id)
+    if (project_id) rows = (rows || []).filter(t => String(t.project_id) === String(project_id))
+    if (requester.role !== 'owner') {
+      const assigned = await getMany(
+        `SELECT pm.project_id FROM project_members pm JOIN projects p ON p.id = pm.project_id WHERE p.workspace_id = $1 AND pm.user_id = $2`,
+        [workspace_id, req.user.id]
+      )
+      const allowed = new Set((assigned || []).map(r => String(r.project_id)))
+      rows = (rows || []).filter(t => allowed.has(String(t.project_id)))
+    }
+    res.json(rows)
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
+app.get('/api/archive/bugs', auth, async (req, res) => {
+  try {
+    const { workspace_id, project_id } = req.query
+    if (!workspace_id) return res.status(400).json({ error: 'workspace_id is required' })
+    const requester = await getWorkspaceRequester(workspace_id, req.user.id)
+    if (!requester) return res.status(403).json({ error: 'Not a workspace member' })
+    let rows = await bugRepository.findDeletedByWorkspace(workspace_id)
+    if (project_id) rows = (rows || []).filter(b => String(b.project_id) === String(project_id))
+    if (requester.role !== 'owner') {
+      const assigned = await getMany(
+        `SELECT pm.project_id FROM project_members pm JOIN projects p ON p.id = pm.project_id WHERE p.workspace_id = $1 AND pm.user_id = $2`,
+        [workspace_id, req.user.id]
+      )
+      const allowed = new Set((assigned || []).map(r => String(r.project_id)))
+      rows = (rows || []).filter(b => allowed.has(String(b.project_id)))
+    }
+    res.json(rows)
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
 
 // Serve static built frontend in production
 app.use(express.static(path.join(process.cwd(), 'dist')))

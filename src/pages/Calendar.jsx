@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react'
 import {
   ChevronLeft, ChevronRight, ListTodo, Bug, CalendarDays, CalendarRange, CalendarClock, Search, SlidersHorizontal, X,
 } from 'lucide-react'
-import { getCurrentWorkspace } from '../features/workspaces/workspaces.service.js'
+import { getCurrentWorkspace } from
+
+  '../features/workspaces/workspaces.service.js'
 import {
   loadWorkspaceEvents,
   toDateKey,

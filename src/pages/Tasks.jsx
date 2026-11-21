@@ -13,7 +13,7 @@ import {
   reorderStages,
 } from '../features/tasks/tasks.service.js'
 import { getProjects } from '../features/projects/projects.service.js'
-import { getCurrentWorkspace } from '../features/workspaces/workspaces.service.js'
+import { getCurrentWorkspace, canWriteModule, canDeleteModule, canWriteProjectModule, canDeleteProjectModule, canAccessProject, getSelectedProjectId } from '../features/workspaces/workspaces.service.js'
 import CreateTaskModal from '../features/tasks/components/CreateTaskModal.jsx'
 import TaskPreviewModal from '../features/tasks/components/TaskPreviewModal.jsx'
 import StageBoard from '../components/StageBoard.jsx'
@@ -43,18 +43,18 @@ function StatCard({ icon, label, value }) {
   )
 }
 
-function TaskCard({ task, onOpen, onDelete, onDragStart }) {
+function TaskCard({ task, onOpen, onDelete, onDragStart, canWrite, canDelete }) {
   const overdue = isOverdue(task)
   const due = formatDate(task.due_date)
 
   return (
     <div
-      draggable
-      onDragStart={(e) => onDragStart(e, task.id)}
+      draggable={!!canWrite}
+      onDragStart={(e) => canWrite && onDragStart(e, task.id)}
       onClick={() => onOpen(task)}
       style={{
         background: 'var(--panel3)', border: overdue ? '1px solid rgba(255,64,64,0.4)' : '1px solid var(--border)',
-        borderRadius: '4px', padding: '10px', marginBottom: '8px', cursor: 'grab',
+        borderRadius: '4px', padding: '10px', marginBottom: '8px', cursor: canWrite ? 'grab' : 'pointer',
         transition: 'border-color 0.15s',
       }}
       onMouseEnter={(e) => { e.currentTarget.style.borderColor = overdue ? 'rgba(255,64,64,0.7)' : '#6e61ff' }}
@@ -73,22 +73,26 @@ function TaskCard({ task, onOpen, onDelete, onDragStart }) {
           <span className="badge" style={{ ...priorityStyle(task.priority), background: 'transparent', fontSize: '9px' }}>
             {task.priority}
           </span>
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); onOpen(task) }}
-            title="Edit"
-            style={{ background: 'transparent', border: 0, color: 'var(--muted2)', cursor: 'pointer', padding: '2px', display: 'inline-flex', borderRadius: '3px' }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--muted)'; e.currentTarget.style.background = 'var(--hover)' }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--muted2)'; e.currentTarget.style.background = 'transparent' }}
-          ><Pencil size={11} /></button>
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); onDelete(task) }}
-            title="Delete"
-            style={{ background: 'transparent', border: 0, color: 'var(--muted2)', cursor: 'pointer', padding: '2px', display: 'inline-flex', borderRadius: '3px' }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = '#ff4040'; e.currentTarget.style.background = 'var(--hover)' }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--muted2)'; e.currentTarget.style.background = 'transparent' }}
-          ><Trash2 size={11} /></button>
+          {canWrite && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onOpen(task) }}
+              title="Edit"
+              style={{ background: 'transparent', border: 0, color: 'var(--muted2)', cursor: 'pointer', padding: '2px', display: 'inline-flex', borderRadius: '3px' }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--muted)'; e.currentTarget.style.background = 'var(--hover)' }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--muted2)'; e.currentTarget.style.background = 'transparent' }}
+            ><Pencil size={11} /></button>
+          )}
+          {canDelete && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onDelete(task) }}
+              title="Delete"
+              style={{ background: 'transparent', border: 0, color: 'var(--muted2)', cursor: 'pointer', padding: '2px', display: 'inline-flex', borderRadius: '3px' }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = '#ff4040'; e.currentTarget.style.background = 'var(--hover)' }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--muted2)'; e.currentTarget.style.background = 'transparent' }}
+            ><Trash2 size={11} /></button>
+          )}
         </div>
       </div>
 
@@ -132,6 +136,10 @@ function TaskCard({ task, onOpen, onDelete, onDragStart }) {
 export default function Tasks({ subPage }) {
   const ws = getCurrentWorkspace()
   const tab = subPage === 'stages' ? 'stages' : 'all'
+  const canWrite = canWriteModule('tasks')
+  const canDelete = canDeleteModule('tasks')
+  const canWriteTaskProject = (projectId) => canWriteProjectModule(projectId, 'tasks')
+  const canDeleteTaskProject = (projectId) => canDeleteProjectModule(projectId, 'tasks')
   const [tasks, setTasks] = useState([])
   const [projects, setProjects] = useState([])
   const [stages, setStages] = useState([])
@@ -145,7 +153,23 @@ export default function Tasks({ subPage }) {
 
   const [query, setQuery] = useState('')
   const [priorityFilter, setPriorityFilter] = useState('all')
-  const [projectFilter, setProjectFilter] = useState('all')
+  const [selectedProjectId, setSelectedProjectIdState] = useState(() => getSelectedProjectId(ws?.id))
+  const [projectFilter, setProjectFilter] = useState(() => getSelectedProjectId(ws?.id) || 'all')
+
+  useEffect(() => {
+    const sync = () => {
+      const next = getSelectedProjectId(getCurrentWorkspace()?.id)
+      setSelectedProjectIdState(next)
+      setProjectFilter(next || 'all')
+    }
+    sync()
+    window.addEventListener('thoth:project-changed', sync)
+    window.addEventListener('storage', sync)
+    return () => {
+      window.removeEventListener('thoth:project-changed', sync)
+      window.removeEventListener('storage', sync)
+    }
+  }, [ws?.id])
 
   async function refresh() {
     try {
@@ -220,6 +244,7 @@ export default function Tasks({ subPage }) {
   }
 
   async function handleAddStage(data) {
+    if (!canWrite) return
     try {
       await createStage(ws?.id, data.name, data.color)
       await refresh()
@@ -230,6 +255,7 @@ export default function Tasks({ subPage }) {
   }
 
   async function handleUpdateStage(id, data) {
+    if (!canWrite) return
     try {
       await updateStageApi(id, data)
       await refresh()
@@ -240,6 +266,7 @@ export default function Tasks({ subPage }) {
   }
 
   async function handleReorder(orderIds) {
+    if (!canWrite) return
     setStages((cur) => {
       const map = new Map(cur.map((s) => [s.id, s]))
       return orderIds.map((id) => map.get(id)).filter(Boolean)
@@ -254,7 +281,7 @@ export default function Tasks({ subPage }) {
   }
 
   async function handleConfirmDelete() {
-    if (!confirmDelete) return
+    if (!canDelete || !confirmDelete) return
     setDeleting(true)
     try {
       await deleteStageApi(confirmDelete.id)
@@ -270,7 +297,7 @@ export default function Tasks({ subPage }) {
   }
 
   async function handleDeleteTask() {
-    if (!confirmDeleteTask) return
+    if (!canDelete || !confirmDeleteTask) return
     setDeleting(true)
     try {
       await deleteTask(confirmDeleteTask.id)
@@ -286,19 +313,24 @@ export default function Tasks({ subPage }) {
     }
   }
 
+  const defaultStageName = stages[0]?.name || 'To Do'
+  const accessibleProjects = projects.filter((p) => canAccessProject(p.id))
+  const activeProjectId = selectedProjectId || (projectFilter !== 'all' ? projectFilter : null)
+  const scopedTasks = activeProjectId
+    ? tasks.filter((t) => String(t.project_id) === String(activeProjectId))
+    : tasks.filter((t) => accessibleProjects.some((p) => String(p.id) === String(t.project_id)))
+
   const counts = {}
-  for (const t of tasks) {
-    const key = t.status || stages[0]?.name || 'To Do'
+  for (const t of scopedTasks) {
+    const key = t.status || defaultStageName
     counts[key] = (counts[key] || 0) + 1
   }
 
-  const defaultStageName = stages[0]?.name || 'To Do'
-
-  // Board filters (stat cards above always show workspace-wide totals)
+  // Board filters are scoped to the active/selected project
   const q = query.trim().toLowerCase()
-  const visibleTasks = tasks.filter((t) => {
+  const visibleTasks = scopedTasks.filter((t) => {
     if (priorityFilter !== 'all' && (t.priority || 'medium') !== priorityFilter) return false
-    if (projectFilter !== 'all' && t.project_id !== projectFilter) return false
+    if (projectFilter !== 'all' && String(t.project_id) !== String(projectFilter)) return false
     if (q && !`${t.task_code || ''} ${t.title || ''} ${t.description || ''}`.toLowerCase().includes(q)) return false
     return true
   })
@@ -311,7 +343,7 @@ export default function Tasks({ subPage }) {
           <p className="page-subtitle">Plan, track and move work across stages</p>
         </div>
 
-        {tab !== 'stages' && (
+        {tab !== 'stages' && canWrite && (
           <button className="btn primary" onClick={() => setShowCreate(true)} style={{ cursor: 'pointer' }}>
             + New Task
           </button>
@@ -321,24 +353,24 @@ export default function Tasks({ subPage }) {
       {/* 3 stat cards */}
       <div className="stat-grid">
         <StatCard icon={<CircleDot size={12} />} label={defaultStageName} value={counts[defaultStageName] || 0} />
-        <StatCard icon={<ListChecks size={12} />} label="Total task" value={tasks.length} />
+        <StatCard icon={<ListChecks size={12} />} label="Total task" value={scopedTasks.length} />
         <StatCard icon={<Columns3 size={12} />} label="Total stage" value={stages.length} />
       </div>
 
-      {projects.length === 0 && !loading && (
+      {accessibleProjects.length === 0 && !loading && (
         <div className="card">
           <div className="description" style={{ margin: 0 }}>
-            Create a project first — tasks live inside projects.
+            No accessible projects. Ask a workspace owner to assign you to a project.
           </div>
         </div>
       )}
 
-      {!loading && projects.length > 0 && (
+      {!loading && accessibleProjects.length > 0 && (
         <ListToolbar
           query={query} onQuery={setQuery}
           priority={priorityFilter} onPriority={setPriorityFilter}
           project={projectFilter} onProject={setProjectFilter}
-          projects={projects}
+          projects={accessibleProjects.filter(p => canWriteTaskProject(p.id))}
           placeholder="Search tasks…"
         />
       )}
@@ -370,8 +402,10 @@ export default function Tasks({ subPage }) {
                   <TaskCard
                     key={task.id}
                     task={task}
+                    canWriteTask={canWriteTaskProject(task.project_id)}
+                    canDeleteTask={canDeleteTaskProject(task.project_id)}
                     onOpen={setPreview}
-                    onDelete={setConfirmDeleteTask}
+                    onDelete={(t) => { if (canDeleteTaskProject(t.project_id)) setConfirmDeleteTask(t) }}
                     onDragStart={(e, id) => { dragId.current = id; e.dataTransfer.effectAllowed = 'move' }}
                   />
                 ))}
@@ -393,6 +427,9 @@ export default function Tasks({ subPage }) {
           stages={stages}
           counts={counts}
           itemLabel="tasks"
+          readOnly={!canWrite || !canDelete}
+          canWrite={canWrite}
+          canDelete={canDelete}
           onAdd={handleAddStage}
           onUpdate={handleUpdateStage}
           onDelete={setConfirmDelete}
@@ -402,7 +439,7 @@ export default function Tasks({ subPage }) {
 
       {showCreate && (
         <CreateTaskModal
-          projects={projects}
+          projects={projects.filter(p => canWriteTaskProject(p.id))}
           workspaceId={ws?.id}
           stages={stages}
           defaultProjectId={projects[0]?.id}
@@ -414,6 +451,8 @@ export default function Tasks({ subPage }) {
       {preview && (
         <TaskPreviewModal
           task={preview}
+          canWrite={canWriteTaskProject(preview.project_id)}
+          canDelete={canDeleteTaskProject(preview.project_id)}
           workspaceId={ws?.id}
           stages={stages}
           onUpdated={onUpdated}

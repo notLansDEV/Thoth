@@ -107,7 +107,11 @@ function StageForm({ initial, onSave, onCancel }) {
  *  - onAdd({name,color}), onUpdate(id,{name,color})
  *  - onDelete(stage), onReorder(orderIds)
  */
-export default function StageBoard({ stages, counts = {}, itemLabel = 'tasks', onAdd, onUpdate, onDelete, onReorder }) {
+export default function StageBoard({ stages, counts = {}, itemLabel = 'tasks', onAdd, onUpdate, onDelete, onReorder, canWrite = true, canDelete = true, readOnly = false }) {
+  const allowWrite = canWrite && !readOnly
+  const allowDelete = canDelete && !readOnly
+  const allowReorder = allowWrite
+
   const [dragId, setDragId] = useState(null)
   const [form, setForm] = useState(null) // null | {} | stage
 
@@ -156,35 +160,41 @@ export default function StageBoard({ stages, counts = {}, itemLabel = 'tasks', o
               <span style={{ fontSize: '9px', color: 'var(--muted2)' }}>
                 {counts[stage.name] || 0} {itemLabel}
               </span>
-              <div style={{ display: 'flex', gap: '4px' }}>
-                <button
-                  className="icon-btn"
-                  title="Edit stage"
-                  onClick={() => setForm(stage)}
-                ><Pencil size={12} /></button>
-                {String(stage.name) !== 'Archived' && (
-                  <button
-                    className="icon-btn"
-                    title="Delete stage"
-                    onClick={() => onDelete(stage)}
-                    style={{ color: '#ff6b6b' }}
-                  ><Trash2 size={12} /></button>
-                )}
-              </div>
+              {(allowWrite || allowDelete) && (
+                <div style={{ display: 'flex', gap: '4px' }}>
+                  {allowWrite && (
+                    <button
+                      className="icon-btn"
+                      title="Edit stage"
+                      onClick={() => setForm(stage)}
+                    ><Pencil size={12} /></button>
+                  )}
+                  {allowDelete && String(stage.name) !== 'Archived' && (
+                    <button
+                      className="icon-btn"
+                      title="Delete stage"
+                      onClick={() => onDelete(stage)}
+                      style={{ color: '#ff6b6b' }}
+                    ><Trash2 size={12} /></button>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         ))}
 
-        <button
-          className="add-stage-btn"
-          onClick={() => setForm({})}
-        >
-          + Add Stage
-        </button>
+        {allowWrite && (
+          <button
+            className="add-stage-btn"
+            onClick={() => setForm({})}
+          >
+            + Add Stage
+          </button>
+        )}
       </div>
 
       <div style={{ marginTop: '10px', fontSize: '10px', color: 'var(--muted2)' }}>
-        Drag a stage card onto another stage to reorder · deleting a stage moves its items to Archived
+        {allowReorder ? 'Drag a stage card onto another stage to reorder · ' : ''}deleting a stage moves its items to Archived
       </div>
 
       {form && (

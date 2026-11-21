@@ -21,17 +21,41 @@ export class TaskRepository extends BaseRepository {
       JOIN projects p ON t.project_id = p.id
       LEFT JOIN users u ON t.assigned_to = u.id
       LEFT JOIN milestones m ON t.milestone_id = m.id
-      WHERE p.workspace_id = $1
+      WHERE p.workspace_id = $1 AND t.deleted_at IS NULL AND p.deleted_at IS NULL
       ORDER BY t.order_index, t.created_at DESC
     `;
     return getMany(sql, [workspaceId]);
+  }
+
+  async findDeletedByWorkspace(workspaceId) {
+    const sql = `
+      SELECT
+        t.*,
+        p.name AS project_name,
+        p.color AS project_color,
+        u.username AS assignee_name
+      FROM tasks t
+      JOIN projects p ON t.project_id = p.id
+      LEFT JOIN users u ON t.assigned_to = u.id
+      WHERE p.workspace_id = $1 AND t.deleted_at IS NOT NULL
+      ORDER BY t.deleted_at DESC, t.created_at DESC
+    `;
+    return getMany(sql, [workspaceId]);
+  }
+
+  async softDeleteById(id) {
+    const rows = await getMany(
+      `UPDATE tasks SET deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = $1 AND deleted_at IS NULL RETURNING *`,
+      [id]
+    );
+    return rows[0] || null;
   }
 
   /**
    * Find tasks by project
    */
   async findByProject(projectId, filters = {}) {
-    let sql = 'SELECT * FROM tasks WHERE project_id = $1';
+    let sql = 'SELECT * FROM tasks WHERE project_id = $1 AND deleted_at IS NULL';
     const params = [projectId];
     let paramIndex = 2;
 
@@ -67,7 +91,7 @@ export class TaskRepository extends BaseRepository {
    */
   async findSubtasks(parentTaskId) {
     return getMany(
-      'SELECT * FROM tasks WHERE parent_task_id = $1 ORDER BY order_index',
+      'SELECT * FROM tasks WHERE parent_task_id = $1 AND deleted_at IS NULL ORDER BY order_index',
       [parentTaskId]
     );
   }
@@ -103,6 +127,7 @@ export class TaskRepository extends BaseRepository {
         AND due_date IS NOT NULL
         AND due_date <= NOW() + INTERVAL '${days} days'
         AND status != 'completed'
+        AND deleted_at IS NULL
       ORDER BY due_date ASC
     `;
     return getMany(sql, [projectId]);
@@ -117,6 +142,7 @@ export class TaskRepository extends BaseRepository {
        WHERE project_id = $1
          AND due_date < NOW()
          AND status != 'completed'
+         AND deleted_at IS NULL
        ORDER BY due_date ASC`,
       [projectId]
     );

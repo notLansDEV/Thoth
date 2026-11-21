@@ -13,7 +13,7 @@ import {
 } from '../features/bugs/bugs.service.js'
 import { priorityStyle } from '../features/tasks/tasks.service.js'
 import { getProjects } from '../features/projects/projects.service.js'
-import { getCurrentWorkspace } from '../features/workspaces/workspaces.service.js'
+import { getCurrentWorkspace, canWriteModule, canDeleteModule, canWriteProjectModule, canDeleteProjectModule, canAccessProject, getSelectedProjectId } from '../features/workspaces/workspaces.service.js'
 import StageBoard from '../components/StageBoard.jsx'
 import ConfirmModal from '../components/ConfirmModal.jsx'
 import ListToolbar from '../components/ListToolbar.jsx'
@@ -32,11 +32,11 @@ function StatCard({ icon, label, value }) {
   )
 }
 
-function BugCard({ bug, projectName, projectColor, onDragStart, onOpen, onDelete }) {
+function BugCard({ bug, projectName, projectColor, onDragStart, onOpen, onDelete, canWriteBug, canDeleteBug }) {
   return (
     <div
-      draggable
-      onDragStart={(e) => onDragStart(e, bug.id)}
+      draggable={!!canWriteBug}
+      onDragStart={(e) => canWriteBug && onDragStart(e, bug.id)}
       onClick={() => onOpen(bug)}
       style={{
         background: 'var(--panel3)', border: '1px solid var(--border)',
@@ -59,22 +59,26 @@ function BugCard({ bug, projectName, projectColor, onDragStart, onOpen, onDelete
           <span className="badge" style={{ ...priorityStyle(bug.priority), background: 'transparent', fontSize: '9px' }}>
             {bug.priority || 'medium'}
           </span>
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); onOpen(bug) }}
-            title="Edit"
-            style={{ background: 'transparent', border: 0, color: 'var(--muted2)', cursor: 'pointer', padding: '2px', display: 'inline-flex', borderRadius: '3px' }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--muted)'; e.currentTarget.style.background = 'var(--hover)' }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--muted2)'; e.currentTarget.style.background = 'transparent' }}
-          ><Pencil size={11} /></button>
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); onDelete(bug) }}
-            title="Delete"
-            style={{ background: 'transparent', border: 0, color: 'var(--muted2)', cursor: 'pointer', padding: '2px', display: 'inline-flex', borderRadius: '3px' }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = '#ff4040'; e.currentTarget.style.background = 'var(--hover)' }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--muted2)'; e.currentTarget.style.background = 'transparent' }}
-          ><Trash2 size={11} /></button>
+          {canWriteBug && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onOpen(bug) }}
+              title="Edit"
+              style={{ background: 'transparent', border: 0, color: 'var(--muted2)', cursor: 'pointer', padding: '2px', display: 'inline-flex', borderRadius: '3px' }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--muted)'; e.currentTarget.style.background = 'var(--hover)' }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--muted2)'; e.currentTarget.style.background = 'transparent' }}
+            ><Pencil size={11} /></button>
+          )}
+          {canDeleteBug && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onDelete(bug) }}
+              title="Delete"
+              style={{ background: 'transparent', border: 0, color: 'var(--muted2)', cursor: 'pointer', padding: '2px', display: 'inline-flex', borderRadius: '3px' }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = '#ff4040'; e.currentTarget.style.background = 'var(--hover)' }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--muted2)'; e.currentTarget.style.background = 'transparent' }}
+            ><Trash2 size={11} /></button>
+          )}
         </div>
       </div>
 
@@ -103,6 +107,10 @@ function BugCard({ bug, projectName, projectColor, onDragStart, onOpen, onDelete
 export default function Bugs({ subPage }) {
   const ws = getCurrentWorkspace()
   const tab = subPage === 'stages' ? 'stages' : 'all'
+  const canWrite = canWriteModule('bugs')
+  const canDelete = canDeleteModule('bugs')
+  const canWriteBugProject = (projectId) => canWriteProjectModule(projectId, 'bugs')
+  const canDeleteBugProject = (projectId) => canDeleteProjectModule(projectId, 'bugs')
   const [bugs, setBugs] = useState([])
   const [projects, setProjects] = useState([])
   const [stages, setStages] = useState([])
@@ -116,7 +124,23 @@ export default function Bugs({ subPage }) {
 
   const [query, setQuery] = useState('')
   const [priorityFilter, setPriorityFilter] = useState('all')
-  const [projectFilter, setProjectFilter] = useState('all')
+  const [selectedProjectId, setSelectedProjectIdState] = useState(() => getSelectedProjectId(ws?.id))
+  const [projectFilter, setProjectFilter] = useState(() => getSelectedProjectId(ws?.id) || 'all')
+
+  useEffect(() => {
+    const sync = () => {
+      const next = getSelectedProjectId(getCurrentWorkspace()?.id)
+      setSelectedProjectIdState(next)
+      setProjectFilter(next || 'all')
+    }
+    sync()
+    window.addEventListener('thoth:project-changed', sync)
+    window.addEventListener('storage', sync)
+    return () => {
+      window.removeEventListener('thoth:project-changed', sync)
+      window.removeEventListener('storage', sync)
+    }
+  }, [ws?.id])
 
   async function refresh() {
     try {
@@ -167,6 +191,7 @@ export default function Bugs({ subPage }) {
     if (!id) return
     const bug = bugs.find((b) => b.id === id)
     if (!bug || (bug.kanban_column || defaultStageName) === stageName) return
+    if (!canWriteBugProject(bug.project_id)) return
 
     setBugs((current) => current.map((b) => (b.id === id ? { ...b, kanban_column: stageName, status: stageName } : b)))
     updateBug(id, { kanban_column: stageName })
@@ -175,6 +200,7 @@ export default function Bugs({ subPage }) {
   }
 
   async function handleAddStage(data) {
+    if (!canWrite) return
     try {
       await createStage(ws?.id, data.name, data.color)
       await refresh()
@@ -185,6 +211,7 @@ export default function Bugs({ subPage }) {
   }
 
   async function handleUpdateStage(id, data) {
+    if (!canWrite) return
     try {
       await updateStageApi(id, data)
       await refresh()
@@ -195,6 +222,7 @@ export default function Bugs({ subPage }) {
   }
 
   async function handleReorder(orderIds) {
+    if (!canWrite) return
     setStages((cur) => {
       const map = new Map(cur.map((s) => [s.id, s]))
       return orderIds.map((id) => map.get(id)).filter(Boolean)
@@ -209,7 +237,7 @@ export default function Bugs({ subPage }) {
   }
 
   async function handleConfirmDelete() {
-    if (!confirmDelete) return
+    if (!canDelete || !confirmDelete) return
     setDeleting(true)
     try {
       await deleteStageApi(confirmDelete.id)
@@ -225,7 +253,7 @@ export default function Bugs({ subPage }) {
   }
 
   async function handleDeleteBug() {
-    if (!confirmDeleteBug) return
+    if (!canDelete || !confirmDeleteBug) return
     setDeleting(true)
     try {
       await deleteBug(confirmDeleteBug.id)
@@ -241,19 +269,24 @@ export default function Bugs({ subPage }) {
     }
   }
 
+  const defaultStageName = stages[0]?.name || 'New'
+  const accessibleProjects = projects.filter((p) => canAccessProject(p.id))
+  const activeProjectId = selectedProjectId || (projectFilter !== 'all' ? projectFilter : null)
+  const scopedBugs = activeProjectId
+    ? bugs.filter((b) => String(b.project_id) === String(activeProjectId))
+    : bugs.filter((b) => accessibleProjects.some((p) => String(p.id) === String(b.project_id)))
+
   const counts = {}
-  for (const b of bugs) {
-    const key = b.kanban_column || stages[0]?.name || 'New'
+  for (const b of scopedBugs) {
+    const key = b.kanban_column || defaultStageName
     counts[key] = (counts[key] || 0) + 1
   }
 
-  const defaultStageName = stages[0]?.name || 'New'
-
-  // Board filters (stat cards above always show workspace-wide totals)
+  // Board filters are scoped to the active/selected project
   const q = query.trim().toLowerCase()
-  const visibleBugs = bugs.filter((b) => {
+  const visibleBugs = scopedBugs.filter((b) => {
     if (priorityFilter !== 'all' && (b.priority || 'medium') !== priorityFilter) return false
-    if (projectFilter !== 'all' && b.project_id !== projectFilter) return false
+    if (projectFilter !== 'all' && String(b.project_id) !== String(projectFilter)) return false
     if (q && !`${b.bug_id || ''} ${b.title || ''} ${b.description || ''}`.toLowerCase().includes(q)) return false
     return true
   })
@@ -266,24 +299,26 @@ export default function Bugs({ subPage }) {
           <p className="page-subtitle">Track and squash bugs across your projects</p>
         </div>
 
-        <button className="btn primary" onClick={() => setShowReport(true)} style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-          <Plus size={13} /> Report a Bug
-        </button>
+        {canWrite && (
+          <button className="btn primary" onClick={() => setShowReport(true)} style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+            <Plus size={13} /> Report a Bug
+          </button>
+        )}
       </div>
 
       {/* 3 stat cards */}
       <div className="stat-grid">
         <StatCard icon={<CircleDot size={12} />} label={defaultStageName} value={counts[defaultStageName] || 0} />
-        <StatCard icon={<BugIcon size={12} />} label="Total bug" value={bugs.length} />
+        <StatCard icon={<BugIcon size={12} />} label="Total bug" value={scopedBugs.length} />
         <StatCard icon={<Columns3 size={12} />} label="Total stage" value={stages.length} />
       </div>
 
       {loading ? (
         <div className="card"><div className="description" style={{ margin: 0 }}>Loading bugs…</div></div>
-      ) : projects.length === 0 ? (
+      ) : accessibleProjects.length === 0 ? (
         <div className="card">
           <div className="description" style={{ margin: 0 }}>
-            Create a project first — bugs live inside projects.
+            No accessible projects. Ask a workspace owner to assign you to a project.
           </div>
         </div>
       ) : (
@@ -293,7 +328,7 @@ export default function Bugs({ subPage }) {
               query={query} onQuery={setQuery}
               priority={priorityFilter} onPriority={setPriorityFilter}
               project={projectFilter} onProject={setProjectFilter}
-              projects={projects}
+              projects={accessibleProjects.filter(p => canWriteBugProject(p.id))}
               placeholder="Search bugs…"
             />
           )}
@@ -325,9 +360,11 @@ export default function Bugs({ subPage }) {
                         bug={bug}
                         projectName={projects.find((p) => p.id === bug.project_id)?.name}
                         projectColor={projects.find((p) => p.id === bug.project_id)?.color}
+                        canWriteBug={canWriteBugProject(bug.project_id)}
+                        canDeleteBug={canDeleteBugProject(bug.project_id)}
                         onDragStart={(e, id) => { dragId.current = id; e.dataTransfer.effectAllowed = 'move' }}
                         onOpen={setPreview}
-                        onDelete={setConfirmDeleteBug}
+                        onDelete={(b) => { if (canDeleteBugProject(b.project_id)) setConfirmDeleteBug(b) }}
                       />
                     ))}
 
@@ -348,6 +385,8 @@ export default function Bugs({ subPage }) {
               stages={stages}
               counts={counts}
               itemLabel="bugs"
+              canWrite={canWrite}
+              canDelete={canDelete}
               onAdd={handleAddStage}
               onUpdate={handleUpdateStage}
               onDelete={setConfirmDelete}

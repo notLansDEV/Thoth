@@ -38,7 +38,7 @@ const iconBtn = {
   lineHeight: 1,
 }
 
-export default function ProjectCard({ project, onView, onEdit, onDelete }) {
+export default function ProjectCard({ project, onView, onEdit, onDelete, canWrite = true, canDelete = true }) {
   const statusColor = STATUS_COLORS[project.status] || 'var(--muted)'
   const statusLabel = STATUS_LABELS[project.status] || project.status || 'Active'
   const priorityMeta = PROJECT_PRIORITIES.find((p) => p.value === project.priority)
@@ -63,12 +63,14 @@ export default function ProjectCard({ project, onView, onEdit, onDelete }) {
         </div>
         <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }} onClick={(e) => e.stopPropagation()}>
           <button style={iconBtn} title="View" onClick={() => onView(project)}><Eye size={12} /></button>
-          <button style={iconBtn} title="Edit" onClick={() => onEdit(project)}><Pencil size={12} /></button>
-          <button
-            style={{ ...iconBtn, color: '#ff6b6b' }}
-            title="Delete"
-            onClick={() => onDelete(project)}
-          ><Trash2 size={12} /></button>
+          {canWrite && <button style={iconBtn} title="Edit" onClick={() => onEdit(project)}><Pencil size={12} /></button>}
+          {canDelete && (
+            <button
+              style={{ ...iconBtn, color: '#ff6b6b' }}
+              title="Delete"
+              onClick={() => onDelete(project)}
+            ><Trash2 size={12} /></button>
+          )}
         </div>
       </div>
 

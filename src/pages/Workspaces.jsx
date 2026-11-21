@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { toast } from 'sonner'
 import {
   getWorkspaces,
   createWorkspace,
@@ -10,8 +11,15 @@ import {
   addMember,
   updateMemberRole,
   removeMember,
+  normalizeGranularRolePerms,
+  refreshMyProjectMemberships,
 } from '../features/workspaces/workspaces.service.js'
-import { ArrowLeft, Settings, UserPlus, Users, Eye, Trash2, Pencil, Check, X } from 'lucide-react'
+import {
+  getProjects,
+  getWorkspaceProjectMemberships,
+  setUserProjectMemberships,
+} from '../features/projects/projects.service.js'
+import { ArrowLeft, Settings, UserPlus, Users, Eye, Trash2, Check, X, Search } from 'lucide-react'
 import ConfirmModal from '../components/ConfirmModal.jsx'
 
 function navigate(path) {
@@ -50,6 +58,21 @@ export default function Workspaces() {
   const [deleting, setDeleting] = useState(false)
   const current = getCurrentWorkspace()
 
+  // Project access provisioning (owner-managed)
+  const [projects, setProjects] = useState([])
+  const [userProjectMap, setUserProjectMap] = useState({})
+  const [projAccessLoading, setProjAccessLoading] = useState(false)
+  const [savingUserAccess, setSavingUserAccess] = useState(null)
+  const [accessSearch, setAccessSearch] = useState('')
+  const [accessProjectFilter, setAccessProjectFilter] = useState('all')
+  const [accessRoleFilter, setAccessRoleFilter] = useState('all')
+  const [accessVisibilityFilter, setAccessVisibilityFilter] = useState('all')
+  const [drawerOpen, setDrawerOpen] = useState(false)
+  const [drawerMemberId, setDrawerMemberId] = useState(null)
+  const [drawerSearch, setDrawerSearch] = useState('')
+  const [draftAssignments, setDraftAssignments] = useState([])
+  const [draftWorkspaceRole, setDraftWorkspaceRole] = useState('member')
+
   useEffect(() => {
     let alive = true
     getWorkspaces()
@@ -58,29 +81,93 @@ export default function Workspaces() {
     return () => { alive = false }
   }, [])
 
+  useEffect(() => {
+    if (!preview?.id) return undefined
+    let alive = true
+    const refreshPreviewAccess = async () => {
+      try {
+        const [memberRows, projRows, accessRows] = await Promise.all([
+          getMembers(preview.id).catch(() => []),
+          getProjects(preview.id).catch(() => []),
+          preview.role === 'owner' ? getWorkspaceProjectMemberships(preview.id).catch(() => []) : Promise.resolve([]),
+        ])
+        if (!alive) return
+        setMembers(Array.isArray(memberRows) ? memberRows : [])
+        setProjects(Array.isArray(projRows) ? projRows : [])
+        if (preview.role === 'owner') {
+          const map = {}
+          for (const r of (Array.isArray(accessRows) ? accessRows : [])) {
+            const uid = String(r.user_id)
+            if (!map[uid]) map[uid] = []
+            map[uid].push({ project_id: r.project_id, role: normalizePermissionRole(r.project_role || r.role || 'member') })
+          }
+          setUserProjectMap(map)
+        } else {
+          setUserProjectMap({})
+        }
+      } catch {
+        /* ignore background refresh errors */
+      }
+    }
+    const onDataChanged = (e) => {
+      const wsId = e?.detail?.workspaceId
+      if (wsId && String(wsId) !== String(preview.id)) return
+      refreshPreviewAccess()
+    }
+    const onFocus = () => refreshPreviewAccess()
+    window.addEventListener('thoth:data-changed', onDataChanged)
+    window.addEventListener('focus', onFocus)
+    return () => {
+      alive = false
+      window.removeEventListener('thoth:data-changed', onDataChanged)
+      window.removeEventListener('focus', onFocus)
+    }
+  }, [preview?.id, preview?.role])
+
   function enter(workspace) {
     setCurrentWorkspace(workspace)
+    refreshMyProjectMemberships(workspace?.id).catch(() => {})
     navigate(`/${workspace.slug}/dashboard`)
   }
 
   async function handleCreate(nameValue) {
-    const workspace = await createWorkspace(nameValue)
+    const workspace = await createWorkspace(String(nameValue || '').trim().slice(0, 16))
     enter(workspace)
   }
 
   async function openPreview(ws) {
-    setPreview(ws)
     setWsName(ws.name)
     setPanel(null)
     setPanelError(null)
     setEditingRole(null)
+    setDrawerOpen(false)
+    setDrawerMemberId(null)
+    setAccessSearch('')
+    setAccessProjectFilter('all')
+    setAccessRoleFilter('all')
+    setAccessVisibilityFilter('all')
     setMembersLoading(true)
     try {
-      const rows = await getMembers(ws.id)
-      setMembers(Array.isArray(rows) ? rows : [])
+      // Refresh workspace data so settings (custom roles/permissions) are current
+      let freshWs = ws
+      try {
+        const all = await getWorkspaces()
+        if (Array.isArray(all)) {
+          setWorkspaces(all)
+          freshWs = all.find(w => String(w.id) === String(ws.id)) || ws
+        }
+      } catch {}
+      setPreview(freshWs)
+      const rows = await getMembers(freshWs.id)
+      const arr = Array.isArray(rows) ? rows : []
+      setMembers(arr)
+      await loadProjectAccessData(freshWs.id, freshWs.role === 'owner')
     } catch (err) {
+      setPreview(ws)
       setPanelError(err.message || 'Could not load members')
       setMembers([])
+      setProjects([])
+      setUserProjectMap({})
     } finally {
       setMembersLoading(false)
     }
@@ -95,11 +182,12 @@ export default function Workspaces() {
   }
 
   async function handleSaveName() {
-    if (!preview || !wsName.trim()) return
+    const nextName = wsName.trim().slice(0, 16)
+    if (!preview || !nextName) return
     setSavingPanel(true)
     setPanelError(null)
     try {
-      const updated = await updateWorkspace(preview.id, { name: wsName.trim() })
+      const updated = await updateWorkspace(preview.id, { name: nextName })
       setPreview((cur) => ({ ...cur, ...updated }))
       setWorkspaces((cur) => cur && cur.map((w) => (w.id === preview.id ? { ...w, ...updated } : w)))
       if (current?.id === preview.id) setCurrentWorkspace({ ...current, ...updated })
@@ -148,7 +236,10 @@ export default function Workspaces() {
     setDeleting(true)
     try {
       await deleteWorkspace(confirmDeleteWs.id)
-      if (current?.id === confirmDeleteWs.id) setCurrentWorkspace(null)
+      if (current?.id === confirmDeleteWs.id) {
+        setCurrentWorkspace(null)
+        refreshMyProjectMemberships(null).catch(() => {})
+      }
       setConfirmDeleteWs(null)
       setPreview(null)
       const rows = await getWorkspaces()
@@ -175,6 +266,166 @@ export default function Workspaces() {
       setDeleting(false)
     }
   }
+
+  function clone(obj) { return JSON.parse(JSON.stringify(obj)) }
+
+  async function loadProjectAccessData(wsId, isOwnerWs) {
+    setProjAccessLoading(true)
+    try {
+      const projRows = await getProjects(wsId)
+      setProjects(Array.isArray(projRows) ? projRows : [])
+      if (isOwnerWs) {
+        try {
+          const rows = await getWorkspaceProjectMemberships(wsId)
+          const map = {}
+          for (const r of (Array.isArray(rows) ? rows : [])) {
+            const uid = String(r.user_id)
+            if (!map[uid]) map[uid] = []
+            map[uid].push({ project_id: r.project_id, role: normalizePermissionRole(r.project_role || r.role || 'member') })
+          }
+          setUserProjectMap(map)
+        } catch {
+          setUserProjectMap({})
+        }
+      } else {
+        setUserProjectMap({})
+      }
+    } catch {
+      setProjects([])
+      setUserProjectMap({})
+    } finally {
+      setProjAccessLoading(false)
+    }
+  }
+
+  function getUserAssignments(userId) {
+    const rows = userProjectMap[String(userId)] || []
+    return rows.map((a) => ({ ...a, project_id: a.project_id || a.id, role: a.role || a.project_role || 'member' }))
+  }
+
+  function getAvailablePermissionRoles() {
+    const perms = normalizeGranularRolePerms(preview?.settings?.rolePermissions)
+    const roles = Object.keys(perms || {}).filter(k => !k.startsWith('_') && k !== 'owner')
+    const order = ['admin', 'member']
+    roles.sort((a, b) => {
+      const ai = order.indexOf(a), bi = order.indexOf(b)
+      if (ai !== -1 || bi !== -1) return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi)
+      return a.localeCompare(b)
+    })
+    return roles.length ? roles : ['member']
+  }
+
+  function formatRoleLabel(role) {
+    const r = String(role || 'member')
+    return r.charAt(0).toUpperCase() + r.slice(1)
+  }
+
+  function normalizePermissionRole(role, availableRoles = getAvailablePermissionRoles()) {
+    const r = String(role || '').toLowerCase()
+    if (availableRoles.includes(r)) return r
+    if (r === 'manager' && availableRoles.includes('admin')) return 'admin'
+    if (availableRoles.includes('member')) return 'member'
+    return availableRoles[0] || 'member'
+  }
+
+  function defaultPermissionRoleForMember(member) {
+    return normalizePermissionRole(member?.role || 'member')
+  }
+
+  function getVisibilityScope(member, assignmentCount, totalProjects = null) {
+    const total = totalProjects != null ? totalProjects : (projects || []).filter(p => !preview?.id || !p?.workspace_id || String(p.workspace_id) === String(preview.id)).length
+    if (member.role === 'owner') return { label: 'All Visible', type: 'all', sub: 'Universal Workspace Scope' }
+    if (assignmentCount === 0) return { label: 'Pending Setup', type: 'pending', sub: `0 of ${total} projects` }
+    if (total > 0 && assignmentCount === total) return { label: 'All Visible', type: 'all', sub: `${assignmentCount} of ${total} projects visible` }
+    return { label: 'Custom Restricted', type: 'custom', sub: `${assignmentCount} of ${total} projects visible` }
+  }
+
+  function memberProjectPermissionRole(member) {
+    return defaultPermissionRoleForMember(member)
+  }
+
+  function openAccessDrawer(memberId) {
+    if (!preview || preview.role !== 'owner') return
+    const member = members.find(m => String(m.id) === String(memberId))
+    if (!member || member.role === 'owner') return
+    const availableRoles = getAvailablePermissionRoles()
+    setDrawerMemberId(String(memberId))
+    setDraftWorkspaceRole(normalizePermissionRole(member.role, availableRoles))
+    setDraftAssignments(clone(getUserAssignments(memberId)).map(a => ({ ...a, role: normalizePermissionRole(a.role, availableRoles) })))
+    setDrawerSearch('')
+    setDrawerOpen(true)
+  }
+
+  function closeAccessDrawer() {
+    if (savingUserAccess) return
+    setDrawerOpen(false)
+    setDrawerMemberId(null)
+    setDraftAssignments([])
+    setDrawerSearch('')
+    setDraftWorkspaceRole('member')
+  }
+
+  function toggleDraftProject(projectId, checked) {
+    setDraftAssignments(cur => {
+      if (checked) {
+        if (cur.some(a => String(a.project_id) === String(projectId))) return cur
+        const member = members.find(m => String(m.id) === String(drawerMemberId))
+        return [...cur, { project_id: projectId, role: defaultPermissionRoleForMember(member) }]
+      }
+      return cur.filter(a => String(a.project_id) !== String(projectId))
+    })
+  }
+
+  function setDraftProjectRole(projectId, role) {
+    const nextRole = normalizePermissionRole(role)
+    setDraftAssignments(cur => cur.map(a => String(a.project_id) === String(projectId) ? { ...a, role: nextRole } : a))
+  }
+
+  function bulkDraftSelect(all) {
+    const wsProjects = (projects || []).filter(p => !preview?.id || !p?.workspace_id || String(p.workspace_id) === String(preview.id))
+    const member = members.find(m => String(m.id) === String(drawerMemberId))
+    const role = defaultPermissionRoleForMember(member)
+    if (all) {
+      setDraftAssignments(wsProjects.map(p => {
+        const ex = draftAssignments.find(a => String(a.project_id) === String(p.id))
+        return { project_id: p.id, role: ex ? normalizePermissionRole(ex.role) : role }
+      }))
+    } else {
+      setDraftAssignments([])
+    }
+  }
+
+  async function saveDrawerChanges() {
+    if (!preview || preview.role !== 'owner' || !drawerMemberId) return
+    const uid = String(drawerMemberId)
+    const member = members.find(m => String(m.id) === uid)
+    setSavingUserAccess(uid)
+    try {
+      const next = clone(draftAssignments)
+      const nextWorkspaceRole = normalizePermissionRole(draftWorkspaceRole)
+      if (member && member.role !== 'owner' && member.role !== nextWorkspaceRole) {
+        await updateMemberRole(preview.id, uid, nextWorkspaceRole)
+        setMembers(cur => (cur || []).map(m => String(m.id) === uid ? { ...m, role: nextWorkspaceRole } : m))
+      }
+      const saved = await setUserProjectMemberships(preview.id, uid, next)
+      setUserProjectMap(cur => ({ ...cur, [uid]: Array.isArray(saved) ? saved : next }))
+      setPanelError(null)
+      window.dispatchEvent(new CustomEvent('thoth:data-changed', { detail: { type: 'project-access', workspaceId: preview.id, userId: uid } }))
+      toast.success('Access updated')
+      setDrawerOpen(false)
+      setDrawerMemberId(null)
+      setDraftAssignments([])
+      setDrawerSearch('')
+      setDraftWorkspaceRole('member')
+    } catch (err) {
+      const msg = err?.message || 'Could not update project access'
+      setPanelError(msg)
+      toast.error(msg)
+    } finally {
+      setSavingUserAccess(null)
+    }
+  }
+
 
   // Full-screen workspace detail view (opened via the preview button)
   if (preview) {
@@ -221,15 +472,19 @@ export default function Workspaces() {
             <div className="card" style={{ marginBottom: '12px' }}>
               <label style={labelStyle}>Workspace name</label>
               <div style={{ display: 'flex', gap: '8px' }}>
-                <input
-                  type="text"
-                  value={wsName}
-                  onChange={(e) => setWsName(e.target.value)}
-                  className="search"
-                  style={{ flex: 1 }}
-                  autoFocus
-                />
-                <button className="btn primary" onClick={handleSaveName} disabled={savingPanel} style={{ cursor: 'pointer' }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <input
+                    type="text"
+                    value={wsName}
+                    maxLength={16}
+                    onChange={(e) => setWsName(e.target.value.slice(0, 16))}
+                    className="search"
+                    style={{ width: '100%' }}
+                    autoFocus
+                  />
+                  <div style={{ marginTop: 4, fontSize: 11, color: 'var(--muted2)', textAlign: 'right' }}>{wsName.length}/16</div>
+                </div>
+                <button className="btn primary" onClick={handleSaveName} disabled={savingPanel} style={{ cursor: 'pointer', alignSelf: 'flex-start' }}>
                   {savingPanel ? 'Saving…' : 'Save'}
                 </button>
                 <button className="btn" onClick={() => { setPanel(null); setWsName(preview.name) }} style={{ cursor: 'pointer' }}>
@@ -265,72 +520,287 @@ export default function Workspaces() {
             </form>
           )}
 
-          {/* Members table */}
-          <div className="card" style={{ padding: 0, overflowX: 'auto' }}>
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Member</th>
-                  <th>Email</th>
-                  <th>Role</th>
-                  <th>Joined</th>
-                  <th style={{ width: '70px' }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {membersLoading ? (
-                  <tr><td colSpan={5} style={{ color: 'var(--muted2)' }}>Loading members…</td></tr>
-                ) : members.length === 0 ? (
-                  <tr><td colSpan={5} style={{ color: 'var(--muted2)' }}>No members found.</td></tr>
-                ) : members.map((m) => (
-                  <tr key={m.id}>
-                    <td>
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-                        <span className="avatar">{(m.full_name || m.username || '?').slice(0, 2).toUpperCase()}</span>
-                        <span style={{ color: 'var(--text-soft)', fontWeight: 600 }}>{m.full_name || m.username}</span>
-                      </span>
-                    </td>
-                    <td>{m.email}</td>
-                    <td>
-                      {editingRole?.userId === m.id ? (
-                        <select
-                          value={editingRole.role}
-                          onChange={(e) => setEditingRole({ userId: m.id, role: e.target.value })}
-                          style={{ background: 'var(--panel3)', border: '1px solid var(--border)', color: 'var(--text-soft)', borderRadius: '4px', fontSize: '11px', padding: '3px 6px' }}
-                        >
-                          {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
-                        </select>
-                      ) : (
-                        <span className="badge paused">{m.role}</span>
-                      )}
-                    </td>
-                    <td>{m.joined_at ? new Date(m.joined_at).toLocaleDateString() : '—'}</td>
-                    <td>
-                      {editingRole?.userId === m.id ? (
-                        <span style={{ display: 'flex', gap: '4px' }}>
-                          <button className="icon-btn" title="Save role" onClick={handleRoleSave}><Check size={12} /></button>
-                          <button className="icon-btn" title="Cancel" onClick={() => setEditingRole(null)}><X size={12} /></button>
-                        </span>
-                      ) : (
-                        <span style={{ display: 'flex', gap: '4px' }}>
-                          <button
-                            className="icon-btn"
-                            title="Edit role"
-                            onClick={() => setEditingRole({ userId: m.id, role: m.role || 'member' })}
-                          ><Pencil size={12} /></button>
-                          <button
-                            className="icon-btn"
-                            title="Remove member"
-                            style={{ color: '#ff6b6b' }}
-                            onClick={() => setConfirmDeleteMember(m)}
-                          ><Trash2 size={12} /></button>
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          {/* Members & Project Access Provisioning */}
+          <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+            {(() => {
+              const q = (accessSearch || '').trim().toLowerCase()
+              const workspaceProjects = (projects || []).filter(p => !preview?.id || !p?.workspace_id || String(p.workspace_id) === String(preview.id))
+              const memberRows = (members || []).filter((m) => {
+                if (m.role === 'owner') return false
+                const assignments = getUserAssignments(m.id)
+                const projNames = assignments.map(a => (workspaceProjects.find(p => String(p.id) === String(a.project_id))?.name || '').toLowerCase()).join(' ')
+                const matchesSearch = !q || (m.full_name || '').toLowerCase().includes(q) || (m.username || '').toLowerCase().includes(q) || (m.email || '').toLowerCase().includes(q) || projNames.includes(q)
+                const matchesProject = accessProjectFilter === 'all' || m.role === 'owner' || assignments.some(a => String(a.project_id) === String(accessProjectFilter))
+                const wsRoleLabel = m.role === 'owner' ? 'Workspace Owner' : m.role === 'admin' ? 'Admin' : 'Member'
+                const matchesRole = accessRoleFilter === 'all' || wsRoleLabel === accessRoleFilter
+                const scope = getVisibilityScope(m, m.role === 'owner' ? workspaceProjects.length : assignments.length, workspaceProjects.length)
+                const matchesVis = accessVisibilityFilter === 'all' || scope.label === accessVisibilityFilter
+                return matchesSearch && matchesProject && matchesRole && matchesVis
+              })
+
+              const drawerMember = members.find(m => String(m.id) === String(drawerMemberId))
+              const filteredDrawerProjects = workspaceProjects.filter(p => {
+                const dq = (drawerSearch || '').trim().toLowerCase()
+                if (!dq) return true
+                return (p.name || '').toLowerCase().includes(dq) || (p.description || '').toLowerCase().includes(dq)
+              })
+
+              const initials = (m) => (m.full_name || m.username || m.email || '?').split(/[\s._-]+/).filter(Boolean).slice(0,2).map(s=>s[0]).join('').toUpperCase() || '?'
+              const wsRoleBadge = (role) => {
+                if (role === 'owner') return { label: 'Workspace Owner', bg: 'rgba(32,217,107,0.12)', color: '#20d96b', border: 'rgba(32,217,107,0.3)' }
+                if (role === 'admin') return { label: 'Admin', bg: 'rgba(110,97,255,0.14)', color: '#a89cff', border: 'rgba(110,97,255,0.35)' }
+                return { label: 'Member', bg: 'var(--panel2)', color: 'var(--text-soft)', border: 'var(--border)' }
+              }
+              const scopeStyle = (type) => {
+                if (type === 'all') return { color: '#20d96b', dot: '#20d96b' }
+                if (type === 'strict') return { color: '#ff8a8a', dot: '#ff6b6b' }
+                if (type === 'pending') return { color: 'var(--muted)', dot: 'var(--muted2)' }
+                return { color: '#a89cff', dot: '#6e61ff' }
+              }
+
+              return (
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <style>{`
+                    .wpt-th{background:var(--panel3);padding:10px 14px;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted2);border-bottom:1px solid var(--border);white-space:nowrap;text-align:left}
+                    .wpt-td{padding:12px 14px;vertical-align:middle;font-size:12.5px;border-bottom:1px solid var(--border-soft);color:var(--text-soft)}
+                    .wpt-row:hover{background:var(--panel2)}
+                    .wpt-input{padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--panel3);color:var(--text-soft);outline:none}
+                    .wpt-input:focus{border-color:var(--hover-border)}
+                    .wpt-select{padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--panel3);color:var(--text-soft);outline:none}
+                    .wpt-chip{display:inline-flex;align-items:center;gap:6px;background:var(--panel2);border:1px solid var(--border);padding:3px 8px;border-radius:6px;font-size:11px;font-weight:600;color:var(--text-soft)}
+                    .wpt-role-tag{font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;background:var(--panel3);color:var(--text-soft);border:1px solid var(--border)}
+                    .wpt-role-tag.lead{background:rgba(110,97,255,.22);color:#c3bcff;border-color:rgba(110,97,255,.35)}
+                    .wpt-role-tag.editor{background:rgba(110,97,255,.12);color:#a89cff;border-color:rgba(110,97,255,.25)}
+                    .wpt-manage{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:6px;font-size:11.5px;font-weight:600;cursor:pointer;border:1px solid var(--border);background:var(--panel2);color:var(--text-soft)}
+                    .wpt-manage:hover{background:var(--hover);border-color:var(--hover-border);color:var(--text-strong)}
+                    .wpt-drawer-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.45);backdrop-filter:blur(1px);z-index:120}
+                    .wpt-drawer{position:fixed;top:0;right:0;width:100%;max-width:460px;height:100vh;background:var(--panel);border-left:1px solid var(--border);box-shadow:-12px 0 30px rgba(0,0,0,.35);z-index:130;display:flex;flex-direction:column}
+                    .wpt-cb{appearance:none;-webkit-appearance:none;width:16px;height:16px;border:1.5px solid var(--border);border-radius:4px;outline:none;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;background:var(--panel2);flex-shrink:0}
+                    .wpt-cb:checked{background:#6e61ff;border-color:#6e61ff}
+                    .wpt-cb:checked::after{content:"";width:4px;height:8px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg);margin-bottom:1px}
+                  `}</style>
+
+                  <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', display: 'flex', flexWrap:'wrap', alignItems:'center', gap:8 }}>
+                    <div style={{ position: 'relative', width: 240 }}>
+                      <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--muted2)', pointerEvents: 'none' }} />
+                      <input className="wpt-input" type="text" placeholder="Filter by name, email or project..." value={accessSearch} onChange={(e)=>setAccessSearch(e.target.value)} style={{ width: '100%', paddingLeft: 30 }} />
+                    </div>
+                    <select className="wpt-select" value={accessProjectFilter} onChange={(e)=>setAccessProjectFilter(e.target.value)}>
+                      <option value="all">All Projects</option>
+                      {workspaceProjects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    </select>
+                    <select className="wpt-select" value={accessRoleFilter} onChange={(e)=>setAccessRoleFilter(e.target.value)}>
+                      <option value="all">All Roles</option>
+                      <option value="Admin">Admin</option>
+                      <option value="Member">Member</option>
+                    </select>
+                    <select className="wpt-select" value={accessVisibilityFilter} onChange={(e)=>setAccessVisibilityFilter(e.target.value)}>
+                      <option value="all">Any Status</option>
+                      <option value="All Visible">All Visible</option>
+                      <option value="Custom Restricted">Custom Restricted</option>
+                      <option value="Strict Boundary">Strict Boundary</option>
+                      <option value="Pending Setup">Pending Setup</option>
+                    </select>
+                    <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--muted)' }}>Showing {memberRows.length} of {(members || []).length} members</span>
+                  </div>
+
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                      <thead>
+                        <tr>
+                          <th className="wpt-th">Workspace Member</th>
+                          <th className="wpt-th">Visible Projects & Scoped Roles</th>
+                          <th className="wpt-th">Visibility Scope</th>
+                          <th className="wpt-th" style={{ textAlign:'right' }}>Access Controls</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(membersLoading || projAccessLoading) ? (
+                          <tr><td className="wpt-td" colSpan={4} style={{ color:'var(--muted2)', padding: 20 }}>Loading members…</td></tr>
+                        ) : memberRows.length === 0 ? (
+                          <tr><td className="wpt-td" colSpan={4} style={{ color:'var(--muted2)', padding: 24, textAlign:'center' }}>No workspace members match the selected filters.</td></tr>
+                        ) : memberRows.map((m) => {
+                          const uid = String(m.id)
+                          const assignments = getUserAssignments(uid)
+                          const isOwnerMember = m.role === 'owner'
+                          const badge = wsRoleBadge(m.role)
+                          const scope = getVisibilityScope(m, isOwnerMember ? projects.length : assignments.length)
+                          const sc = scopeStyle(scope.type)
+                          const canManageAccess = preview.role === 'owner' && !isOwnerMember
+                          const visibleAssignments = isOwnerMember ? [] : assignments.slice(0,3)
+                          const extra = !isOwnerMember ? Math.max(0, assignments.length - 3) : 0
+                          const editingWsRole = editingRole?.userId === m.id
+                          return (
+                            <tr key={uid} className="wpt-row">
+                              <td className="wpt-td" style={{ minWidth: 260 }}>
+                                <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                                  <span className="avatar" style={{ width:34, height:34, fontSize:11 }}>{initials(m)}</span>
+                                  <div style={{ minWidth:0, display:'flex', flexDirection:'column', gap:2 }}>
+                                    <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
+                                      <span style={{ fontWeight:700, fontSize:13, color:'var(--text-strong)' }}>{m.full_name || m.username || m.email}</span>
+                                      <span style={{ fontSize:10, fontWeight:700, padding:'2px 7px', borderRadius:5, background:badge.bg, color:badge.color, border:`1px solid ${badge.border}` }}>{badge.label}</span>
+                                    </div>
+                                    <span style={{ fontSize:11, color:'var(--muted)' }}>{m.email}</span>
+                                    <div style={{ fontSize:10, color:'var(--muted2)', marginTop:2 }}>Joined {m.joined_at ? new Date(m.joined_at).toLocaleDateString() : '—'}</div>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="wpt-td" style={{ minWidth: 340 }}>
+                                {isOwnerMember ? (
+                                  <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+                                    <span style={{ display:'inline-flex', alignItems:'center', gap:6, background:'rgba(32,217,107,.1)', color:'#20d96b', border:'1px solid rgba(32,217,107,.25)', padding:'4px 9px', borderRadius:6, fontSize:11, fontWeight:700 }}>∞ Universal Project Access ({workspaceProjects.length}/{workspaceProjects.length})</span>
+                                    <span style={{ fontSize:11, color:'var(--muted)' }}>Inherited via Owner Role</span>
+                                  </div>
+                                ) : assignments.length === 0 ? (
+                                  <div style={{ display:'flex', alignItems:'center', gap:8, color:'var(--muted)' }}>
+                                    <span style={{ fontStyle:'italic', fontSize:12 }}>No projects assigned yet</span>
+                                    {canManageAccess && <button type="button" className="wpt-chip" style={{ cursor:'pointer', color:'#a89cff' }} onClick={() => openAccessDrawer(uid)}>+ Assign Projects</button>}
+                                  </div>
+                                ) : (
+                                  <div style={{ display:'flex', flexWrap:'wrap', alignItems:'center', gap:6 }}>
+                                    {visibleAssignments.map((a) => {
+                                      const proj = workspaceProjects.find(p => String(p.id) === String(a.project_id)) || projects.find(p => String(p.id) === String(a.project_id))
+                                      if (!proj) return null
+                                      const roleVal = normalizePermissionRole(a.role)
+                                      const tagCls = roleVal === 'admin' ? 'lead' : ''
+                                      return (
+                                        <span key={String(a.project_id)} className="wpt-chip">
+                                          {proj.name}
+                                          <span className={`wpt-role-tag ${tagCls}`}>{formatRoleLabel(roleVal)}</span>
+                                        </span>
+                                      )
+                                    })}
+                                    {extra > 0 && <button type="button" className="wpt-chip" style={{ cursor: canManageAccess ? 'pointer':'default', color:'#a89cff', background:'rgba(110,97,255,.1)', borderColor:'rgba(110,97,255,.25)' }} onClick={() => canManageAccess && openAccessDrawer(uid)}>+{extra} more</button>}
+                                    {canManageAccess && <button type="button" className="wpt-chip" style={{ cursor:'pointer', width:24, height:24, padding:0, justifyContent:'center' }} title="Manage project access" onClick={() => openAccessDrawer(uid)}>+</button>}
+                                  </div>
+                                )}
+                              </td>
+                              <td className="wpt-td" style={{ minWidth: 170 }}>
+                                <div style={{ display:'flex', alignItems:'center', gap:6, fontSize:12, fontWeight:700, color:sc.color, marginBottom:2 }}>
+                                  <span style={{ width:7, height:7, borderRadius:'50%', background:sc.dot, display:'inline-block' }} />
+                                  <span>{scope.label}</span>
+                                </div>
+                                <div style={{ fontSize:11, color:'var(--muted)' }}>{scope.sub}</div>
+                              </td>
+                              <td className="wpt-td" style={{ textAlign:'right', whiteSpace:'nowrap' }}>
+                                <div style={{ display:'inline-flex', alignItems:'center', gap:8 }}>
+                                  {canManageAccess ? (
+                                    <button type="button" className="wpt-manage" onClick={() => openAccessDrawer(uid)}>⇄ Manage Access</button>
+                                  ) : isOwnerMember ? (
+                                    <span style={{ fontSize:11.5, fontStyle:'italic', color:'var(--muted)' }}>Owner Immutable</span>
+                                  ) : null}
+                                  <button className="icon-btn" title="Remove member" style={{ color: '#ff6b6b' }} onClick={() => setConfirmDeleteMember(m)}><Trash2 size={12} /></button>
+                                </div>
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div style={{ padding: '10px 14px', borderTop: '1px solid var(--border)', background: 'var(--panel2)', fontSize: 11, color: 'var(--muted)' }}>
+                    {preview.role === 'owner' ? 'Manage each member’s project visibility and project-specific role via “Manage Access”.' : 'Project access and per-project roles are managed by the workspace owner.'}
+                  </div>
+
+                  {drawerOpen && drawerMember && (
+                    <>
+                      <div className="wpt-drawer-backdrop" onClick={closeAccessDrawer} />
+                      <aside className="wpt-drawer" aria-hidden="false">
+                        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'14px 16px', borderBottom:'1px solid var(--border)', background:'var(--panel3)' }}>
+                          <div style={{ display:'flex', alignItems:'center', gap:8, fontSize:11, fontWeight:800, letterSpacing:'.05em', textTransform:'uppercase', color:'#a89cff' }}>
+                            <span style={{ width:24, height:24, borderRadius:6, background:'#6e61ff', color:'#fff', display:'inline-flex', alignItems:'center', justifyContent:'center' }}>🛡</span>
+                            <span>Access Inspector & Provisioning</span>
+                          </div>
+                          <button type="button" className="icon-btn" onClick={closeAccessDrawer} title="Close panel"><X size={14} /></button>
+                        </div>
+
+                        <div style={{ flex:1, overflowY:'auto', padding:16, display:'flex', flexDirection:'column', gap:14 }}>
+                          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:12, background:'var(--panel2)', border:'1px solid var(--border)', borderRadius:8, padding:12 }}>
+                            <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                              <span className="avatar" style={{ width:40, height:40, fontSize:13 }}>{initials(drawerMember)}</span>
+                              <div>
+                                <div style={{ fontSize:14, fontWeight:700, color:'var(--text-strong)' }}>{drawerMember.full_name || drawerMember.username || drawerMember.email}</div>
+                                <div style={{ fontSize:11, color:'var(--muted)' }}>{drawerMember.email} · {formatRoleLabel(drawerMember.role)}</div>
+                              </div>
+                            </div>
+                            <span style={{ fontSize:10.5, fontWeight:700, padding:'4px 8px', borderRadius:6, background:'rgba(110,97,255,.14)', color:'#a89cff', border:'1px solid rgba(110,97,255,.3)' }}>Manage Access</span>
+                          </div>
+
+                          <div style={{ background:'var(--panel2)', border:'1px solid var(--border)', borderRadius:8, padding:12, display:'flex', flexDirection:'column', gap:8 }}>
+                            <div>
+                              <div style={{ fontSize:13, fontWeight:700, color:'var(--text-strong)', marginBottom:3 }}>Workspace Role (Modules & Permissions)</div>
+                              <div style={{ fontSize:11.5, color:'var(--muted)' }}>Controls which modules this user can see/use in the workspace based on Roles & Permissions settings.</div>
+                            </div>
+                            <select
+                              className="wpt-select"
+                              value={normalizePermissionRole(draftWorkspaceRole)}
+                              onChange={(e) => setDraftWorkspaceRole(normalizePermissionRole(e.target.value))}
+                              style={{ maxWidth: 260 }}
+                            >
+                              {getAvailablePermissionRoles().map(r => <option key={r} value={r}>{formatRoleLabel(r)}</option>)}
+                            </select>
+                          </div>
+
+                          <div>
+                            <div style={{ fontSize:13, fontWeight:700, color:'var(--text-strong)', marginBottom:3 }}>Project Visibility & Role Assignment</div>
+                            <div style={{ fontSize:11.5, color:'var(--muted)' }}>Select which projects this user can access and assign a role for each project. Available roles come from Roles & Permissions in Settings.</div>
+                          </div>
+
+                          <div style={{ position: 'relative' }}>
+                            <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--muted2)', pointerEvents: 'none' }} />
+                            <input className="wpt-input" type="text" placeholder={`Search from ${workspaceProjects.length} workspace projects...`} value={drawerSearch} onChange={(e)=>setDrawerSearch(e.target.value)} style={{ width: '100%', paddingLeft: 30 }} />
+                          </div>
+
+                          <div style={{ background:'rgba(110,97,255,.08)', border:'1px solid rgba(110,97,255,.22)', borderRadius:6, padding:'10px 12px', fontSize:11.5, color:'var(--text-soft)', lineHeight:1.45 }}>
+                            <strong>Access rule:</strong> Assign projects explicitly to control visibility/access per user. Select a role from Roles & Permissions for each project assignment.
+                          </div>
+
+                          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', fontSize:10.5, fontWeight:700, textTransform:'uppercase', letterSpacing:'.05em', color:'var(--muted2)' }}>
+                            <span>Available Projects ({workspaceProjects.length})</span>
+                            <div style={{ display:'flex', gap:8 }}>
+                              <button type="button" style={{ background:'none', border:'none', color:'#a89cff', fontSize:11, fontWeight:600, cursor:'pointer' }} onClick={() => bulkDraftSelect(true)}>select all</button>
+                              <button type="button" style={{ background:'none', border:'none', color:'#a89cff', fontSize:11, fontWeight:600, cursor:'pointer' }} onClick={() => bulkDraftSelect(false)}>clear all</button>
+                            </div>
+                          </div>
+
+                          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                            {filteredDrawerProjects.length === 0 ? (
+                              <div style={{ fontSize:12, color:'var(--muted2)', padding:'8px 0' }}>No projects match this search.</div>
+                            ) : filteredDrawerProjects.map((proj) => {
+                              const assignment = draftAssignments.find(a => String(a.project_id) === String(proj.id))
+                              const checked = !!assignment
+                              const availableRoles = getAvailablePermissionRoles()
+                              const role = normalizePermissionRole(assignment?.role || defaultPermissionRoleForMember(drawerMember), availableRoles)
+                              return (
+                                <div key={proj.id} style={{ border:`1px solid ${checked ? 'rgba(110,97,255,.35)' : 'var(--border)'}`, borderRadius:8, padding:'10px 12px', display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:10, background: checked ? 'rgba(110,97,255,.06)' : 'var(--panel2)' }}>
+                                  <label style={{ display:'flex', alignItems:'flex-start', gap:10, cursor:'pointer', minWidth:0, flex:1 }}>
+                                    <input type="checkbox" className="wpt-cb" checked={checked} onChange={(e)=>toggleDraftProject(proj.id, e.target.checked)} style={{ marginTop:2 }} />
+                                    <div style={{ minWidth:0 }}>
+                                      <div style={{ fontSize:13, fontWeight:700, color:'var(--text-strong)', marginBottom:2 }}>{proj.name}</div>
+                                      <div style={{ fontSize:11, color:'var(--muted)' }}>{proj.status || 'active'}{proj.priority ? ` · ${proj.priority} priority` : ''}</div>
+                                      <div style={{ fontSize:10.5, color: checked ? '#20d96b' : 'var(--muted2)', marginTop:4 }}>{checked ? `✓ Access granted as ${formatRoleLabel(role)} (permissions from Roles & Permissions)` : 'No access currently granted'}</div>
+                                    </div>
+                                  </label>
+                                  <select className="wpt-select" value={role} disabled={!checked} onChange={(e)=>setDraftProjectRole(proj.id, e.target.value)} style={{ minWidth: 130, opacity: checked ? 1 : 0.6 }} title={checked ? 'Select a role from Roles & Permissions' : 'Enable access to assign role'}>
+                                    {availableRoles.map(r => <option key={r} value={r}>{formatRoleLabel(r)}</option>)}
+                                  </select>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </div>
+
+                        <div style={{ padding:'12px 16px', borderTop:'1px solid var(--border)', background:'var(--panel3)', display:'flex', justifyContent:'flex-end', gap:8 }}>
+                          <button type="button" className="btn" onClick={closeAccessDrawer} disabled={!!savingUserAccess}>Cancel</button>
+                          <button type="button" className="btn primary" onClick={saveDrawerChanges} disabled={!!savingUserAccess}>{savingUserAccess ? 'Saving…' : 'Apply & Save Access'}</button>
+                        </div>
+                      </aside>
+                    </>
+                  )}
+                </div>
+              )
+            })()}
           </div>
         </div>
 
@@ -400,13 +870,17 @@ export default function Workspaces() {
                   Created {new Date(ws.created_at).toLocaleDateString()}
                 </span>
                 <span style={{ flex: 1 }} />
-                <button className="icon-btn" title="Preview workspace" onClick={() => openPreview(ws)}><Eye size={12} /></button>
-                <button
-                  className="icon-btn"
-                  title="Delete workspace"
-                  style={{ color: '#ff6b6b' }}
-                  onClick={() => setConfirmDeleteWs(ws)}
-                ><Trash2 size={12} /></button>
+                {ws.role === 'owner' && (
+                  <>
+                    <button className="icon-btn" title="Preview workspace" onClick={() => openPreview(ws)}><Eye size={12} /></button>
+                    <button
+                      className="icon-btn"
+                      title="Delete workspace"
+                      style={{ color: '#ff6b6b' }}
+                      onClick={() => setConfirmDeleteWs(ws)}
+                    ><Trash2 size={12} /></button>
+                  </>
+                )}
               </div>
             </div>
           ))}
@@ -461,7 +935,7 @@ function CreateWorkspaceModal({ onCreate, onClose }) {
     setLoading(true)
     setError(null)
     try {
-      await onCreate(name.trim())
+      await onCreate(name.trim().slice(0, 16))
     } catch (err) {
       setError(err.message || 'Could not create workspace')
       setLoading(false)
@@ -503,7 +977,8 @@ function CreateWorkspaceModal({ onCreate, onClose }) {
             <input
               type="text"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              maxLength={16}
+              onChange={(e) => setName(e.target.value.slice(0, 16))}
               placeholder="e.g., Game Dev"
               style={{
                 width: '100%', padding: '8px 9px', border: '1px solid var(--border)',
@@ -512,6 +987,7 @@ function CreateWorkspaceModal({ onCreate, onClose }) {
               }}
               autoFocus
             />
+            <div style={{ marginTop: 6, fontSize: 11, color: 'var(--muted2)', textAlign: 'right' }}>{name.length}/16</div>
           </div>
 
           <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>

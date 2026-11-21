@@ -62,7 +62,8 @@ export default function ForgotPassword() {
 
       <main className="auth-wrapper">
         <div className="auth-logo" aria-label="Thoth">
-          <span>th</span><span className="accent">o</span><span>th</span>
+          <img src="/favicon.svg" alt="" />
+          <span className="auth-logo-text">Thoth</span>
         </div>
 
         <div className="auth-card-container">

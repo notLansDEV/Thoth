@@ -10,7 +10,7 @@ export class BugRepository extends BaseRepository {
    * Find bugs by project
    */
   async findByProject(projectId, filters = {}) {
-    let sql = 'SELECT * FROM bugs WHERE project_id = $1';
+    let sql = 'SELECT * FROM bugs WHERE project_id = $1 AND deleted_at IS NULL';
     const params = [projectId];
     let paramIndex = 2;
 
@@ -46,7 +46,7 @@ export class BugRepository extends BaseRepository {
    */
   async findByKanbanColumn(projectId, columnName) {
     return getMany(
-      'SELECT * FROM bugs WHERE project_id = $1 AND kanban_column = $2 ORDER BY created_at DESC',
+      'SELECT * FROM bugs WHERE project_id = $1 AND kanban_column = $2 AND deleted_at IS NULL ORDER BY created_at DESC',
       [projectId, columnName]
     );
   }
@@ -117,7 +117,7 @@ export class BugRepository extends BaseRepository {
         priority,
         COUNT(*) as count
       FROM bugs
-      WHERE project_id = $1
+      WHERE project_id = $1 AND deleted_at IS NULL
       GROUP BY status, priority
     `;
     return getMany(sql, [projectId]);
@@ -132,9 +132,30 @@ export class BugRepository extends BaseRepository {
        WHERE project_id = $1
          AND priority IN ('high', 'critical')
          AND status != 'resolved'
+         AND deleted_at IS NULL
        ORDER BY priority DESC, created_at DESC`,
       [projectId]
     );
+  }
+
+  async findDeletedByWorkspace(workspaceId) {
+    return getMany(
+      `SELECT b.*, p.name AS project_name, p.color AS project_color, u.username AS assignee_name
+       FROM bugs b
+       JOIN projects p ON b.project_id = p.id
+       LEFT JOIN users u ON b.assigned_to = u.id
+       WHERE p.workspace_id = $1 AND b.deleted_at IS NOT NULL
+       ORDER BY b.deleted_at DESC, b.created_at DESC`,
+      [workspaceId]
+    );
+  }
+
+  async softDeleteById(id) {
+    const rows = await getMany(
+      `UPDATE bugs SET deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = $1 AND deleted_at IS NULL RETURNING *`,
+      [id]
+    );
+    return rows[0] || null;
   }
 }
 

@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { getProjects, addProject, deleteProject } from '../features/projects/projects.service.js'
-import { getCurrentWorkspace } from '../features/workspaces/workspaces.service.js'
+import { getCurrentWorkspace, canWriteModule, canDeleteModule, getMembers } from '../features/workspaces/workspaces.service.js'
+import { getAccountUser } from '../features/auth/account.service.js'
 import ProjectForm from '../features/projects/components/ProjectForm.jsx'
 import ProjectCard from '../features/projects/components/ProjectCard.jsx'
 import EditProjectModal from '../features/projects/components/EditProjectModal.jsx'
 import ProjectDetail from '../features/projects/components/ProjectDetail.jsx'
+import ConfirmModal from '../components/ConfirmModal.jsx'
 
 function navigate(path) {
   window.history.pushState({}, '', path)
@@ -17,8 +19,43 @@ export default function Projects({ workspace, projectId }) {
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState(null)
   const [refreshKey, setRefreshKey] = useState(0)
+  const [members, setMembers] = useState([])
+  const [confirmDeleteProject, setConfirmDeleteProject] = useState(null)
+  const [deletingProject, setDeletingProject] = useState(false)
+  const canWrite = canWriteModule('projects')
+  const canDelete = canDeleteModule('projects')
 
   const ws = getCurrentWorkspace()
+  const user = getAccountUser()
+  const role = (ws?.role || '').toLowerCase()
+  const isWorkspaceOwner = role === 'owner'
+  const isWorkspaceAdmin = role === 'admin'
+
+  const creatorRole = (project) => {
+    if (!project?.created_by) return 'owner' // legacy treated as owner-managed by default
+    const m = (members || []).find((x) => String(x.id) === String(project.created_by))
+    return m?.role || null
+  }
+
+  const canDeleteProject = (project) => {
+    const uid = user?.id
+    if (!uid) return false
+
+    // Workspace owner can delete all created projects
+    if (isWorkspaceOwner) return true
+
+    // Admin can create/delete projects but cannot delete owner's projects
+    if (isWorkspaceAdmin) {
+      if (creatorRole(project) === 'owner') return false
+      return canDelete
+    }
+
+    // Members: respect module delete permission and allow deleting own non-owner projects only
+    if (!canDelete) return false
+    if (!project?.created_by) return false
+    if (creatorRole(project) === 'owner') return false
+    return String(project.created_by) === String(uid)
+  }
 
   useEffect(() => {
     if (projectId) return
@@ -26,8 +63,14 @@ export default function Projects({ workspace, projectId }) {
 
     async function loadProjects() {
       const current = getCurrentWorkspace()
-      const rows = await getProjects(current?.id || undefined)
-      if (alive) setProjects(rows)
+      const [rows, memberRows] = await Promise.all([
+        getProjects(current?.id || undefined),
+        current?.id ? getMembers(current.id).catch(() => []) : Promise.resolve([]),
+      ])
+      if (alive) {
+        setProjects(rows)
+        setMembers(memberRows || [])
+      }
     }
 
     loadProjects()
@@ -36,6 +79,22 @@ export default function Projects({ workspace, projectId }) {
       alive = false
     }
   }, [workspace, projectId])
+
+  useEffect(() => {
+    if (projectId) return
+    const syncNew = () => {
+      const params = new URLSearchParams(window.location.search)
+      if (params.get('new') === '1' && canWrite) {
+        setShowForm(true)
+        params.delete('new')
+        const next = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ''}`
+        window.history.replaceState({}, '', next)
+      }
+    }
+    syncNew()
+    window.addEventListener('popstate', syncNew)
+    return () => window.removeEventListener('popstate', syncNew)
+  }, [projectId, canWrite, workspace])
 
   const openProject = (project) => {
     const slug = ws?.slug || ws?.name?.toLowerCase().replace(/[^a-z0-9]+/g, '-') || 'ws'
@@ -60,13 +119,23 @@ export default function Projects({ workspace, projectId }) {
     setRefreshKey((k) => k + 1)
   }
 
-  const handleDelete = async (project) => {
-    if (!window.confirm(`Delete project "${project.name}"? This cannot be undone.`)) return
+  const handleDelete = (project) => {
+    if (!canDeleteProject(project)) return
+    setConfirmDeleteProject(project)
+  }
+
+  const handleConfirmDeleteProject = async () => {
+    if (!confirmDeleteProject) return
+    setDeletingProject(true)
     try {
-      await deleteProject(project.id)
-      setProjects((current) => current.filter((p) => p.id !== project.id))
-    } catch {
-      toast.error('Could not delete project')
+      await deleteProject(confirmDeleteProject.id)
+      setProjects((current) => current.filter((p) => p.id !== confirmDeleteProject.id))
+      toast.success('Project deleted')
+      setConfirmDeleteProject(null)
+    } catch (err) {
+      toast.error(err?.message || 'Could not delete project')
+    } finally {
+      setDeletingProject(false)
     }
   }
 
@@ -93,13 +162,15 @@ export default function Projects({ workspace, projectId }) {
           <h1 style={{ margin: '0 0 4px 0', fontSize: '20px', fontWeight: '700' }}>Projects</h1>
           <p style={{ margin: '0', color: 'var(--muted)', fontSize: '12px' }}>Manage and track your projects</p>
         </div>
-        <button
-          onClick={() => setShowForm(true)}
-          className="btn primary"
-          style={{ cursor: 'pointer' }}
-        >
-          + New Project
-        </button>
+        {canWrite && (
+          <button
+            onClick={() => setShowForm(true)}
+            className="btn primary"
+            style={{ cursor: 'pointer' }}
+          >
+            + New Project
+          </button>
+        )}
       </div>
 
       {projects.length === 0 ? (
@@ -117,6 +188,8 @@ export default function Projects({ workspace, projectId }) {
             <ProjectCard
               key={project.id}
               project={project}
+              canWrite={canWrite}
+              canDelete={canDeleteProject(project)}
               onView={openProject}
               onEdit={setEditing}
               onDelete={handleDelete}
@@ -137,6 +210,19 @@ export default function Projects({ workspace, projectId }) {
           project={editing}
           onSaved={handleUpdated}
           onClose={() => setEditing(null)}
+        />
+      )}
+
+      {confirmDeleteProject && (
+        <ConfirmModal
+          title={`Delete project "${confirmDeleteProject.name}"?`}
+          message="This permanently deletes the project and its related data."
+          note="* This action cannot be undone."
+          confirmLabel="Delete project"
+          requiredText="DELETE PROJECT"
+          busy={deletingProject}
+          onConfirm={handleConfirmDeleteProject}
+          onCancel={() => { if (!deletingProject) setConfirmDeleteProject(null) }}
         />
       )}
     </div>

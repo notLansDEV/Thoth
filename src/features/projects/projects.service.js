@@ -91,9 +91,22 @@ export async function getProjectMembers(projectId) {
   return apiRequest(`/projects/${encodeURIComponent(projectId)}/members`)
 }
 
-export async function setProjectMembers(projectId, memberIds) {
+export async function setProjectMembers(projectId, memberIdsOrEntries) {
+  const isEntryArray = Array.isArray(memberIdsOrEntries) && memberIdsOrEntries.some(v => v && typeof v === 'object')
   return apiRequest(`/projects/${encodeURIComponent(projectId)}/members`, {
     method: 'PUT',
-    body: JSON.stringify({ member_ids: memberIds }),
+    body: JSON.stringify(isEntryArray ? { members: memberIdsOrEntries } : { member_ids: memberIdsOrEntries }),
+  })
+}
+
+export async function getWorkspaceProjectMemberships(workspaceId) {
+  if (!workspaceId) return []
+  return apiRequest(`/workspaces/${encodeURIComponent(workspaceId)}/project-memberships`)
+}
+
+export async function setUserProjectMemberships(workspaceId, userId, assignments) {
+  return apiRequest(`/workspaces/${encodeURIComponent(workspaceId)}/members/${encodeURIComponent(userId)}/project-memberships`, {
+    method: 'PUT',
+    body: JSON.stringify({ assignments }),
   })
 }

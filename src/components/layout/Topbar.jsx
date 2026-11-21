@@ -2,8 +2,10 @@
 import { LogOut, Menu, PanelLeftClose, ChevronDown, Bell, Sun, Moon } from 'lucide-react'
 import {
   getCurrentWorkspace,
-  setCurrentWorkspace,
-  getWorkspaces,
+  getProjectRole,
+  refreshMyProjectMemberships,
+  getSelectedProjectId,
+  setSelectedProjectId,
 } from '../../features/workspaces/workspaces.service.js'
 import { getProjects } from '../../features/projects/projects.service.js'
 import {
@@ -54,21 +56,22 @@ function logout() {
 export default function Topbar({ collapsed, onToggleCollapse }) {
   const ws = getCurrentWorkspace()
   const user = getUser()
-  const [wsOpen, setWsOpen] = useState(false)
-  const [wsList, setWsList] = useState(null)
   const [profileOpen, setProfileOpen] = useState(false)
   const [notifOpen, setNotifOpen] = useState(false)
+  const [projOpen, setProjOpen] = useState(false)
+  const [projList, setProjList] = useState([])
   const [notifications, setNotifications] = useState([])
   const [unread, setUnread] = useState(0)
   const [theme, setTheme] = useState(() => getSettings().theme)
+  const [selectedProjectId, setSelectedProjectIdState] = useState(() => getSelectedProjectId(getCurrentWorkspace()?.id))
   const menuRef = useRef(null)
 
   useEffect(() => {
     function onDocClick(e) {
       if (menuRef.current && !menuRef.current.contains(e.target)) {
-        setWsOpen(false)
         setProfileOpen(false)
         setNotifOpen(false)
+        setProjOpen(false)
       }
     }
     document.addEventListener('mousedown', onDocClick)
@@ -117,19 +120,61 @@ export default function Topbar({ collapsed, onToggleCollapse }) {
     saveSettings({ theme: next })
   }
 
-  async function toggleWsMenu() {
-    const next = !wsOpen
-    setWsOpen(next)
+
+  function pickDefaultProjectId(list, wsId) {
+    const rows = Array.isArray(list) ? list : []
+    if (rows.length === 0) return null
+    const cur = getSelectedProjectId(wsId)
+    if (cur && rows.some((p) => String(p.id) === String(cur))) return cur
+    if (rows.length === 1) return rows[0].id
+    const alpha = [...rows].sort((a, b) => String(a?.name || '').localeCompare(String(b?.name || ''), undefined, { sensitivity: 'base' }))
+    return alpha[0]?.id || rows[0]?.id || null
+  }
+
+  async function loadProjectsAndResolveDefault() {
+    const wsId = getCurrentWorkspace()?.id
+    if (!wsId) {
+      setProjList([])
+      setSelectedProjectIdState(null)
+      return
+    }
+    try {
+      await refreshMyProjectMemberships(wsId).catch(() => {})
+      const rows = await getProjects(wsId)
+      const list = Array.isArray(rows) ? rows : []
+      setProjList(list)
+      const nextId = pickDefaultProjectId(list, wsId)
+      const cur = getSelectedProjectId(wsId)
+      if (nextId) {
+        if (String(cur || '') !== String(nextId)) setSelectedProjectId(nextId, wsId)
+        setSelectedProjectIdState(nextId)
+      } else {
+        if (cur) setSelectedProjectId(null, wsId)
+        setSelectedProjectIdState(null)
+      }
+    } catch {
+      setProjList([])
+    }
+  }
+
+  async function toggleProjMenu() {
+    const next = !projOpen
+    setProjOpen(next)
     setProfileOpen(false)
     setNotifOpen(false)
-    if (next && wsList === null) {
-      try {
-        const rows = await getWorkspaces()
-        setWsList(Array.isArray(rows) ? rows : [])
-      } catch {
-        setWsList([])
-      }
+    if (next) {
+      await loadProjectsAndResolveDefault()
     }
+  }
+
+  function selectProject(projectId) {
+    const wsId = getCurrentWorkspace()?.id
+    setSelectedProjectId(projectId, wsId)
+    setSelectedProjectIdState(projectId)
+    setProjOpen(false)
+    window.dispatchEvent(new CustomEvent('thoth:project-changed', { detail: { projectId, workspaceId: wsId } }))
+    // Navigate to dashboard so module/sidebar permissions re-evaluate in project context
+    navigate(`/Thoth/${ws?.slug || 'default'}/dashboard`)
   }
 
   const parts = window.location.pathname.split('/').filter(Boolean)
@@ -138,6 +183,20 @@ export default function Topbar({ collapsed, onToggleCollapse }) {
   const pageKey = parts[1] || parts[0] || 'dashboard'
   const subSeg = parts[2] || null
   const pageLabel = PAGE_LABELS[pageKey] || pageKey
+
+  useEffect(() => {
+    setSelectedProjectIdState(getSelectedProjectId(getCurrentWorkspace()?.id))
+  }, [ws?.id, pageKey, subSeg])
+
+  useEffect(() => {
+    let alive = true
+    ;(async () => {
+      if (!alive) return
+      await loadProjectsAndResolveDefault()
+    })()
+    return () => { alive = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ws?.id])
 
   // Resolve the crumb tail: project name on detail pages, otherwise sub-page label
   const [projectName, setProjectName] = useState(null)
@@ -210,50 +269,53 @@ export default function Topbar({ collapsed, onToggleCollapse }) {
       </div>
 
       <div className="top-right" ref={menuRef}>
-        {/* Workspace switcher */}
+        {/* Project switcher */}
         <div style={{ position: 'relative' }}>
+          {(() => {
+            const activeProjectId = selectedProjectId || (pageKey === 'projects' ? subSeg : null)
+            const activeProject = projList.find(p => String(p.id) === String(activeProjectId))
+              || (pageKey === 'projects' && subSeg && projectName ? { id: subSeg, name: projectName } : null)
+            return (
           <button
             className="btn ws-btn"
-            onClick={toggleWsMenu}
-            title="Switch workspace"
+            onClick={toggleProjMenu}
+            title="Switch project"
             aria-haspopup="menu"
-            aria-expanded={wsOpen}
+            aria-expanded={projOpen}
+            style={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
           >
-            <span className="dot purple" />
-            {ws ? ws.name : 'No workspace'}
+            <span className="dot" style={{ background: activeProject ? (activeProject.color || '#6e61ff') : 'var(--muted2)' }} />
+            {activeProject?.name || 'Select project'}
             <span style={{ fontSize: '8px', color: 'var(--muted2)' }}><ChevronDown size={10} /></span>
           </button>
-          {wsOpen && (
-            <div className="dropdown-menu" role="menu">
-              <div className="dropdown-head">Workspaces</div>
-              {wsList === null && <div className="dropdown-empty">Loading…</div>}
-              {Array.isArray(wsList) && wsList.length === 0 && (
-                <div className="dropdown-empty">No workspaces yet</div>
-              )}
-              {Array.isArray(wsList) && wsList.map((w) => (
-                <button
-                  key={w.id}
-                  className={`dropdown-item${ws?.id === w.id ? ' active' : ''}`}
-                  onClick={() => {
-                    setWsOpen(false)
-                    if (ws?.id !== w.id) {
-                      setCurrentWorkspace(w)
-                      navigate('/dashboard')
-                    }
-                  }}
-                >
-                  <span className="dot purple" />
-                  {w.name}
-                </button>
-              ))}
-              {Array.isArray(wsList) && (
-                <button
-                  className="dropdown-item"
-                  onClick={() => { setWsOpen(false); navigate('/workspaces') }}
-                >
-                  + New workspace
-                </button>
-              )}
+            )
+          })()}
+          {projOpen && (
+            <div className="dropdown-menu" role="menu" style={{ minWidth: 220 }}>
+              <div className="dropdown-head">Projects</div>
+              {projList.length === 0 && <div className="dropdown-empty">No accessible projects</div>}
+              {projList.map((p) => {
+                const projectRole = getProjectRole?.(p.id, ws)
+                const active = String(selectedProjectId || (pageKey === 'projects' ? subSeg : '')) === String(p.id)
+                return (
+                  <button
+                    key={p.id}
+                    className={`dropdown-item${active ? ' active' : ''}`}
+                    onClick={() => selectProject(p.id)}
+                    style={{ alignItems: 'center', justifyContent: 'space-between', gap: 8 }}
+                  >
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                      <span className="dot" style={{ background: p.color || '#6e61ff', flexShrink: 0 }} />
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</span>
+                    </span>
+                    {projectRole && (
+                      <span style={{ fontSize: 9, color: 'var(--muted2)', textTransform: 'uppercase', letterSpacing: '.04em', flexShrink: 0 }}>
+                        {String(projectRole).replace(/[_-]+/g, ' ')}
+                      </span>
+                    )}
+                  </button>
+                )
+              })}
             </div>
           )}
         </div>
@@ -261,7 +323,7 @@ export default function Topbar({ collapsed, onToggleCollapse }) {
         {/* Theme toggle */}
         <button
           className="notif-btn"
-          onClick={() => { toggleTheme(); setWsOpen(false); setNotifOpen(false); setProfileOpen(false) }}
+          onClick={() => { toggleTheme(); setProjOpen(false); setNotifOpen(false); setProfileOpen(false) }}
           aria-label={resolvedTheme() === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
           title={resolvedTheme() === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
         >
@@ -275,7 +337,7 @@ export default function Topbar({ collapsed, onToggleCollapse }) {
             onClick={() => {
               const next = !notifOpen
               setNotifOpen(next)
-              setWsOpen(false)
+              setProjOpen(false)
               setProfileOpen(false)
               if (next) refreshNotifications()
             }}
@@ -319,7 +381,7 @@ export default function Topbar({ collapsed, onToggleCollapse }) {
         <div style={{ position: 'relative' }}>
           <button
             className="profile-btn"
-            onClick={() => { setProfileOpen(!profileOpen); setWsOpen(false); setNotifOpen(false) }}
+            onClick={() => { setProfileOpen(!profileOpen); setProjOpen(false); setNotifOpen(false) }}
             aria-haspopup="menu"
             aria-expanded={profileOpen}
             title={name}

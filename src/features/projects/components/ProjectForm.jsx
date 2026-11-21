@@ -30,9 +30,10 @@ export default function ProjectForm({ onSubmit, onCancel }) {
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    if (!name.trim()) return
+    const trimmedName = name.trim().slice(0, 16)
+    if (!trimmedName) return
     onSubmit({
-      name: name.trim(),
+      name: trimmedName,
       description: description.trim(),
       status,
       start_date: startDate || null,
@@ -75,11 +76,13 @@ export default function ProjectForm({ onSubmit, onCancel }) {
             <input
               type="text"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              maxLength={16}
+              onChange={(e) => setName(e.target.value.slice(0, 16))}
               placeholder="e.g., My Awesome Project"
               style={inputStyle}
               autoFocus
             />
+            <div style={{ marginTop: 6, fontSize: 11, color: 'var(--muted2)', textAlign: 'right' }}>{name.length}/16</div>
           </div>
 
           <div style={{ marginBottom: '14px' }}>
