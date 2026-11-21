@@ -13,7 +13,7 @@ import {
 } from '../features/bugs/bugs.service.js'
 import { priorityStyle } from '../features/tasks/tasks.service.js'
 import { getProjects } from '../features/projects/projects.service.js'
-import { getCurrentWorkspace, canWriteModule, canDeleteModule, canWriteProjectModule, canDeleteProjectModule, canAccessProject, getSelectedProjectId } from '../features/workspaces/workspaces.service.js'
+import { getCurrentWorkspace, canWriteModule, canDeleteModule, canWriteProjectModule, canDeleteProjectModule, canAccessProject, getSelectedProjectId, setSelectedProjectId } from '../features/workspaces/workspaces.service.js'
 import StageBoard from '../components/StageBoard.jsx'
 import ConfirmModal from '../components/ConfirmModal.jsx'
 import ListToolbar from '../components/ListToolbar.jsx'
@@ -421,13 +421,21 @@ export default function Bugs({ subPage }) {
 
       {showReport && (
         <ReportBugModal
-          projects={projects}
+          projects={accessibleProjects.filter(p => canWriteBugProject(p.id))}
           workspaceId={ws?.id}
           stages={stages}
           defaultStageName={defaultStageName}
+          defaultProjectId={activeProjectId || accessibleProjects[0]?.id}
           onCreated={(bug) => {
             setBugs((current) => [bug, ...current])
             setShowReport(false)
+            const wsId = getCurrentWorkspace()?.id
+            if (bug?.project_id && String(selectedProjectId || '') !== String(bug.project_id)) {
+              setSelectedProjectId(bug.project_id, wsId)
+              setSelectedProjectIdState(bug.project_id)
+              setProjectFilter(bug.project_id)
+              window.dispatchEvent(new CustomEvent('thoth:project-changed', { detail: { projectId: bug.project_id, workspaceId: wsId } }))
+            }
             toast.success(`Bug "${bug.title || 'Untitled'}" has been added`)
           }}
           onClose={() => setShowReport(false)}

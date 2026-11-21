@@ -53,8 +53,8 @@ function fileIcon(name) {
   return <Paperclip size={13} />
 }
 
-export default function ReportBugModal({ projects, workspaceId, stages, defaultStageName, onCreated, onClose }) {
-  const [projectId, setProjectId] = useState(projects[0]?.id || '')
+export default function ReportBugModal({ projects, workspaceId, stages, defaultStageName, defaultProjectId, onCreated, onClose }) {
+  const [projectId, setProjectId] = useState(defaultProjectId || projects[0]?.id || '')
   const [milestoneId, setMilestoneId] = useState('')
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
