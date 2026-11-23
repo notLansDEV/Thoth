@@ -67,7 +67,9 @@ ALTER TABLE md_pages ADD COLUMN IF NOT EXISTS comments JSONB DEFAULT '[]';
 ALTER TABLE md_pages ADD COLUMN IF NOT EXISTS attachments JSONB DEFAULT '[]';
 ALTER TABLE md_pages ADD COLUMN IF NOT EXISTS pinned BOOLEAN DEFAULT FALSE;
 ALTER TABLE md_pages ADD COLUMN IF NOT EXISTS archived BOOLEAN DEFAULT FALSE;
+ALTER TABLE md_pages ADD COLUMN IF NOT EXISTS project_id UUID REFERENCES projects(id) ON DELETE SET NULL;
 CREATE INDEX IF NOT EXISTS idx_md_pages_workspace ON md_pages(workspace_id);
+CREATE INDEX IF NOT EXISTS idx_md_pages_project ON md_pages(project_id);
 CREATE INDEX IF NOT EXISTS idx_md_pages_updated ON md_pages(updated_at DESC);
 
 -- Milestones Table

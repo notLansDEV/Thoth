@@ -17,23 +17,25 @@ async function apiRequest(path, options = {}) {
   return data
 }
 
-export async function getPages(workspaceId) {
+export async function getPages(workspaceId, projectId) {
   if (!workspaceId) return []
-  return apiRequest(`/md-pages?workspace_id=${encodeURIComponent(workspaceId)}`)
+  const q = new URLSearchParams({ workspace_id: workspaceId })
+  if (projectId) q.set('project_id', projectId)
+  return apiRequest(`/md-pages?${q.toString()}`)
 }
 
-export async function getPageByDate(workspaceId, date) {
+export async function getPageByDate(workspaceId, date, projectId) {
   if (!workspaceId) return null
-  const rows = await apiRequest(
-    `/md-pages?workspace_id=${encodeURIComponent(workspaceId)}&type=journal&page_date=${encodeURIComponent(date)}`
-  )
+  const q = new URLSearchParams({ workspace_id: workspaceId, type: 'journal', page_date: date })
+  if (projectId) q.set('project_id', projectId)
+  const rows = await apiRequest(`/md-pages?${q.toString()}`)
   return Array.isArray(rows) && rows.length > 0 ? rows[0] : null
 }
 
-export async function createPage(workspaceId, { title, content, page_type, page_date, attachments }) {
+export async function createPage(workspaceId, { title, content, page_type, page_date, attachments, project_id }) {
   return apiRequest('/md-pages', {
     method: 'POST',
-    body: JSON.stringify({ workspace_id: workspaceId, title, content, page_type, page_date, attachments }),
+    body: JSON.stringify({ workspace_id: workspaceId, title, content, page_type, page_date, attachments, project_id }),
   })
 }
 

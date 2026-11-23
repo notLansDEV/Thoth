@@ -544,10 +544,14 @@ app.delete('/api/milestones/:id', auth, async (req, res) => {
 
 app.get('/api/md-pages', auth, async (req, res) => {
   try {
-    const { workspace_id, type, page_date } = req.query
+    const { workspace_id, type, page_date, project_id } = req.query
     if (!workspace_id) return res.status(400).json({ error: 'workspace_id is required' })
     let sql = 'SELECT * FROM md_pages WHERE workspace_id = $1'
     const params = [workspace_id]
+    if (project_id) {
+      params.push(project_id)
+      sql += ` AND project_id = $${params.length}`
+    }
     if (type) {
       params.push(type)
       sql += ` AND page_type = $${params.length}`
@@ -567,11 +571,11 @@ app.get('/api/md-pages', auth, async (req, res) => {
 
 app.post('/api/md-pages', auth, async (req, res) => {
   try {
-    const { workspace_id, title, content, page_type, page_date, attachments } = req.body
+    const { workspace_id, title, content, page_type, page_date, attachments, project_id } = req.body
     if (!workspace_id) return res.status(400).json({ error: 'workspace_id is required' })
     const created = await getOne(
-      `INSERT INTO md_pages (workspace_id, title, content, page_type, page_date, attachments, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `INSERT INTO md_pages (workspace_id, title, content, page_type, page_date, attachments, created_by, project_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING *`,
       [
         workspace_id,
@@ -581,6 +585,7 @@ app.post('/api/md-pages', auth, async (req, res) => {
         page_date || null,
         attachments ? JSON.stringify(attachments) : '[]',
         req.user.id,
+        project_id || null,
       ]
     )
     res.status(201).json(created)

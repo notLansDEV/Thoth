@@ -7,7 +7,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { getPages, createPage, updatePage, deletePage } from '../features/markdown/markdown.service.js'
-import { getCurrentWorkspace } from '../features/workspaces/workspaces.service.js'
+import { getCurrentWorkspace, getSelectedProjectId } from '../features/workspaces/workspaces.service.js'
 import { getWorkspaceMembers } from '../features/tasks/tasks.service.js'
 import ConfirmModal from '../components/ConfirmModal.jsx'
 
@@ -230,6 +230,7 @@ export default function Markdown({ subPage }) {
   const ws = getCurrentWorkspace()
   const wsId = ws?.id
   const view = subPage === 'pages' ? 'pages' : 'journal'
+  const [selectedProjectId, setSelectedProjectIdState] = useState(() => getSelectedProjectId(wsId) || '')
 
   const [pages, setPages] = useState([])
   const [loaded, setLoaded] = useState(false)
@@ -239,10 +240,30 @@ export default function Markdown({ subPage }) {
   const [showNewPage, setShowNewPage] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(null)
 
+  useEffect(() => {
+    setSelectedProjectIdState(getSelectedProjectId(wsId) || '')
+    const onProjectChanged = (event) => {
+      const detail = event?.detail || {}
+      if (detail.workspaceId && String(detail.workspaceId) !== String(wsId || '')) return
+      setSelectedProjectIdState(detail.projectId || getSelectedProjectId(wsId) || '')
+    }
+    window.addEventListener('thoth:project-changed', onProjectChanged)
+    return () => window.removeEventListener('thoth:project-changed', onProjectChanged)
+  }, [wsId])
+
   async function refresh() {
-    if (!wsId) return
+    if (!wsId) {
+      setPages([])
+      setLoaded(true)
+      return
+    }
+    if (!selectedProjectId) {
+      setPages([])
+      setLoaded(true)
+      return
+    }
     try {
-      const rows = await getPages(wsId)
+      const rows = await getPages(wsId, selectedProjectId)
       setPages(Array.isArray(rows) ? rows : [])
     } catch {
       setPages([])
@@ -251,7 +272,7 @@ export default function Markdown({ subPage }) {
     }
   }
 
-  useEffect(() => { refresh() }, [wsId])
+  useEffect(() => { refresh() }, [wsId, selectedProjectId])
 
   // author lookup for feed cards
   const [authors, setAuthors] = useState({})
@@ -305,7 +326,7 @@ export default function Markdown({ subPage }) {
       return
     }
     try {
-      const page = await createPage(wsId, { title: title || 'Untitled', page_type: 'page', content: '' })
+      const page = await createPage(wsId, { title: title || 'Untitled', page_type: 'page', content: '', project_id: selectedProjectId || null })
       setPages((prev) => [page, ...prev])
       setOpenPage(page)
       setShowNewPage(false)
@@ -400,6 +421,7 @@ export default function Markdown({ subPage }) {
               <Composer
                 dateStr={jDate}
                 wsId={wsId}
+                projectId={selectedProjectId}
                 focusMode={focusMode}
                 showToolbar={showToolbar}
                 onToggleFocus={() => { setFocusPage('new'); setFocusMode(true) }}
@@ -451,6 +473,7 @@ export default function Markdown({ subPage }) {
             key={focusPage === 'new' ? 'focus-new' : `focus-${focusPage.id}`}
             dateStr={jDate}
             wsId={wsId}
+            projectId={selectedProjectId}
             focusMode={true}
             showToolbar={showToolbar}
             onToggleFocus={() => {}}
@@ -1274,7 +1297,7 @@ function formatBytes(bytes) {
 }
 
 // ---------- composer ----------
-function Composer({ dateStr, wsId, focusMode, showToolbar, onToggleFocus, onToggleToolbar, onCreated, editPage, onExitFocus, onPatchPage }) {
+function Composer({ dateStr, wsId, projectId, focusMode, showToolbar, onToggleFocus, onToggleToolbar, onCreated, editPage, onExitFocus, onPatchPage }) {
   const [text, setText] = useState(editPage?.content || '')
   const [atts, setAtts] = useState([])
   const [menuOpen, setMenuOpen] = useState(false)
@@ -1340,6 +1363,7 @@ function Composer({ dateStr, wsId, focusMode, showToolbar, onToggleFocus, onTogg
           content: text,
           page_type: 'journal',
           page_date: dateStr,
+          project_id: projectId || null,
           ...(atts.length ? { attachments: atts } : {}),
         })
         setAtts([])
