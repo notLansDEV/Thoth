@@ -1,15 +1,16 @@
 import { useState } from 'react'
 
-export default function ConfirmModal({ title, message, note, confirmLabel = 'Delete', busy, onConfirm, onCancel, requiredText = '' }) {
+export default function ConfirmModal({ title, message, note, confirmLabel = 'Delete', busy, onConfirm, onCancel, requiredText = '', tone = 'danger' }) {
   const [confirmText, setConfirmText] = useState('')
   const needsText = String(requiredText || '').trim().length > 0
   const canConfirm = !busy && (!needsText || confirmText.trim().toLowerCase() === String(requiredText).trim().toLowerCase())
+  const confirmBg = tone === 'danger' ? '#ff4040' : 'var(--accent, #6e61ff)'
 
   return (
     <div onClick={busy ? undefined : onCancel} style={{
       position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
       background: 'rgba(0,0,0,0.6)', display: 'flex',
-      alignItems: 'center', justifyContent: 'center', zIndex: 1200,
+      alignItems: 'center', justifyContent: 'center', zIndex: 1400,
     }}>
       <div onClick={(e) => e.stopPropagation()} style={{
         background: 'var(--panel2)', border: '1px solid var(--border)', borderRadius: '6px',
@@ -43,7 +44,7 @@ export default function ConfirmModal({ title, message, note, confirmLabel = 'Del
 
         <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '18px' }}>
           <button className="btn" onClick={onCancel} disabled={busy} style={{ cursor: 'pointer' }}>No</button>
-          <button className="btn primary" onClick={onConfirm} disabled={!canConfirm} style={{ cursor: canConfirm ? 'pointer' : 'not-allowed', background: '#ff4040', opacity: canConfirm ? 1 : 0.6 }}>
+          <button className="btn primary" onClick={onConfirm} disabled={!canConfirm} style={{ cursor: canConfirm ? 'pointer' : 'not-allowed', background: confirmBg, opacity: canConfirm ? 1 : 0.6 }}>
             {busy ? 'Working…' : `Yes, ${confirmLabel}`}
           </button>
         </div>

@@ -395,11 +395,68 @@ export default function Settings() {
   const [archiveHoverId, setArchiveHoverId] = useState(null)
   const [archiveDetail, setArchiveDetail] = useState(null)
   const [archiveDetailLoading, setArchiveDetailLoading] = useState(false)
-  const [archiveDetailData, setArchiveDetailData] = useState({ tasks: [], bugs: [] })
+  const [archiveDetailData, setArchiveDetailData] = useState({ tasks: [], bugs: [], pages: [], attachments: [] })
+  const [expandedArchiveId, setExpandedArchiveId] = useState(null)
+  const [expandedArchiveLoading, setExpandedArchiveLoading] = useState(false)
+  const [expandedArchiveData, setExpandedArchiveData] = useState({ tasks: [], bugs: [], pages: [], attachments: [] })
+  const [confirmRecoverProject, setConfirmRecoverProject] = useState(null)
+  const [recoveringArchive, setRecoveringArchive] = useState(false)
+  const [archiveViewItem, setArchiveViewItem] = useState(null) // { kind, data }
+
+  async function handleRecoverProject() {
+    if (!confirmRecoverProject?.id || !ws?.id) return
+    setRecoveringArchive(true)
+    try {
+      const token = localStorage.getItem('token')
+      const res = await fetch(`/api/archive/projects/${encodeURIComponent(confirmRecoverProject.id)}/recover`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ workspace_id: ws.id }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || 'Failed to recover project')
+      toast.success(`Project "${confirmRecoverProject.name || 'Project'}" recovered`)
+      setConfirmRecoverProject(null)
+      setArchiveDetail(null)
+      setExpandedArchiveId(null)
+      setArchiveRows((rows) => rows.filter((r) => String(r.id) !== String(confirmRecoverProject.id)))
+    } catch (err) {
+      console.error('Recover project failed:', err)
+      toast.error(err.message || 'Failed to recover project')
+    } finally {
+      setRecoveringArchive(false)
+    }
+  }
+
+  async function toggleArchiveExpand(row) {
+    const id = row?.id
+    if (!id) return
+    if (String(expandedArchiveId) === String(id)) {
+      setExpandedArchiveId(null)
+      return
+    }
+    setExpandedArchiveId(id)
+    setExpandedArchiveData({ tasks: [], bugs: [], pages: [], attachments: [] })
+    if (!ws?.id) return
+    setExpandedArchiveLoading(true)
+    try {
+      const token = localStorage.getItem('token')
+      const res = await fetch(`/api/archive/projects/${encodeURIComponent(id)}/details?workspace_id=${encodeURIComponent(ws.id)}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!res.ok) throw new Error('Failed to load archive details')
+      const data = await res.json()
+      setExpandedArchiveData({ tasks: Array.isArray(data.tasks) ? data.tasks : [], bugs: Array.isArray(data.bugs) ? data.bugs : [], pages: Array.isArray(data.pages) ? data.pages : [], attachments: Array.isArray(data.attachments) ? data.attachments : [] })
+    } catch (err) {
+      console.error('Archive expand load failed:', err)
+    } finally {
+      setExpandedArchiveLoading(false)
+    }
+  }
 
   async function openArchiveDetail(row) {
     setArchiveDetail(row)
-    setArchiveDetailData({ tasks: [], bugs: [] })
+    setArchiveDetailData({ tasks: [], bugs: [], pages: [], attachments: [] })
     if (!ws?.id || !row?.id) return
     setArchiveDetailLoading(true)
     try {
@@ -409,7 +466,7 @@ export default function Settings() {
       })
       if (!res.ok) throw new Error('Failed to load archive details')
       const data = await res.json()
-      setArchiveDetailData({ tasks: Array.isArray(data.tasks) ? data.tasks : [], bugs: Array.isArray(data.bugs) ? data.bugs : [] })
+      setArchiveDetailData({ tasks: Array.isArray(data.tasks) ? data.tasks : [], bugs: Array.isArray(data.bugs) ? data.bugs : [], pages: Array.isArray(data.pages) ? data.pages : [], attachments: Array.isArray(data.attachments) ? data.attachments : [] })
     } catch (err) {
       console.error('Archive detail load failed:', err)
     } finally {
@@ -2280,28 +2337,80 @@ export default function Settings() {
                   <div style={{ display: 'flex', flexDirection: 'column' }}>
                     {archiveRows.map((row, idx) => {
                       const isHover = String(archiveHoverId) === String(row.id)
+                      const isExpanded = String(expandedArchiveId) === String(row.id)
+                      const detailRows = isExpanded ? [
+                        ...(expandedArchiveData.tasks || []).map(t => ({ type: 'Task', id: t.task_code || t.id, title: t.title, status: t.status, assignee: t.assignee_name, attachments: Array.isArray(t.meta?.attachments) ? t.meta.attachments : [], deleted_at: t.deleted_at, created_at: t.created_at })),
+                        ...(expandedArchiveData.bugs || []).map(b => ({ type: 'Bug', id: b.bug_id || b.id, title: b.title, status: b.status || b.kanban_column, assignee: b.assignee_name, attachments: Array.isArray(b.attachments) ? b.attachments : (typeof b.attachments === 'string' ? (() => { try { const v=JSON.parse(b.attachments); return Array.isArray(v)?v:[] } catch { return [] } })() : []), deleted_at: b.deleted_at, created_at: b.created_at })),
+                      ].sort((a,b) => new Date(b.deleted_at || b.created_at || 0) - new Date(a.deleted_at || a.created_at || 0)) : []
                       return (
-                        <div
-                          key={String(row.id || idx)}
-                          onMouseEnter={() => setArchiveHoverId(row.id)}
-                          onMouseLeave={() => setArchiveHoverId(null)}
-                          style={{ padding: '10px 12px', borderBottom: idx === archiveRows.length - 1 ? 'none' : '1px solid var(--border-soft, var(--border))', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, background: isHover ? 'var(--panel3)' : 'transparent' }}
-                        >
-                          <div style={{ minWidth: 0, flex: 1 }}>
-                            <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-strong)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.name || 'Untitled project'}</div>
-                            <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {(row.status || 'project')}{row.deleted_at ? ` • Deleted ${new Date(row.deleted_at).toLocaleString()}` : ''}
+                        <div key={String(row.id || idx)} style={{ borderBottom: idx === archiveRows.length - 1 ? 'none' : '1px solid var(--border-soft, var(--border))', background: isHover || isExpanded ? 'var(--panel3)' : 'transparent' }}>
+                          <div
+                            onMouseEnter={() => setArchiveHoverId(row.id)}
+                            onMouseLeave={() => setArchiveHoverId(null)}
+                            style={{ padding: '10px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, cursor: 'pointer' }}
+                            onClick={() => toggleArchiveExpand(row)}
+                          >
+                            <div style={{ minWidth: 0, flex: 1 }}>
+                              <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-strong)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.name || 'Untitled project'}</div>
+                              <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {(row.status || 'project')}{row.deleted_at ? ` • Deleted ${new Date(row.deleted_at).toLocaleString()}` : ''}
+                              </div>
+                            </div>
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                              <button
+                                type="button"
+                                className="icon-btn"
+                                title="View details"
+                                onClick={(e) => { e.stopPropagation(); openArchiveDetail(row) }}
+                                style={{ width: 28, height: 28, opacity: isHover || isExpanded ? 1 : 0, pointerEvents: isHover || isExpanded ? 'auto' : 'none', transition: 'opacity .12s ease' }}
+                              >
+                                <Pencil size={13} />
+                              </button>
                             </div>
                           </div>
-                          <button
-                            type="button"
-                            className="icon-btn"
-                            title="View details"
-                            onClick={() => openArchiveDetail(row)}
-                            style={{ width: 28, height: 28, flexShrink: 0, opacity: isHover ? 1 : 0, pointerEvents: isHover ? 'auto' : 'none', transition: 'opacity .12s ease' }}
-                          >
-                            <Pencil size={13} />
-                          </button>
+
+                          {isExpanded && (
+                            <div style={{ padding: '0 12px 12px' }}>
+                              <div style={{ border: '1px solid var(--border)', borderRadius: 10, overflow: 'auto', maxHeight: 320, background: 'var(--panel2)' }}>
+                                <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 680 }}>
+                                  <thead>
+                                    <tr style={{ background: 'var(--panel3)' }}>
+                                      {['Type', 'ID', 'Title', 'Status', 'Assignee', 'Attachments', 'Deleted'].map(h => (
+                                        <th key={h} style={{ textAlign: 'left', padding: '9px 10px', fontSize: 10, fontWeight: 700, color: 'var(--muted2)', textTransform: 'uppercase', letterSpacing: '.05em', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap', position: 'sticky', top: 0, zIndex: 1, background: 'var(--panel3)' }}>{h}</th>
+                                      ))}
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {expandedArchiveLoading ? (
+                                      <tr><td colSpan={7} style={{ padding: 12, fontSize: 12, color: 'var(--muted)' }}>Loading project items…</td></tr>
+                                    ) : detailRows.length === 0 ? (
+                                      <tr><td colSpan={7} style={{ padding: 12, fontSize: 12, color: 'var(--muted)' }}>No tasks, bugs, or attachments found in this project.</td></tr>
+                                    ) : detailRows.map((r, i) => (
+                                      <tr key={`${r.type}-${r.id}-${i}`} style={{ borderBottom: i === detailRows.length - 1 ? 'none' : '1px solid var(--border-soft, var(--border))' }}>
+                                        <td style={{ padding: '9px 10px', fontSize: 11, fontWeight: 700, color: r.type === 'Bug' ? '#ff8a8a' : '#a89cff' }}>{r.type}</td>
+                                        <td style={{ padding: '9px 10px', fontSize: 11, color: 'var(--muted)', fontFamily: 'monospace' }}>{r.id || '—'}</td>
+                                        <td style={{ padding: '9px 10px', fontSize: 12, color: 'var(--text-soft)' }}>{r.title || '—'}</td>
+                                        <td style={{ padding: '9px 10px', fontSize: 11, color: 'var(--muted)' }}>{r.status || '—'}</td>
+                                        <td style={{ padding: '9px 10px', fontSize: 11, color: 'var(--muted)' }}>{r.assignee || '—'}</td>
+                                        <td style={{ padding: '9px 10px', fontSize: 11, color: 'var(--muted)' }}>
+                                          {r.attachments.length === 0 ? '—' : (
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                              {r.attachments.map((a, ai) => {
+                                                const name = a?.name || a?.filename || a?.file_name || a?.url || a?.path || `Attachment ${ai + 1}`
+                                                const url = a?.url || a?.path || a?.href
+                                                return url ? <a key={ai} href={url} target="_blank" rel="noreferrer" style={{ color: '#a89cff', textDecoration: 'none' }}>{String(name)}</a> : <span key={ai}>{String(name)}</span>
+                                              })}
+                                            </div>
+                                          )}
+                                        </td>
+                                        <td style={{ padding: '9px 10px', fontSize: 11, color: 'var(--muted)', whiteSpace: 'nowrap' }}>{r.deleted_at ? new Date(r.deleted_at).toLocaleString() : 'Active'}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )
                     })}
@@ -2375,24 +2484,24 @@ export default function Settings() {
 
                 <div>
                   <div className="settings-label" style={{ marginBottom: 8 }}>Tasks, Bugs & Attachments</div>
-                  <div style={{ border: '1px solid var(--border)', borderRadius: 10, overflow: 'auto', background: 'var(--panel3)' }}>
+                  <div style={{ border: '1px solid var(--border)', borderRadius: 10, overflow: 'auto', maxHeight: 320, background: 'var(--panel3)' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 720 }}>
                       <thead>
                         <tr style={{ background: 'var(--panel2)' }}>
-                          {['Type', 'ID', 'Title', 'Status', 'Assignee', 'Attachments', 'Deleted'].map(h => (
-                            <th key={h} style={{ textAlign: 'left', padding: '10px 12px', fontSize: 10.5, fontWeight: 700, color: 'var(--muted2)', textTransform: 'uppercase', letterSpacing: '.05em', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>{h}</th>
+                          {['Type', 'ID', 'Title', 'Status', 'Assignee', 'Attachments', 'Deleted', 'View'].map(h => (
+                            <th key={h} style={{ textAlign: 'left', padding: '10px 12px', fontSize: 10.5, fontWeight: 700, color: 'var(--muted2)', textTransform: 'uppercase', letterSpacing: '.05em', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap', position: 'sticky', top: 0, zIndex: 1, background: 'var(--panel2)' }}>{h}</th>
                           ))}
                         </tr>
                       </thead>
                       <tbody>
                         {archiveDetailLoading ? (
-                          <tr><td colSpan={7} style={{ padding: 14, fontSize: 12, color: 'var(--muted)' }}>Loading project items…</td></tr>
+                          <tr><td colSpan={8} style={{ padding: 14, fontSize: 12, color: 'var(--muted)' }}>Loading project items…</td></tr>
                         ) : (() => {
                           const rows = [
-                            ...(archiveDetailData.tasks || []).map(t => ({ type: 'Task', id: t.task_code || t.id, title: t.title, status: t.status, assignee: t.assignee_name, attachments: Array.isArray(t.meta?.attachments) ? t.meta.attachments : [], deleted_at: t.deleted_at, created_at: t.created_at })),
-                            ...(archiveDetailData.bugs || []).map(b => ({ type: 'Bug', id: b.bug_id || b.id, title: b.title, status: b.status || b.kanban_column, assignee: b.assignee_name, attachments: Array.isArray(b.attachments) ? b.attachments : (typeof b.attachments === 'string' ? (() => { try { const v=JSON.parse(b.attachments); return Array.isArray(v)?v:[] } catch { return [] } })() : []), deleted_at: b.deleted_at, created_at: b.created_at })),
+                            ...(archiveDetailData.tasks || []).map(t => ({ type: 'Task', id: t.task_code || t.id, title: t.title, status: t.status, assignee: t.assignee_name, attachments: Array.isArray(t.meta?.attachments) ? t.meta.attachments : [], deleted_at: t.deleted_at, created_at: t.created_at, raw: t })),
+                            ...(archiveDetailData.bugs || []).map(b => ({ type: 'Bug', id: b.bug_id || b.id, title: b.title, status: b.status || b.kanban_column, assignee: b.assignee_name, attachments: Array.isArray(b.attachments) ? b.attachments : (typeof b.attachments === 'string' ? (() => { try { const v=JSON.parse(b.attachments); return Array.isArray(v)?v:[] } catch { return [] } })() : []), deleted_at: b.deleted_at, created_at: b.created_at, raw: b })),
                           ].sort((a,b) => new Date(b.deleted_at || b.created_at || 0) - new Date(a.deleted_at || a.created_at || 0))
-                          if (rows.length === 0) return <tr><td colSpan={7} style={{ padding: 14, fontSize: 12, color: 'var(--muted)' }}>No tasks or bugs found in this project.</td></tr>
+                          if (rows.length === 0) return <tr><td colSpan={8} style={{ padding: 14, fontSize: 12, color: 'var(--muted)' }}>No tasks or bugs found in this project.</td></tr>
                           return rows.map((r, i) => (
                             <tr key={`${r.type}-${r.id}-${i}`} style={{ borderBottom: i === rows.length - 1 ? 'none' : '1px solid var(--border-soft, var(--border))' }}>
                               <td style={{ padding: '10px 12px', fontSize: 11, fontWeight: 700, color: r.type === 'Bug' ? '#ff8a8a' : '#a89cff' }}>{r.type}</td>
@@ -2412,6 +2521,11 @@ export default function Settings() {
                                 )}
                               </td>
                               <td style={{ padding: '10px 12px', fontSize: 11, color: 'var(--muted)', whiteSpace: 'nowrap' }}>{r.deleted_at ? new Date(r.deleted_at).toLocaleString() : 'Active'}</td>
+                              <td style={{ padding: '10px 12px' }}>
+                                <button type="button" className="icon-btn" title="View" onClick={() => setArchiveViewItem({ kind: r.type.toLowerCase(), data: r.raw })} style={{ width: 28, height: 28 }}>
+                                  <Eye size={13} />
+                                </button>
+                              </td>
                             </tr>
                           ))
                         })()}
@@ -2419,10 +2533,172 @@ export default function Settings() {
                     </table>
                   </div>
                 </div>
+
+                <div>
+                  <div className="settings-label" style={{ marginBottom: 8 }}>Attachments</div>
+                  <div style={{ border: '1px solid var(--border)', borderRadius: 10, overflow: 'auto', maxHeight: 220, background: 'var(--panel3)' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 560 }}>
+                      <thead>
+                        <tr style={{ background: 'var(--panel2)' }}>
+                          {['Name', 'Source', 'Type', 'Size', 'View'].map(h => (
+                            <th key={h} style={{ textAlign: 'left', padding: '10px 12px', fontSize: 10.5, fontWeight: 700, color: 'var(--muted2)', textTransform: 'uppercase', letterSpacing: '.05em', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap', position: 'sticky', top: 0, zIndex: 1, background: 'var(--panel2)' }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {archiveDetailLoading ? (
+                          <tr><td colSpan={5} style={{ padding: 14, fontSize: 12, color: 'var(--muted)' }}>Loading attachments…</td></tr>
+                        ) : (archiveDetailData.attachments || []).length === 0 ? (
+                          <tr><td colSpan={5} style={{ padding: 14, fontSize: 12, color: 'var(--muted)' }}>No attachments found.</td></tr>
+                        ) : (archiveDetailData.attachments || []).map((a, i, arr) => {
+                          const name = a?.name || a?.filename || a?.file_name || a?.url || a?.path || `Attachment ${i + 1}`
+                          const url = a?.url || a?.path || a?.href
+                          const source = [a?.source_type, a?.source_id].filter(Boolean).join(' ')
+                          const size = a?.size ? (a.size < 1024 ? `${a.size} B` : a.size < 1024*1024 ? `${(a.size/1024).toFixed(1)} KB` : `${(a.size/(1024*1024)).toFixed(1)} MB`) : '—'
+                          const type = a?.type || a?.mimeType || a?.mime_type || (String(name).includes('.') ? String(name).split('.').pop().toUpperCase() : '—')
+                          return (
+                            <tr key={i} style={{ borderBottom: i === arr.length - 1 ? 'none' : '1px solid var(--border-soft, var(--border))' }}>
+                              <td style={{ padding: '10px 12px', fontSize: 12, color: 'var(--text-soft)' }}>{url ? <a href={url} target="_blank" rel="noreferrer" style={{ color: '#a89cff', textDecoration: 'none' }}>{String(name)}</a> : String(name)}</td>
+                              <td style={{ padding: '10px 12px', fontSize: 11, color: 'var(--muted)' }}>{source || '—'}{a?.source_title ? <span style={{ color: 'var(--muted2)' }}> — {a.source_title}</span> : null}</td>
+                              <td style={{ padding: '10px 12px', fontSize: 11, color: 'var(--muted)' }}>{String(type)}</td>
+                              <td style={{ padding: '10px 12px', fontSize: 11, color: 'var(--muted)', whiteSpace: 'nowrap' }}>{size}</td>
+                              <td style={{ padding: '10px 12px' }}>
+                                <button type="button" className="icon-btn" title="View" onClick={() => setArchiveViewItem({ kind: 'attachment', data: a })} style={{ width: 28, height: 28 }}>
+                                  <Eye size={13} />
+                                </button>
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="settings-label" style={{ marginBottom: 8 }}>Pages</div>
+                  <div style={{ border: '1px solid var(--border)', borderRadius: 10, overflow: 'auto', maxHeight: 220, background: 'var(--panel3)' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 560 }}>
+                      <thead>
+                        <tr style={{ background: 'var(--panel2)' }}>
+                          {['Title', 'Type', 'Date', 'Updated', 'View'].map(h => (
+                            <th key={h} style={{ textAlign: 'left', padding: '10px 12px', fontSize: 10.5, fontWeight: 700, color: 'var(--muted2)', textTransform: 'uppercase', letterSpacing: '.05em', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap', position: 'sticky', top: 0, zIndex: 1, background: 'var(--panel2)' }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {archiveDetailLoading ? (
+                          <tr><td colSpan={5} style={{ padding: 14, fontSize: 12, color: 'var(--muted)' }}>Loading pages…</td></tr>
+                        ) : (archiveDetailData.pages || []).length === 0 ? (
+                          <tr><td colSpan={5} style={{ padding: 14, fontSize: 12, color: 'var(--muted)' }}>No pages found.</td></tr>
+                        ) : (archiveDetailData.pages || []).map((pg, i, arr) => (
+                          <tr key={pg.id || i} style={{ borderBottom: i === arr.length - 1 ? 'none' : '1px solid var(--border-soft, var(--border))' }}>
+                            <td style={{ padding: '10px 12px', fontSize: 12, color: 'var(--text-soft)' }}>{pg.title || 'Untitled'}</td>
+                            <td style={{ padding: '10px 12px', fontSize: 11, color: 'var(--muted)' }}>{pg.page_type || 'page'}</td>
+                            <td style={{ padding: '10px 12px', fontSize: 11, color: 'var(--muted)', whiteSpace: 'nowrap' }}>{pg.page_date ? new Date(pg.page_date).toLocaleDateString() : '—'}</td>
+                            <td style={{ padding: '10px 12px', fontSize: 11, color: 'var(--muted)', whiteSpace: 'nowrap' }}>{pg.updated_at ? new Date(pg.updated_at).toLocaleString() : '—'}</td>
+                            <td style={{ padding: '10px 12px' }}>
+                              <button type="button" className="icon-btn" title="View" onClick={() => setArchiveViewItem({ kind: 'page', data: pg })} style={{ width: 28, height: 28 }}>
+                                <Eye size={13} />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ padding: '14px 24px 18px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, background: 'var(--panel2)' }}>
+                <div style={{ fontSize: 11, color: 'var(--muted2)' }}>All deleted projects will be permanently deleted after 30 days.</div>
+                <button
+                  type="button"
+                  className="btn primary"
+                  onClick={() => setConfirmRecoverProject(archiveDetail)}
+                  disabled={recoveringArchive}
+                  style={{ cursor: recoveringArchive ? 'not-allowed' : 'pointer', flexShrink: 0 }}
+                >
+                  Recover
+                </button>
               </div>
             </div>
           </div>
         )}
+
+        {confirmRecoverProject && (
+          <ConfirmModal
+            title="Recover project"
+            message={`Recover "${confirmRecoverProject.name || 'this project'}" and all its tasks and bugs?`}
+            note="This will restore the project and all items inside it."
+            confirmLabel="Recover"
+            tone="primary"
+            busy={recoveringArchive}
+            requiredText={`RECOVER ${confirmRecoverProject.name || ''}`.trim()}
+            onConfirm={handleRecoverProject}
+            onCancel={() => { if (!recoveringArchive) setConfirmRecoverProject(null) }}
+          />
+        )}
+
+        {archiveViewItem && (() => {
+          const { kind, data } = archiveViewItem
+          const title = kind === 'task' ? (data.task_code || 'Task') : kind === 'bug' ? (data.bug_id || 'Bug') : kind === 'page' ? (data.title || 'Page') : (data?.name || data?.filename || 'Attachment')
+          const rows = kind === 'task' ? [
+            ['Title', data.title], ['Status', data.status], ['Priority', data.priority], ['Assignee', data.assignee_name], ['Start', data.start_date ? new Date(data.start_date).toLocaleDateString() : null], ['Due', data.due_date ? new Date(data.due_date).toLocaleDateString() : null], ['Deleted', data.deleted_at ? new Date(data.deleted_at).toLocaleString() : 'Active'],
+          ] : kind === 'bug' ? [
+            ['Title', data.title], ['Status', data.status || data.kanban_column], ['Priority', data.priority], ['Assignee', data.assignee_name], ['Created', data.created_at ? new Date(data.created_at).toLocaleString() : null], ['Deleted', data.deleted_at ? new Date(data.deleted_at).toLocaleString() : 'Active'],
+          ] : kind === 'page' ? [
+            ['Title', data.title], ['Type', data.page_type], ['Date', data.page_date ? new Date(data.page_date).toLocaleDateString() : null], ['Updated', data.updated_at ? new Date(data.updated_at).toLocaleString() : null],
+          ] : [
+            ['Name', data?.name || data?.filename || data?.file_name], ['Source', [data?.source_type, data?.source_id].filter(Boolean).join(' ')], ['Type', data?.type || data?.mimeType || data?.mime_type], ['Size', data?.size ? (data.size < 1024 ? `${data.size} B` : data.size < 1024*1024 ? `${(data.size/1024).toFixed(1)} KB` : `${(data.size/(1024*1024)).toFixed(1)} MB`) : null],
+          ]
+          const description = kind === 'task' || kind === 'bug' ? data.description : kind === 'page' ? data.content : null
+          const fileSrc = kind === 'attachment' ? (data?.dataUrl || data?.data_url || data?.url || data?.path || data?.href || data?.src) : null
+          const fileType = String(data?.type || data?.mimeType || data?.mime_type || '')
+          const isImage = !!fileSrc && (fileType.startsWith('image/') || /^data:image\//i.test(String(fileSrc)) || /\.(png|jpe?g|gif|webp|svg|bmp|avif)(\?|$)/i.test(String(fileSrc)))
+          const isVideo = !!fileSrc && !isImage && (fileType.startsWith('video/') || /^data:video\//i.test(String(fileSrc)) || /\.(mp4|webm|ogg|mov)(\?|$)/i.test(String(fileSrc)))
+          return (
+            <div onClick={() => setArchiveViewItem(null)} style={{ position: 'fixed', inset: 0, zIndex: 1400, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+              <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 680, maxHeight: 'min(80vh,720px)', overflow: 'hidden', background: 'var(--panel2)', border: '1px solid var(--border)', borderRadius: 10, boxShadow: '0 20px 40px rgba(0,0,0,0.35)', display: 'flex', flexDirection: 'column' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 22px 14px', borderBottom: '1px solid var(--border)', gap: 12 }}>
+                  <div>
+                    <div style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--muted2)', textTransform: 'uppercase', letterSpacing: '.05em' }}>{kind}</div>
+                    <h3 style={{ margin: '4px 0 0', fontSize: 17, fontWeight: 700, color: 'var(--text-strong)' }}>{String(title)}</h3>
+                  </div>
+                  <button type="button" className="icon-btn" onClick={() => setArchiveViewItem(null)} title="Close"><X size={14} /></button>
+                </div>
+                <div style={{ padding: '16px 22px 22px', overflowY: 'auto', display: 'grid', gap: 14 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }}>
+                    {rows.filter(([,v]) => v !== null && v !== undefined && v !== '').map(([k,v]) => (
+                      <div key={k} style={{ background: 'var(--panel3)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 12px' }}>
+                        <div className="settings-label" style={{ marginBottom: 4 }}>{k}</div>
+                        <div style={{ fontSize: 12, color: 'var(--text-soft)', wordBreak: 'break-word' }}>{String(v)}</div>
+                      </div>
+                    ))}
+                  </div>
+                  {fileSrc && (
+                    <div>
+                      <div className="settings-label" style={{ marginBottom: 6 }}>Preview</div>
+                      {isImage ? (
+                        <img src={fileSrc} alt={String(title)} style={{ maxWidth: '100%', maxHeight: 420, borderRadius: 8, border: '1px solid var(--border)', display: 'block' }} />
+                      ) : isVideo ? (
+                        <video src={fileSrc} controls style={{ maxWidth: '100%', maxHeight: 420, borderRadius: 8, border: '1px solid var(--border)', display: 'block' }} />
+                      ) : (
+                        <a href={fileSrc} target="_blank" rel="noreferrer" style={{ color: '#a89cff', fontSize: 12, wordBreak: 'break-all' }}>{String(fileSrc).startsWith('data:') ? `Open ${String(title)}` : String(fileSrc)}</a>
+                      )}
+                    </div>
+                  )}
+                  {description ? (
+                    <div>
+                      <div className="settings-label" style={{ marginBottom: 6 }}>{kind === 'page' ? 'Content' : 'Description'}</div>
+                      <div style={{ fontSize: 13, color: 'var(--text-soft)', lineHeight: 1.6, whiteSpace: 'pre-wrap', background: 'var(--panel3)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 12px', minHeight: 56 }}>{String(description)}</div>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          )
+        })()}
 
         {editRoleModal && (
           <div

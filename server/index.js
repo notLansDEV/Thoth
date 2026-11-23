@@ -52,13 +52,34 @@ async function userCanAccessProject(project, userId) {
   return !!row
 }
 
+async function purgeExpiredDeletedProjects() {
+  try {
+    const res = await query(
+      `DELETE FROM projects
+       WHERE deleted_at IS NOT NULL
+         AND deleted_at < NOW() - INTERVAL '30 days'
+       RETURNING id`
+    )
+    const count = res?.rowCount || 0
+    if (count > 0) console.log(`[purge] Permanently deleted ${count} expired project(s)`)
+  } catch (err) {
+    console.error('[purge] Failed to purge expired deleted projects:', err.message)
+  }
+}
+
 const { PORT, JWT_SECRET } = env
 
 // Initialize DB
 initializeDatabase(env.db)
 
 // Apply idempotent schema (CREATE TABLE IF NOT EXISTS / ADD COLUMN IF NOT EXISTS)
-initializeSchema().catch((err) => console.error('Schema init failed:', err.message))
+initializeSchema()
+  .then(() => purgeExpiredDeletedProjects())
+  .catch((err) => console.error('Schema init failed:', err.message))
+
+setInterval(() => {
+  purgeExpiredDeletedProjects().catch((err) => console.error('[purge] interval failed:', err.message))
+}, 60 * 60 * 1000)
 
 function auth(req, res, next) {
   const header = req.headers.authorization
@@ -1524,7 +1545,63 @@ app.get('/api/archive/projects/:id/details', auth, async (req, res) => {
        ORDER BY b.created_at DESC`,
       [projectId]
     )
-    res.json({ project, tasks: tasks || [], bugs: bugs || [] })
+    const pages = await getMany(
+      `SELECT id, title, page_type, page_date, content, attachments, created_at, updated_at
+       FROM md_pages
+       WHERE workspace_id = $1
+       ORDER BY updated_at DESC`,
+      [workspace_id]
+    )
+
+    const normalizeAtts = (raw) => {
+      if (Array.isArray(raw)) return raw
+      if (typeof raw === 'string') { try { const v = JSON.parse(raw); return Array.isArray(v) ? v : [] } catch { return [] } }
+      return []
+    }
+    const collectAttachments = []
+    for (const t of (tasks || [])) {
+      const atts = [...normalizeAtts(t.meta?.attachments), ...normalizeAtts(t.attachments), ...normalizeAtts(t.meta?.files)]
+      for (const a of atts) {
+        const obj = (a && typeof a === 'object') ? a : { name: String(a) }
+        collectAttachments.push({ ...obj, source_type: 'Task', source_id: t.task_code || t.id, source_title: t.title || '' })
+      }
+    }
+    for (const b of (bugs || [])) {
+      const atts = [...normalizeAtts(b.attachments), ...normalizeAtts(b.meta?.attachments), ...normalizeAtts(b.meta?.files)]
+      for (const a of atts) {
+        const obj = (a && typeof a === 'object') ? a : { name: String(a) }
+        collectAttachments.push({ ...obj, source_type: 'Bug', source_id: b.bug_id || b.id, source_title: b.title || '' })
+      }
+    }
+
+    res.json({ project, tasks: tasks || [], bugs: bugs || [], pages: pages || [], attachments: collectAttachments })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
+app.post('/api/archive/projects/:id/recover', auth, async (req, res) => {
+  try {
+    const { workspace_id } = req.body || {}
+    const projectId = req.params.id
+    if (!workspace_id) return res.status(400).json({ error: 'workspace_id is required' })
+    const requester = await getWorkspaceRequester(workspace_id, req.user.id)
+    if (!requester) return res.status(403).json({ error: 'Not a workspace member' })
+    if (requester.role !== 'owner') return res.status(403).json({ error: 'Only workspace owner can recover projects' })
+
+    const project = await projectRepository.findById(projectId)
+    if (!project || String(project.workspace_id) !== String(workspace_id)) {
+      return res.status(404).json({ error: 'Project not found' })
+    }
+    if (!project.deleted_at) return res.status(400).json({ error: 'Project is not deleted' })
+
+    await query(`UPDATE projects SET deleted_at = NULL, updated_at = NOW() WHERE id = $1`, [projectId])
+    await query(`UPDATE tasks SET deleted_at = NULL, updated_at = NOW() WHERE project_id = $1 AND deleted_at IS NOT NULL`, [projectId])
+    await query(`UPDATE bugs SET deleted_at = NULL, updated_at = NOW() WHERE project_id = $1 AND deleted_at IS NOT NULL`, [projectId])
+
+    const restored = await projectRepository.findById(projectId)
+    res.json({ ok: true, project: restored })
   } catch (err) {
     console.error(err)
     res.status(500).json({ error: 'Server error' })
