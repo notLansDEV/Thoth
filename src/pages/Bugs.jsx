@@ -256,12 +256,14 @@ export default function Bugs({ subPage }) {
     if (!canDelete || !confirmDeleteBug) return
     setDeleting(true)
     try {
-      await deleteBug(confirmDeleteBug.id)
+      const res = await deleteBug(confirmDeleteBug.id)
+      const updated = res?.bug
       const title = confirmDeleteBug.title || 'Bug'
-      setBugs((cur) => cur.filter((b) => b.id !== confirmDeleteBug.id))
+      setBugs((cur) => cur.map((b) => (b.id === confirmDeleteBug.id ? { ...b, ...(updated || {}), status: 'Archived', kanban_column: 'Archived' } : b)))
+      setStages((cur) => cur.some((s) => s.name === 'Archived') ? cur : [...cur, { id: 'archived-temp', name: 'Archived', color: '#555555' }])
       setConfirmDeleteBug(null)
-      if (preview?.id === confirmDeleteBug.id) setPreview(null)
-      toast.success(`Bug "${title}" has been removed`)
+      if (preview?.id === confirmDeleteBug.id) setPreview((p) => p ? { ...p, ...(updated || {}), status: 'Archived', kanban_column: 'Archived' } : p)
+      toast.success(`Bug "${title}" moved to Archived`)
     } catch (err) {
       toast.error(err.message || 'Could not delete bug')
     } finally {

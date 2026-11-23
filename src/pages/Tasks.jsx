@@ -307,12 +307,14 @@ export default function Tasks({ subPage }) {
     if (!canDelete || !confirmDeleteTask) return
     setDeleting(true)
     try {
-      await deleteTask(confirmDeleteTask.id)
+      const res = await deleteTask(confirmDeleteTask.id)
+      const updated = res?.task
       const title = confirmDeleteTask.title || 'Task'
-      setTasks((cur) => cur.filter((t) => t.id !== confirmDeleteTask.id))
+      setTasks((cur) => cur.map((t) => (t.id === confirmDeleteTask.id ? { ...t, ...(updated || {}), status: 'Archived' } : t)))
+      setStages((cur) => cur.some((s) => s.name === 'Archived') ? cur : [...cur, { id: 'archived-temp', name: 'Archived', color: '#555555' }])
       setConfirmDeleteTask(null)
-      if (preview?.id === confirmDeleteTask.id) setPreview(null)
-      toast.success(`Task "${title}" has been removed`)
+      if (preview?.id === confirmDeleteTask.id) setPreview((p) => p ? { ...p, ...(updated || {}), status: 'Archived' } : p)
+      toast.success(`Task "${title}" moved to Archived`)
     } catch (err) {
       toast.error(err.message || 'Could not delete task')
     } finally {

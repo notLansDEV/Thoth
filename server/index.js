@@ -842,9 +842,10 @@ app.delete('/api/tasks/:id', auth, async (req, res) => {
     if (!(await userCanAccessProject(project, req.user.id))) {
       return res.status(403).json({ error: 'You do not have access to this project' })
     }
-    const deleted = await taskRepository.softDeleteById(req.params.id)
-    if (!deleted) return res.status(404).json({ error: 'Task not found' })
-    res.json({ success: true })
+    await ensureArchivedStage(taskStageRepository, project.workspace_id)
+    const updated = await taskRepository.updateById(req.params.id, { status: 'Archived', deleted_at: null })
+    if (!updated) return res.status(404).json({ error: 'Task not found' })
+    res.json({ success: true, task: updated })
   } catch (err) {
     console.error(err)
     res.status(500).json({ error: 'Server error' })
@@ -1253,9 +1254,10 @@ app.delete('/api/bugs/:id', auth, async (req, res) => {
     if (!(await userCanAccessProject(project, req.user.id))) {
       return res.status(403).json({ error: 'You do not have access to this project' })
     }
-    const deleted = await bugRepository.softDeleteById(req.params.id)
-    if (!deleted) return res.status(404).json({ error: 'Bug not found' })
-    res.json({ success: true })
+    await ensureArchivedStage(bugStageRepository, project.workspace_id)
+    const updated = await bugRepository.updateById(req.params.id, { kanban_column: 'Archived', status: 'Archived', deleted_at: null })
+    if (!updated) return res.status(404).json({ error: 'Bug not found' })
+    res.json({ success: true, bug: updated })
   } catch (err) {
     console.error(err)
     res.status(500).json({ error: 'Server error' })
