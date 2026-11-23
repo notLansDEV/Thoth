@@ -14,6 +14,7 @@ import {
   relativeTime,
 } from '../../features/notifications/notifications.service.js'
 import { getSettings, saveSettings } from '../../features/settings/settings.service.js'
+import { clearSession } from '../../features/auth/account.service.js'
 
 const PAGE_LABELS = {
   dashboard: 'Dashboard',
@@ -47,10 +48,13 @@ function getUser() {
 }
 
 function logout() {
-  localStorage.removeItem('token')
-  localStorage.removeItem('thoth_user')
-  setCurrentWorkspace(null)
-  navigate('/login')
+  try { setCurrentWorkspace(null) } catch {}
+  try {
+    localStorage.removeItem('token')
+    localStorage.removeItem('thoth_user')
+    localStorage.removeItem('thoth_workspace')
+  } catch {}
+  window.location.href = '/login'
 }
 
 export default function Topbar({ collapsed, onToggleCollapse }) {
@@ -68,6 +72,7 @@ export default function Topbar({ collapsed, onToggleCollapse }) {
 
   useEffect(() => {
     function onDocClick(e) {
+      if (e.target?.closest?.('[data-action="logout"]')) return
       if (menuRef.current && !menuRef.current.contains(e.target)) {
         setProfileOpen(false)
         setNotifOpen(false)
@@ -392,7 +397,13 @@ export default function Topbar({ collapsed, onToggleCollapse }) {
             <div className="dropdown-menu right" role="menu">
               <div className="dropdown-head">{name}</div>
               {user?.email && <div className="dropdown-email">{user.email}</div>}
-              <button className="dropdown-item danger" onClick={logout}>
+              <button
+                type="button"
+                className="dropdown-item danger"
+                data-action="logout"
+                onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); logout(); }}
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); logout(); }}
+              >
                 <LogOut size={12} style={{ display: 'inline', marginRight: '5px' }} /> Log out
               </button>
             </div>
