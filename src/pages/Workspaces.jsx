@@ -47,11 +47,15 @@ export default function Workspaces() {
   const [preview, setPreview] = useState(null)
   const [members, setMembers] = useState([])
   const [membersLoading, setMembersLoading] = useState(false)
-  const [panel, setPanel] = useState(null) // null | 'settings' | 'invite'
+  const [panel, setPanel] = useState(null) // null | 'settings'
   const [wsName, setWsName] = useState('')
-  const [inviteEmail, setInviteEmail] = useState('')
   const [panelError, setPanelError] = useState(null)
   const [savingPanel, setSavingPanel] = useState(false)
+  const [showAddMemberModal, setShowAddMemberModal] = useState(false)
+  const [availableUsers, setAvailableUsers] = useState([])
+  const [availableUsersLoading, setAvailableUsersLoading] = useState(false)
+  const [addMemberSearch, setAddMemberSearch] = useState('')
+  const [addingMemberId, setAddingMemberId] = useState(null)
   const [editingRole, setEditingRole] = useState(null) // {userId, role}
   const [confirmDeleteWs, setConfirmDeleteWs] = useState(null)
   const [confirmDeleteMember, setConfirmDeleteMember] = useState(null)
@@ -199,20 +203,42 @@ export default function Workspaces() {
     }
   }
 
-  async function handleInvite(e) {
-    e.preventDefault()
-    if (!preview || !inviteEmail.trim()) return
-    setSavingPanel(true)
+  async function loadAvailableUsers(search = '') {
+    if (!preview?.id) return
+    setAvailableUsersLoading(true)
+    try {
+      const token = localStorage.getItem('token')
+      const q = search.trim() ? `?q=${encodeURIComponent(search.trim())}` : ''
+      const res = await fetch(`/api/workspaces/${encodeURIComponent(preview.id)}/available-users${q}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const data = await res.json().catch(() => [])
+      setAvailableUsers(Array.isArray(data) ? data : [])
+    } catch {
+      setAvailableUsers([])
+    } finally {
+      setAvailableUsersLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (!showAddMemberModal || !preview?.id) return
+    const t = setTimeout(() => { loadAvailableUsers(addMemberSearch) }, 200)
+    return () => clearTimeout(t)
+  }, [showAddMemberModal, addMemberSearch, preview?.id])
+
+  async function handleAddMemberFromModal(user) {
+    if (!preview?.id || !user?.email) return
+    setAddingMemberId(user.id)
     setPanelError(null)
     try {
-      await addMember(preview.id, inviteEmail.trim())
-      setInviteEmail('')
-      setPanel(null)
+      await addMember(preview.id, user.email)
       await refreshMembers(preview.id)
+      await loadAvailableUsers(addMemberSearch)
     } catch (err) {
       setPanelError(err.message || 'Could not add member')
     } finally {
-      setSavingPanel(false)
+      setAddingMemberId(null)
     }
   }
 
@@ -453,8 +479,8 @@ export default function Workspaces() {
             style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
           ><Settings size={12} /> Settings</button>
           <button
-            className={`btn${panel === 'invite' ? ' primary' : ''}`}
-            onClick={() => setPanel(panel === 'invite' ? null : 'invite')}
+            className="btn"
+            onClick={() => { setAddMemberSearch(''); setShowAddMemberModal(true) }}
             style={{ cursor: 'pointer', height: '30px', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
           ><UserPlus size={12} /> Invite members</button>
         </div>
@@ -494,31 +520,6 @@ export default function Workspaces() {
             </div>
           )}
 
-          {panel === 'invite' && (
-            <form className="card" style={{ marginBottom: '12px' }} onSubmit={handleInvite}>
-              <label style={labelStyle}>Invite by email</label>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <input
-                  type="email"
-                  value={inviteEmail}
-                  onChange={(e) => setInviteEmail(e.target.value)}
-                  placeholder="teammate@company.com"
-                  className="search"
-                  style={{ flex: 1 }}
-                  autoFocus
-                />
-                <button type="submit" className="btn primary" disabled={savingPanel} style={{ cursor: 'pointer' }}>
-                  {savingPanel ? 'Adding…' : 'Add member'}
-                </button>
-                <button type="button" className="btn" onClick={() => setPanel(null)} style={{ cursor: 'pointer' }}>
-                  Cancel
-                </button>
-              </div>
-              <div style={{ fontSize: '10px', color: 'var(--muted2)', marginTop: '6px' }}>
-                The user must already have a Thoth account.
-              </div>
-            </form>
-          )}
 
           {/* Members & Project Access Provisioning */}
           <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
@@ -803,6 +804,61 @@ export default function Workspaces() {
             })()}
           </div>
         </div>
+
+        {showAddMemberModal && (
+          <div
+            onClick={() => setShowAddMemberModal(false)}
+            style={{ position: 'fixed', inset: 0, zIndex: 1300, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{ width: '100%', maxWidth: 560, maxHeight: 'min(80vh,720px)', overflow: 'hidden', background: 'var(--panel2)', border: '1px solid var(--border)', borderRadius: 10, boxShadow: '0 20px 40px rgba(0,0,0,0.35)', display: 'flex', flexDirection: 'column' }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 24px 14px', borderBottom: '1px solid var(--border)', gap: 12 }}>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text-strong)' }}>Add Member</h3>
+                  <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--muted)' }}>Select a user to add to this workspace.</p>
+                </div>
+                <button type="button" className="icon-btn" onClick={() => setShowAddMemberModal(false)} title="Close"><X size={14} /></button>
+              </div>
+              <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--border)' }}>
+                <div style={{ position: 'relative' }}>
+                  <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--muted2)', pointerEvents: 'none' }} />
+                  <input
+                    className="search"
+                    type="text"
+                    value={addMemberSearch}
+                    onChange={(e) => setAddMemberSearch(e.target.value)}
+                    placeholder="Search users by name or email..."
+                    style={{ width: '100%', paddingLeft: 32 }}
+                    autoFocus
+                  />
+                </div>
+              </div>
+              <div style={{ padding: '8px 12px', overflowY: 'auto', flex: 1 }}>
+                {availableUsersLoading ? (
+                  <div style={{ padding: 16, fontSize: 12, color: 'var(--muted)' }}>Loading users…</div>
+                ) : availableUsers.length === 0 ? (
+                  <div style={{ padding: 16, fontSize: 12, color: 'var(--muted)' }}>No available users found.</div>
+                ) : availableUsers.map((u) => {
+                  const busy = String(addingMemberId) === String(u.id)
+                  const name = u.full_name || u.username || 'User'
+                  return (
+                    <div key={u.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '10px 12px', borderRadius: 8 }}>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-strong)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</div>
+                        <div style={{ fontSize: 11, color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.email}{u.username ? ` • @${u.username}` : ''}</div>
+                      </div>
+                      <button type="button" className="btn primary" disabled={busy} onClick={() => handleAddMemberFromModal(u)} style={{ flexShrink: 0, padding: '6px 10px', fontSize: 11 }}>
+                        {busy ? 'Adding…' : 'Add'}
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+        )}
 
         {confirmDeleteMember && (
           <ConfirmModal

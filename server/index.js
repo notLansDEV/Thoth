@@ -347,6 +347,32 @@ app.get('/api/workspaces/:id/members', auth, async (req, res) => {
   }
 })
 
+app.get('/api/workspaces/:id/available-users', auth, async (req, res) => {
+  try {
+    const requester = await getWorkspaceRequester(req.params.id, req.user.id)
+    if (!requester) return res.status(403).json({ error: 'Not a workspace member' })
+    const q = String(req.query.q || '').trim().toLowerCase()
+    const params = [req.params.id]
+    let where = `WHERE u.id NOT IN (SELECT wm.user_id FROM workspace_members wm WHERE wm.workspace_id = $1)`
+    if (q) {
+      params.push(`%${q}%`)
+      where += ` AND (LOWER(u.username) LIKE $${params.length} OR LOWER(u.email) LIKE $${params.length} OR LOWER(COALESCE(u.full_name,'')) LIKE $${params.length})`
+    }
+    const rows = await getMany(
+      `SELECT u.id, u.username, u.email, u.full_name, u.avatar_url
+       FROM users u
+       ${where}
+       ORDER BY COALESCE(NULLIF(u.full_name,''), u.username) ASC
+       LIMIT 50`,
+      params
+    )
+    res.json(rows || [])
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
 app.patch('/api/workspaces/:id', auth, async (req, res) => {
   try {
     const { name, settings } = req.body
