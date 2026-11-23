@@ -8,10 +8,10 @@ export const TASK_STAGES = [
 ]
 
 export const TASK_PRIORITIES = [
-  { value: 'low', label: 'Low', color: '#20d96b' },
-  { value: 'medium', label: 'Medium', color: '#e8c547' },
-  { value: 'high', label: 'High', color: '#ff7918' },
-  { value: 'critical', label: 'Critical', color: '#ff4040' },
+  { value: 'low', label: 'Low', color: '#4ea1ff' },
+  { value: 'medium', label: 'Medium', color: '#f2c94c' },
+  { value: 'high', label: 'High', color: '#8b5cf6' },
+  { value: 'critical', label: 'Critical', color: '#ff4d4f' },
 ]
 
 export function priorityStyle(value) {

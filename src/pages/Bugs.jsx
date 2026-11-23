@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Bug as BugIcon, CircleDot, Columns3, Plus, Pencil, Trash2 } from 'lucide-react'
+import { Bug as BugIcon, CircleDot, Columns3, Plus, Trash2 } from 'lucide-react'
 import {
   BUG_STAGES,
   getBugs,
@@ -59,17 +59,7 @@ function BugCard({ bug, projectName, projectColor, onDragStart, onOpen, onDelete
           <span className="badge" style={{ ...priorityStyle(bug.priority), background: 'transparent', fontSize: '9px' }}>
             {bug.priority || 'medium'}
           </span>
-          {canWriteBug && (
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); onOpen(bug) }}
-              title="Edit"
-              style={{ background: 'transparent', border: 0, color: 'var(--muted2)', cursor: 'pointer', padding: '2px', display: 'inline-flex', borderRadius: '3px' }}
-              onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--muted)'; e.currentTarget.style.background = 'var(--hover)' }}
-              onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--muted2)'; e.currentTarget.style.background = 'transparent' }}
-            ><Pencil size={11} /></button>
-          )}
-          {canDeleteBug && (
+          {canDeleteBug && bug.kanban_column !== 'Archived' && bug.status !== 'Archived' && (
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); onDelete(bug) }}
@@ -356,28 +346,30 @@ export default function Bugs({ subPage }) {
                       <span style={{ fontSize: '10px', color: 'var(--muted2)' }}>{columnBugs.length}</span>
                     </div>
 
-                    {columnBugs.map((bug) => (
-                      <BugCard
-                        key={bug.id}
-                        bug={bug}
-                        projectName={projects.find((p) => p.id === bug.project_id)?.name}
-                        projectColor={projects.find((p) => p.id === bug.project_id)?.color}
-                        canWriteBug={canWriteBugProject(bug.project_id)}
-                        canDeleteBug={canDeleteBugProject(bug.project_id)}
-                        onDragStart={(e, id) => { dragId.current = id; e.dataTransfer.effectAllowed = 'move' }}
-                        onOpen={setPreview}
-                        onDelete={(b) => { if (canDeleteBugProject(b.project_id)) setConfirmDeleteBug(b) }}
-                      />
-                    ))}
+                    <div style={{ maxHeight: 'calc(100vh - 320px)', overflowY: 'auto', overflowX: 'hidden', paddingRight: 2 }}>
+                      {columnBugs.map((bug) => (
+                        <BugCard
+                          key={bug.id}
+                          bug={bug}
+                          projectName={projects.find((p) => p.id === bug.project_id)?.name}
+                          projectColor={projects.find((p) => p.id === bug.project_id)?.color}
+                          canWriteBug={canWriteBugProject(bug.project_id)}
+                          canDeleteBug={canDeleteBugProject(bug.project_id)}
+                          onDragStart={(e, id) => { dragId.current = id; e.dataTransfer.effectAllowed = 'move' }}
+                          onOpen={setPreview}
+                          onDelete={(b) => { if (canDeleteBugProject(b.project_id)) setConfirmDeleteBug(b) }}
+                        />
+                      ))}
 
-                    {columnBugs.length === 0 && (
-                      <div style={{
-                        border: '1px dashed var(--border)', borderRadius: '4px', padding: '14px',
-                        textAlign: 'center', color: 'var(--muted2)', fontSize: '10px',
-                      }}>
-                        Drop bugs here
-                      </div>
-                    )}
+                      {columnBugs.length === 0 && (
+                        <div style={{
+                          border: '1px dashed var(--border)', borderRadius: '4px', padding: '14px',
+                          textAlign: 'center', color: 'var(--muted2)', fontSize: '10px',
+                        }}>
+                          Drop bugs here
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )
               })}

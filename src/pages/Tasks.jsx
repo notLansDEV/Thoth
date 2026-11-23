@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { User, Clock, CircleDot, ListChecks, Columns3, Pencil, Trash2 } from 'lucide-react'
+import { User, Clock, CircleDot, ListChecks, Columns3, Trash2 } from 'lucide-react'
 import {
   TASK_STAGES,
   priorityStyle,
@@ -73,17 +73,7 @@ function TaskCard({ task, onOpen, onDelete, onDragStart, canWrite, canDelete }) 
           <span className="badge" style={{ ...priorityStyle(task.priority), background: 'transparent', fontSize: '9px' }}>
             {task.priority}
           </span>
-          {canWrite && (
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); onOpen(task) }}
-              title="Edit"
-              style={{ background: 'transparent', border: 0, color: 'var(--muted2)', cursor: 'pointer', padding: '2px', display: 'inline-flex', borderRadius: '3px' }}
-              onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--muted)'; e.currentTarget.style.background = 'var(--hover)' }}
-              onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--muted2)'; e.currentTarget.style.background = 'transparent' }}
-            ><Pencil size={11} /></button>
-          )}
-          {canDelete && (
+          {canDelete && task.status !== 'Archived' && (
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); onDelete(task) }}
@@ -407,26 +397,28 @@ export default function Tasks({ subPage }) {
                   <span style={{ fontSize: '10px', color: 'var(--muted2)' }}>{columnTasks.length}</span>
                 </div>
 
-                {columnTasks.map((task) => (
-                  <TaskCard
-                    key={task.id}
-                    task={task}
-                    canWrite={canWriteTaskProject(task.project_id)}
-                    canDelete={canDeleteTaskProject(task.project_id)}
-                    onOpen={setPreview}
-                    onDelete={(t) => { if (canDeleteTaskProject(t.project_id)) setConfirmDeleteTask(t) }}
-                    onDragStart={(e, id) => { dragId.current = id; e.dataTransfer.effectAllowed = 'move' }}
-                  />
-                ))}
+                <div style={{ maxHeight: 'calc(100vh - 320px)', overflowY: 'auto', overflowX: 'hidden', paddingRight: 2 }}>
+                  {columnTasks.map((task) => (
+                    <TaskCard
+                      key={task.id}
+                      task={task}
+                      canWrite={canWriteTaskProject(task.project_id)}
+                      canDelete={canDeleteTaskProject(task.project_id)}
+                      onOpen={setPreview}
+                      onDelete={(t) => { if (canDeleteTaskProject(t.project_id)) setConfirmDeleteTask(t) }}
+                      onDragStart={(e, id) => { dragId.current = id; e.dataTransfer.effectAllowed = 'move' }}
+                    />
+                  ))}
 
-                {columnTasks.length === 0 && (
-                  <div style={{
-                    border: '1px dashed var(--border)', borderRadius: '4px', padding: '14px',
-                    textAlign: 'center', color: 'var(--muted2)', fontSize: '10px',
-                  }}>
-                    Drop tasks here
-                  </div>
-                )}
+                  {columnTasks.length === 0 && (
+                    <div style={{
+                      border: '1px dashed var(--border)', borderRadius: '4px', padding: '14px',
+                      textAlign: 'center', color: 'var(--muted2)', fontSize: '10px',
+                    }}>
+                      Drop tasks here
+                    </div>
+                  )}
+                </div>
               </div>
             )
           })}

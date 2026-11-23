@@ -15,6 +15,7 @@ import {
 } from '../../tasks/tasks.service.js'
 import { getProjectMembers } from '../../projects/projects.service.js'
 import CopyCode from '../../../components/CopyCode.jsx'
+import { renderMarkdown } from '../../../utils/renderMarkdown.js'
 
 const inputStyle = {
   width: '100%',
@@ -80,6 +81,7 @@ export default function BugPreviewModal({ bug, workspaceId, projectName, stages,
     : BUG_STAGE_OPTIONS
   const [title, setTitle] = useState(bug.title || '')
   const [description, setDescription] = useState(bug.description || '')
+  const [editingDesc, setEditingDesc] = useState(false)
   const [stage, setStage] = useState(bug.kanban_column || bug.status || 'New')
   const [priority, setPriority] = useState(bug.priority || 'medium')
   const [assignee, setAssignee] = useState(bug.assigned_to || '')
@@ -359,52 +361,70 @@ export default function BugPreviewModal({ bug, workspaceId, projectName, stages,
 
           {tab === 'description' && (
             <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
+                <button type="button" className="btn" onClick={() => setEditingDesc((v) => !v)} style={{ padding: '4px 10px', fontSize: 11 }}>
+                  {editingDesc ? 'Preview' : 'Edit'}
+                </button>
+              </div>
+
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
                 <label style={labelStyle}>Description</label>
                 <span style={{ fontSize: '9px', color: 'var(--muted2)' }}>Add context about the issue</span>
               </div>
-              <textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                onBlur={onDescriptionBlur}
-                placeholder="Add a more detailed description…"
-                style={{ ...inputStyle, minHeight: '90px', resize: 'vertical', marginBottom: '18px' }}
-              />
+              {editingDesc ? (
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  onBlur={onDescriptionBlur}
+                  placeholder="Add a more detailed description…"
+                  style={{ ...inputStyle, minHeight: '90px', resize: 'vertical', marginBottom: '18px' }}
+                />
+              ) : (
+                <div className="md-preview" style={{ minHeight: '90px', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--panel3)', fontSize: 12, color: 'var(--text-soft)', marginBottom: '18px' }}
+                  dangerouslySetInnerHTML={{ __html: renderMarkdown(description, { emptyHtml: '<div style="color:var(--muted2)">No description.</div>' }) }} />
+              )}
 
               <label style={{ ...labelStyle, color: '#e88', marginBottom: '6px' }}>Steps to Reproduce</label>
-              <textarea
-                value={stepsToReproduce}
-                onChange={(e) => setStepsToReproduce(e.target.value)}
-                onBlur={onStepsBlur}
-                placeholder="1. Go to…&#10;2. Click on…&#10;3. See error"
-                style={{ ...inputStyle, minHeight: '90px', resize: 'vertical', marginBottom: '18px', borderColor: 'var(--hover-border)' }}
-              />
+              {editingDesc ? (
+                <textarea
+                  value={stepsToReproduce}
+                  onChange={(e) => setStepsToReproduce(e.target.value)}
+                  onBlur={onStepsBlur}
+                  placeholder="1. Go to…&#10;2. Click on…&#10;3. See error"
+                  style={{ ...inputStyle, minHeight: '90px', resize: 'vertical', marginBottom: '18px', borderColor: 'var(--hover-border)' }}
+                />
+              ) : (
+                <div className="md-preview" style={{ minHeight: '70px', padding: '10px 12px', border: '1px solid var(--hover-border)', borderRadius: 8, background: 'var(--panel3)', fontSize: 12, color: 'var(--text-soft)', marginBottom: '18px' }}
+                  dangerouslySetInnerHTML={{ __html: renderMarkdown(stepsToReproduce, { emptyHtml: '<div style="color:var(--muted2)">No steps provided.</div>' }) }} />
+              )}
 
               <label style={{ ...labelStyle, color: '#4cdf8a', marginBottom: '6px' }}>Expected Behavior</label>
-              <textarea
-                value={expectedBehavior}
-                onChange={(e) => setExpectedBehavior(e.target.value)}
-                onBlur={onExpectedBlur}
-                placeholder="What should have happened?"
-                style={{
-                  ...inputStyle, minHeight: '70px', resize: 'vertical', marginBottom: '18px',
-                  borderColor: 'rgba(32,217,107,0.35)',
-                  background: 'rgba(32,217,107,0.04)',
-                }}
-              />
+              {editingDesc ? (
+                <textarea
+                  value={expectedBehavior}
+                  onChange={(e) => setExpectedBehavior(e.target.value)}
+                  onBlur={onExpectedBlur}
+                  placeholder="What should have happened?"
+                  style={{ ...inputStyle, minHeight: '70px', resize: 'vertical', marginBottom: '18px', borderColor: 'rgba(32,217,107,0.35)', background: 'rgba(32,217,107,0.04)' }}
+                />
+              ) : (
+                <div className="md-preview" style={{ minHeight: '60px', padding: '10px 12px', border: '1px solid rgba(32,217,107,0.35)', borderRadius: 8, background: 'rgba(32,217,107,0.04)', fontSize: 12, color: 'var(--text-soft)', marginBottom: '18px' }}
+                  dangerouslySetInnerHTML={{ __html: renderMarkdown(expectedBehavior, { emptyHtml: '<div style="color:var(--muted2)">No expected behavior provided.</div>' }) }} />
+              )}
 
               <label style={{ ...labelStyle, color: '#ff7c7c', marginBottom: '6px' }}>Actual Behavior</label>
-              <textarea
-                value={actualBehavior}
-                onChange={(e) => setActualBehavior(e.target.value)}
-                onBlur={onActualBlur}
-                placeholder="What actually happened?"
-                style={{
-                  ...inputStyle, minHeight: '70px', resize: 'vertical', marginBottom: '4px',
-                  borderColor: 'rgba(255,64,64,0.35)',
-                  background: 'rgba(255,64,64,0.04)',
-                }}
-              />
+              {editingDesc ? (
+                <textarea
+                  value={actualBehavior}
+                  onChange={(e) => setActualBehavior(e.target.value)}
+                  onBlur={onActualBlur}
+                  placeholder="What actually happened?"
+                  style={{ ...inputStyle, minHeight: '70px', resize: 'vertical', marginBottom: '4px', borderColor: 'rgba(255,64,64,0.35)', background: 'rgba(255,64,64,0.04)' }}
+                />
+              ) : (
+                <div className="md-preview" style={{ minHeight: '60px', padding: '10px 12px', border: '1px solid rgba(255,64,64,0.35)', borderRadius: 8, background: 'rgba(255,64,64,0.04)', fontSize: 12, color: 'var(--text-soft)', marginBottom: '4px' }}
+                  dangerouslySetInnerHTML={{ __html: renderMarkdown(actualBehavior, { emptyHtml: '<div style="color:var(--muted2)">No actual behavior provided.</div>' }) }} />
+              )}
             </div>
           )}
 

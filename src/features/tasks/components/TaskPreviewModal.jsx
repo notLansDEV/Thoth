@@ -13,6 +13,7 @@ import {
 } from '../tasks.service.js'
 import { getProjectMembers } from '../../projects/projects.service.js'
 import CopyCode from '../../../components/CopyCode.jsx'
+import { renderMarkdown } from '../../../utils/renderMarkdown.js'
 
 const inputStyle = {
   width: '100%',
@@ -161,6 +162,7 @@ export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated,
     : TASK_STAGES
   const [title, setTitle] = useState(task.title)
   const [description, setDescription] = useState(task.description || '')
+  const [editingDesc, setEditingDesc] = useState(false)
   const [stage, setStage] = useState(task.status || 'todo')
   const [priority, setPriority] = useState(task.priority || 'medium')
   const [assignee, setAssignee] = useState(task.assigned_to || '')
@@ -489,13 +491,28 @@ export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated,
           </div>
 
           {tab === 'description' && (
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              onBlur={onDescriptionBlur}
-              placeholder="Add a more detailed description…"
-              style={{ ...inputStyle, minHeight: '320px', resize: 'vertical', marginBottom: '18px' }}
-            />
+            <div style={{ marginBottom: '18px' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
+                <button type="button" className="btn" onClick={() => setEditingDesc((v) => !v)} style={{ padding: '4px 10px', fontSize: 11 }}>
+                  {editingDesc ? 'Preview' : 'Edit'}
+                </button>
+              </div>
+              {editingDesc ? (
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  onBlur={onDescriptionBlur}
+                  placeholder="Add a more detailed description…"
+                  style={{ ...inputStyle, minHeight: '320px', resize: 'vertical' }}
+                />
+              ) : (
+                <div
+                  className="md-preview"
+                  style={{ minHeight: '320px', padding: '12px', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--panel3)', fontSize: 12, color: 'var(--text-soft)' }}
+                  dangerouslySetInnerHTML={{ __html: renderMarkdown(description, { emptyHtml: '<div style="color:var(--muted2)">No description.</div>' }) }}
+                />
+              )}
+            </div>
           )}
 
           {/* Checklist */}
