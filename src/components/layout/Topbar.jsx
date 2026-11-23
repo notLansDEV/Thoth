@@ -59,6 +59,7 @@ function logout() {
 
 export default function Topbar({ collapsed, onToggleCollapse }) {
   const ws = getCurrentWorkspace()
+  const hasWorkspace = !!ws?.id
   const user = getUser()
   const [profileOpen, setProfileOpen] = useState(false)
   const [notifOpen, setNotifOpen] = useState(false)
@@ -274,6 +275,8 @@ export default function Topbar({ collapsed, onToggleCollapse }) {
       </div>
 
       <div className="top-right" ref={menuRef}>
+        {hasWorkspace && (
+        <>
         {/* Project switcher */}
         <div style={{ position: 'relative' }}>
           {(() => {
@@ -381,6 +384,8 @@ export default function Topbar({ collapsed, onToggleCollapse }) {
             </div>
           )}
         </div>
+        </>
+        )}
 
         {/* Profile menu */}
         <div style={{ position: 'relative' }}>

@@ -139,6 +139,16 @@ export default function Workspaces() {
     enter(workspace)
   }
 
+  async function handleCreateDemo() {
+    setError(null)
+    try {
+      const workspace = await createWorkspace('Demo Workspace')
+      enter(workspace)
+    } catch (err) {
+      setError(err.message || 'Could not create demo workspace')
+    }
+  }
+
   async function openPreview(ws) {
     setWsName(ws.name)
     setPanel(null)
@@ -886,13 +896,15 @@ export default function Workspaces() {
               : 'Create a workspace to get started'}
           </p>
         </div>
-        <button
-          onClick={() => setShowCreate(true)}
-          className="btn primary"
-          style={{ cursor: 'pointer' }}
-        >
-          + Create Workspace
-        </button>
+        {(Array.isArray(workspaces) && workspaces.length > 0) && (
+          <button
+            onClick={() => setShowCreate(true)}
+            className="btn primary"
+            style={{ cursor: 'pointer' }}
+          >
+            + Create Workspace
+          </button>
+        )}
       </div>
 
       {error && (
@@ -906,8 +918,12 @@ export default function Workspaces() {
         <div className="card"><div className="description" style={{ margin: 0 }}>Loading workspaces…</div></div>
       ) : workspaces.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--muted)' }}>
-          <div style={{ fontSize: '14px', marginBottom: '12px' }}>No workspaces yet</div>
-          <div style={{ fontSize: '12px', color: 'var(--muted2)' }}>Create your first workspace to get started</div>
+          <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-strong)', marginBottom: '8px' }}>No workspace yet</div>
+          <div style={{ fontSize: '12px', color: 'var(--muted2)', marginBottom: '20px' }}>Create your first workspace to get started. You can also add a demo workspace.</div>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <button className="btn primary" onClick={() => setShowCreate(true)} style={{ cursor: 'pointer' }}>Create Workspace</button>
+            <button className="btn" onClick={handleCreateDemo} style={{ cursor: 'pointer' }}>Add Demo</button>
+          </div>
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '10px', marginBottom: '18px' }}>

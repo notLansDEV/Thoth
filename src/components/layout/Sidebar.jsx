@@ -71,6 +71,8 @@ export default function Sidebar({ collapsed }) {
   const [wsList, setWsList] = useState([])
   const [wsOpen, setWsOpen] = useState(false)
   const wsMenuRef = useRef(null)
+  const currentWs = getCurrentWorkspace()
+  const hasWorkspace = !!currentWs?.id
 
   useEffect(() => {
     let alive = true
@@ -181,6 +183,7 @@ export default function Sidebar({ collapsed }) {
         </div>
       )}
 
+      {hasWorkspace && (
       <nav className="nav">
         {NAV.filter((item) => canAccessModule(item.key)).map(item => {
           const { Icon } = item
@@ -217,8 +220,9 @@ export default function Sidebar({ collapsed }) {
           )
         })}
       </nav>
+      )}
 
-      {!collapsed && (
+      {hasWorkspace && !collapsed && (
         <>
           <div className="section-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
             <span>Projects</span>
@@ -262,7 +266,7 @@ export default function Sidebar({ collapsed }) {
 
       <div className="bottom">
         <a href={`/Thoth/${workspace}/workspaces`} title="Workspaces" className={`nav-item ${page === 'workspaces' ? 'active' : ''}`} onClick={(e)=>{e.preventDefault(); navigateTo(workspace,'workspaces')}}><span className="icon"><LayoutGrid size={14} /></span><span className="label">Workspace</span></a>
-        {canAccessModule('settings') && (
+        {hasWorkspace && canAccessModule('settings') && (
           <a href={`/Thoth/${workspace}/settings`} title="Settings" className={`nav-item ${page === 'settings' ? 'active' : ''}`} onClick={(e)=>{e.preventDefault(); navigateTo(workspace,'settings')}}><span className="icon"><Settings size={14} /></span><span className="label">Settings</span></a>
         )}
         <a href="/login" title="Log out" className="nav-item" onClick={(e)=>{
