@@ -13,6 +13,43 @@ function inlineMd(raw) {
   return s
 }
 
+function sanitizeRenderedHtml(html) {
+  // Defense-in-depth: allowlist tags/attrs after controlled renderer output.
+  const allowedTags = new Set(['p','br','strong','em','del','code','pre','blockquote','hr','ul','ol','li','h2','h3','h4','h5','a','img','span','div'])
+  const allowedAttrs = {
+    a: new Set(['href','target','rel']),
+    img: new Set(['src','alt','style']),
+    li: new Set(['class']),
+    ul: new Set(['class']),
+    span: new Set(['class']),
+    div: new Set(['class','style']),
+  }
+  return String(html).replace(/<\/?([a-z0-9-]+)([^>]*)>/gi, (m, tagName, attrs) => {
+    const tag = tagName.toLowerCase()
+    if (!allowedTags.has(tag)) return ''
+    if (m.startsWith('</')) return `</${tag}>`
+    if (tag === 'br' || tag === 'hr') return `<${tag}>`
+    const allowed = allowedAttrs[tag] || new Set()
+    const outAttrs = []
+    const attrRe = /([a-z0-9:-]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/gi
+    let a
+    while ((a = attrRe.exec(attrs || ''))) {
+      const name = a[1].toLowerCase()
+      const val = (a[2] ?? a[3] ?? a[4] ?? '')
+      if (!allowed.has(name)) continue
+      if ((name === 'href' || name === 'src') && !/^(https?:\/\/|data:image\/[a-zA-Z0-9.+-]+;base64,)/.test(val)) continue
+      if (name === 'style' && !/^(max-width:100%;border-radius:6px;margin:6px 0;display:block;|color:var\(--muted2\))$/.test(val)) continue
+      outAttrs.push(`${name}="${val}"`)
+    }
+    if (tag === 'a') {
+      if (!outAttrs.some(x => x.startsWith('href="'))) outAttrs.push('href="#"')
+      if (!outAttrs.some(x => x.startsWith('target="'))) outAttrs.push('target="_blank"')
+      if (!outAttrs.some(x => x.startsWith('rel="'))) outAttrs.push('rel="noreferrer"')
+    }
+    return `<${tag}${outAttrs.length ? ' ' + outAttrs.join(' ') : ''}>`
+  })
+}
+
 export function renderMarkdown(src, { emptyHtml = '<div class="md-blank">Nothing here yet — start typing…</div>' } = {}) {
   if (!src || !src.trim()) return emptyHtml
   const lines = String(src).split('\n')
@@ -43,7 +80,7 @@ export function renderMarkdown(src, { emptyHtml = '<div class="md-blank">Nothing
   }
   if (inCode && codeBuf.length) html += `<pre><code>${escapeHtml(codeBuf.join('\n'))}</code></pre>`
   flushPara(); closeList()
-  return html || emptyHtml
+  return sanitizeRenderedHtml(html || emptyHtml)
 }
 
 export default renderMarkdown

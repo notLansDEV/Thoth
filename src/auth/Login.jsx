@@ -29,7 +29,8 @@ export default function Login() {
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', ...(typeof document !== 'undefined' && document.cookie.match(/(?:^|; )thoth_csrf=([^;]+)/) ? { 'X-CSRF-Token': decodeURIComponent(document.cookie.match(/(?:^|; )thoth_csrf=([^;]+)/)[1]) } : {}) },
         body: JSON.stringify({ email: email.trim(), password })
       })
       const data = await res.json()

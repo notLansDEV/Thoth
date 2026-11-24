@@ -1,11 +1,19 @@
 import { query, getOne, getMany } from '../database.js';
 
+const IDENTIFIER_RE = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
+function assertIdentifier(name, label = 'identifier') {
+  if (!IDENTIFIER_RE.test(String(name || ''))) {
+    throw new Error(`Unsafe SQL ${label}: ${String(name)}`);
+  }
+  return String(name);
+}
+
 /**
  * Base Repository class with common CRUD operations
  */
 export class BaseRepository {
   constructor(tableName) {
-    this.tableName = tableName;
+    this.tableName = assertIdentifier(tableName, 'table name');
   }
 
   /**
@@ -19,7 +27,12 @@ export class BaseRepository {
    * Find all
    */
   async findAll(orderBy = 'created_at DESC', limit = 100, offset = 0) {
-    const sql = `SELECT * FROM ${this.tableName} ORDER BY ${orderBy} LIMIT $1 OFFSET $2`;
+    const safeOrder = String(orderBy).split(',').map(part => {
+      const m = part.trim().match(/^([a-zA-Z_][a-zA-Z0-9_]*)(?:\s+(ASC|DESC))?$/i);
+      if (!m) throw new Error(`Unsafe SQL orderBy: ${orderBy}`);
+      return `${m[1]}${m[2] ? ' ' + m[2].toUpperCase() : ''}`;
+    }).join(', ');
+    const sql = `SELECT * FROM ${this.tableName} ORDER BY ${safeOrder} LIMIT $1 OFFSET $2`;
     return getMany(sql, [limit, offset]);
   }
 
@@ -27,7 +40,12 @@ export class BaseRepository {
    * Find by condition
    */
   async findByCondition(whereClause, params = [], orderBy = 'created_at DESC') {
-    const sql = `SELECT * FROM ${this.tableName} WHERE ${whereClause} ORDER BY ${orderBy}`;
+    const safeOrder = String(orderBy).split(',').map(part => {
+      const m = part.trim().match(/^([a-zA-Z_][a-zA-Z0-9_]*)(?:\s+(ASC|DESC))?$/i);
+      if (!m) throw new Error(`Unsafe SQL orderBy: ${orderBy}`);
+      return `${m[1]}${m[2] ? ' ' + m[2].toUpperCase() : ''}`;
+    }).join(', ');
+    const sql = `SELECT * FROM ${this.tableName} WHERE ${whereClause} ORDER BY ${safeOrder}`;
     return getMany(sql, params);
   }
 
@@ -62,6 +80,7 @@ export class BaseRepository {
   async updateById(id, data) {
     const keys = Object.keys(data);
     const values = Object.values(data);
+    keys.forEach(k => assertIdentifier(k, 'column')); 
     const setClause = keys.map((key, i) => `${key} = $${i + 1}`).join(', ');
     
     const sql = `UPDATE ${this.tableName} SET ${setClause}, updated_at = CURRENT_TIMESTAMP WHERE id = $${keys.length + 1} RETURNING *`;
@@ -74,6 +93,7 @@ export class BaseRepository {
   async create(data) {
     const keys = Object.keys(data);
     const values = Object.values(data);
+    keys.forEach(k => assertIdentifier(k, 'column'));
     const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ');
     
     const sql = `INSERT INTO ${this.tableName} (${keys.join(', ')}) VALUES (${placeholders}) RETURNING *`;
@@ -95,6 +115,7 @@ export class BaseRepository {
   async updateByCondition(whereClause, params = [], data = {}) {
     const entries = Object.entries(data);
     if (entries.length === 0) return [];
+    entries.forEach(([k]) => assertIdentifier(k, 'column'));
     const setClause = entries.map(([key], i) => `${key} = $${params.length + i + 1}`).join(', ');
     const sql = `UPDATE ${this.tableName} SET ${setClause}, updated_at = CURRENT_TIMESTAMP WHERE ${whereClause} RETURNING *`;
     return getMany(sql, [...params, ...entries.map(([, value]) => value)]);

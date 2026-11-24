@@ -104,29 +104,63 @@ export async function getMany(text, params = []) {
   return result.rows || [];
 }
 
+async function applySqlStatements(sql) {
+  const statements = String(sql)
+    .split(';')
+    .map(stmt => stmt.trim())
+    .filter(stmt => stmt.length > 0);
+  for (const statement of statements) {
+    try {
+      await query(statement);
+    } catch (error) {
+      if (!String(error.message).includes('already exists')) {
+        console.warn('Schema statement error:', error.message);
+      }
+    }
+  }
+}
+
 /**
- * Initialize database schema from schema.sql
+ * Initialize database schema from schema.sql and apply pending migrations.
  */
 export async function initializeSchema() {
   try {
     const schemaPath = path.join(__dirname, 'schema.sql');
     const schema = fs.readFileSync(schemaPath, 'utf-8');
-    
-    // Split by semicolon and filter empty statements
-    const statements = schema
-      .split(';')
-      .map(stmt => stmt.trim())
-      .filter(stmt => stmt.length > 0);
+    console.log('Applying schema.sql bootstrap...');
+    await applySqlStatements(schema);
 
-    console.log(`Executing ${statements.length} schema statements...`);
+    await query(`CREATE TABLE IF NOT EXISTS schema_migrations (
+      id SERIAL PRIMARY KEY,
+      name VARCHAR(255) NOT NULL UNIQUE,
+      applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )`);
 
-    for (const statement of statements) {
-      try {
-        await query(statement);
-      } catch (error) {
-        // Ignore "already exists" errors
-        if (!error.message.includes('already exists')) {
-          console.warn('Schema statement error:', error.message);
+    const migrationsDir = path.join(__dirname, 'migrations');
+    if (fs.existsSync(migrationsDir)) {
+      const files = fs.readdirSync(migrationsDir).filter(f => f.endsWith('.sql')).sort();
+      const appliedRows = await getMany('SELECT name FROM schema_migrations');
+      const applied = new Set((appliedRows || []).map(r => r.name));
+
+      // Baseline: if no migration records exist, mark existing migrations as applied
+      // to avoid re-running legacy full-schema dumps on established databases.
+      if (applied.size === 0) {
+        for (const f of files) {
+          await query('INSERT INTO schema_migrations (name) VALUES ($1) ON CONFLICT (name) DO NOTHING', [f]);
+          applied.add(f);
+        }
+        console.log('Recorded baseline schema migrations');
+      } else {
+        for (const f of files) {
+          if (applied.has(f)) continue;
+          const sql = fs.readFileSync(path.join(migrationsDir, f), 'utf-8');
+          console.log(`Applying migration ${f}...`);
+          if (/\bBEGIN\b/i.test(sql) && /\bCOMMIT\b/i.test(sql)) {
+            await query(sql);
+          } else {
+            await applySqlStatements(sql);
+          }
+          await query('INSERT INTO schema_migrations (name) VALUES ($1) ON CONFLICT (name) DO NOTHING', [f]);
         }
       }
     }

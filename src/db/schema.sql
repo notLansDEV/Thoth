@@ -44,6 +44,9 @@ ALTER TABLE projects ADD COLUMN IF NOT EXISTS priority VARCHAR(50) DEFAULT 'medi
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS meta JSONB DEFAULT '{}';
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS created_by UUID;
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP;
+CREATE INDEX IF NOT EXISTS idx_projects_deleted_at ON projects(deleted_at);
+CREATE INDEX IF NOT EXISTS idx_tasks_deleted_at ON tasks(deleted_at);
+CREATE INDEX IF NOT EXISTS idx_bugs_deleted_at ON bugs(deleted_at);
 
 -- Markdown Pages Table (Logseq-style journal + pages)
 CREATE TABLE IF NOT EXISTS md_pages (
@@ -361,3 +364,27 @@ CREATE INDEX idx_notifications_user_id ON notifications(user_id);
 CREATE INDEX idx_notifications_user_read ON notifications(user_id, is_read);
 
 
+
+
+-- Minimal migration tracking (schema.sql bootstrap model)
+CREATE TABLE IF NOT EXISTS schema_migrations (
+  id SERIAL PRIMARY KEY,
+  name VARCHAR(255) NOT NULL UNIQUE,
+  applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_md_pages_project_id ON md_pages(project_id);
+CREATE INDEX IF NOT EXISTS idx_md_pages_workspace_id ON md_pages(workspace_id);
+
+-- Audit logs (security/activity trail)
+CREATE TABLE IF NOT EXISTS audit_logs (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  actor_id UUID,
+  action VARCHAR(100) NOT NULL,
+  entity_type VARCHAR(100),
+  entity_id UUID,
+  meta JSONB DEFAULT '{}'::jsonb,
+  ip VARCHAR(64),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_actor_id ON audit_logs(actor_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at);

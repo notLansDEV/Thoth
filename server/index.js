@@ -1,9 +1,12 @@
 import { env } from './env.js'
+import { isUuid, createRateLimiter, validateAttachments } from './utils.js'
+import { requireWorkspaceModulePerm } from './rbac.js'
 import express from 'express'
 import cors from 'cors'
 import bcrypt from 'bcrypt'
 import jwt from 'jsonwebtoken'
 import path from 'path'
+import crypto from 'node:crypto'
 
 import { initializeDatabase, initializeSchema, getMany, getOne, query, closeDatabase } from '../src/db/database.js'
 import userRepository from '../src/db/repositories/user.repository.js'
@@ -35,9 +38,38 @@ function notifyUser({ userId, workspaceId, entityType, entityId, title, body }) 
     .catch((err) => console.error('notification send failed:', err.message))
 }
 
+function logAudit(req, { actorId = null, action, entityType = null, entityId = null, meta = {} }) {
+  const ip = (req.headers['x-forwarded-for'] || req.ip || '').toString().slice(0, 64)
+  query(
+    `INSERT INTO audit_logs (actor_id, action, entity_type, entity_id, meta, ip) VALUES ($1,$2,$3,$4,$5,$6)`,
+    [actorId, action, entityType, entityId, JSON.stringify(meta || {}), ip]
+  ).catch((err) => console.error('audit log failed:', err.message))
+}
+
+const authRateLimit = createRateLimiter({ windowMs: 15 * 60 * 1000, max: 30 })
+const strictAuthRateLimit = createRateLimiter({ windowMs: 15 * 60 * 1000, max: 15 })
+
 async function getWorkspaceRequester(workspaceId, userId) {
+  if (!isUuid(workspaceId) || !isUuid(userId)) return null
   const members = await workspaceRepository.getMembers(workspaceId)
   return members.find((m) => String(m.id) === String(userId)) || null
+}
+
+async function requireWorkspaceMember(req, res, workspaceId, roles = null) {
+  if (!isUuid(workspaceId)) {
+    res.status(400).json({ error: 'Invalid workspace_id' })
+    return null
+  }
+  const requester = await getWorkspaceRequester(workspaceId, req.user?.id)
+  if (!requester) {
+    res.status(403).json({ error: 'Not a workspace member' })
+    return null
+  }
+  if (Array.isArray(roles) && roles.length > 0 && !roles.includes(requester.role)) {
+    res.status(403).json({ error: 'Insufficient workspace permissions' })
+    return null
+  }
+  return requester
 }
 
 async function userCanAccessProject(project, userId) {
@@ -52,6 +84,45 @@ async function userCanAccessProject(project, userId) {
   return !!row
 }
 
+async function requireProjectAccess(req, res, projectId, roles = null) {
+  if (!isUuid(projectId)) {
+    res.status(400).json({ error: 'Invalid project_id' })
+    return null
+  }
+  const project = await projectRepository.findById(projectId)
+  if (!project || project.deleted_at) {
+    res.status(404).json({ error: 'Project not found' })
+    return null
+  }
+  const requester = await getWorkspaceRequester(project.workspace_id, req.user?.id)
+  if (!requester) {
+    res.status(403).json({ error: 'Not a workspace member' })
+    return null
+  }
+  if (requester.role !== 'owner') {
+    const member = await getOne(
+      `SELECT role FROM project_members WHERE project_id = $1 AND user_id = $2 LIMIT 1`,
+      [project.id, req.user.id]
+    )
+    if (!member) {
+      res.status(403).json({ error: 'You do not have access to this project' })
+      return null
+    }
+    if (Array.isArray(roles) && roles.length > 0 && !roles.includes(member.role)) {
+      res.status(403).json({ error: 'Insufficient project permissions' })
+      return null
+    }
+  } else if (Array.isArray(roles) && roles.length > 0 && !roles.includes('owner') && !roles.includes(requester.role)) {
+    // owner always allowed
+  }
+  return { project, requester }
+}
+
+
+async function getProjectRoleForUser(projectId, userId) {
+  const row = await getOne(`SELECT role FROM project_members WHERE project_id = $1 AND user_id = $2 LIMIT 1`, [projectId, userId])
+  return row?.role || null
+}
 async function purgeExpiredDeletedProjects() {
   try {
     const res = await query(
@@ -72,37 +143,141 @@ const { PORT, JWT_SECRET } = env
 // Initialize DB
 initializeDatabase(env.db)
 
-// Apply idempotent schema (CREATE TABLE IF NOT EXISTS / ADD COLUMN IF NOT EXISTS)
-initializeSchema()
-  .then(() => purgeExpiredDeletedProjects())
-  .catch((err) => console.error('Schema init failed:', err.message))
+if (process.env.NODE_ENV !== 'test') {
+  // Apply idempotent schema (CREATE TABLE IF NOT EXISTS / ADD COLUMN IF NOT EXISTS)
+  initializeSchema()
+    .then(() => purgeExpiredDeletedProjects())
+    .catch((err) => console.error('Schema init failed:', err.message))
 
-setInterval(() => {
-  purgeExpiredDeletedProjects().catch((err) => console.error('[purge] interval failed:', err.message))
-}, 60 * 60 * 1000)
+  setInterval(() => {
+    purgeExpiredDeletedProjects().catch((err) => console.error('[purge] interval failed:', err.message))
+  }, 60 * 60 * 1000)
+}
+
+function getAuthToken(req) {
+  const header = req.headers.authorization
+  if (header) {
+    const parts = header.split(' ')
+    if (parts.length === 2 && /^Bearer$/i.test(parts[0])) return { token: parts[1], via: 'bearer' }
+  }
+  if (req.cookies?.thoth_token) return { token: req.cookies.thoth_token, via: 'cookie' }
+  return null
+}
+
+function setAuthCookie(res, token) {
+  res.cookie('thoth_token', token, {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+    path: '/',
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+  })
+}
+
+function clearAuthCookie(res) {
+  res.clearCookie('thoth_token', { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production', path: '/' })
+  res.clearCookie('thoth_csrf', { sameSite: 'lax', secure: process.env.NODE_ENV === 'production', path: '/' })
+}
+
+function ensureCsrfCookie(req, res) {
+  let token = req.cookies?.thoth_csrf
+  if (!token) {
+    token = crypto.randomUUID().replace(/-/g, '') + Date.now().toString(36)
+  }
+  res.cookie('thoth_csrf', token, {
+    httpOnly: false,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+    path: '/',
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+  })
+  return token
+}
+
+function csrfProtect(req, res, next) {
+  const method = String(req.method || 'GET').toUpperCase()
+  if (['GET','HEAD','OPTIONS'].includes(method)) return next()
+  const authInfo = req.authInfo
+  if (!authInfo || authInfo.via !== 'cookie') return next()
+  // Allow if Sec-Fetch-Site indicates same-origin/same-site in supporting browsers
+  const sfs = String(req.headers['sec-fetch-site'] || '').toLowerCase()
+  if (sfs === 'same-origin' || sfs === 'same-site' || sfs === 'none') {
+    // still verify CSRF token for defense-in-depth
+  }
+  const headerToken = String(req.headers['x-csrf-token'] || '')
+  const cookieToken = String(req.cookies?.thoth_csrf || '')
+  if (headerToken && cookieToken && headerToken === cookieToken) return next()
+  // Fallback Origin check
+  const origin = String(req.headers.origin || '')
+  if (origin) {
+    try {
+      const u = new URL(origin)
+      const host = req.headers.host
+      if (host && u.host === host) return next()
+    } catch {}
+  }
+  return res.status(403).json({ error: 'CSRF validation failed' })
+}
 
 function auth(req, res, next) {
-  const header = req.headers.authorization
-  if (!header) return res.status(401).json({ error: 'Missing auth' })
-  const parts = header.split(' ')
-  if (parts.length !== 2) return res.status(401).json({ error: 'Invalid auth' })
+  const info = getAuthToken(req)
+  if (!info) return res.status(401).json({ error: 'Missing auth' })
   try {
-    req.user = jwt.verify(parts[1], JWT_SECRET)
-    next()
+    req.user = jwt.verify(info.token, JWT_SECRET)
+    req.authInfo = info
+    if (info.via === 'cookie') ensureCsrfCookie(req, res)
+    return csrfProtect(req, res, next)
   } catch {
     return res.status(401).json({ error: 'Invalid token' })
   }
 }
 
 const app = express()
-app.use(cors())
+app.disable('x-powered-by')
+app.set('trust proxy', 1)
+const corsOrigin = process.env.CORS_ORIGIN
+  ? process.env.CORS_ORIGIN.split(',').map(s => s.trim()).filter(Boolean)
+  : (process.env.NODE_ENV === 'production' ? false : true)
+if (process.env.NODE_ENV === 'production' && !process.env.CORS_ORIGIN) {
+  console.warn('[security] CORS_ORIGIN not set in production; cross-origin credentialed requests will be blocked.')
+}
+app.use(cors({ origin: corsOrigin, credentials: true }))
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff')
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN')
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin')
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
+  res.setHeader('Cross-Origin-Resource-Policy', 'same-site')
+  if (process.env.NODE_ENV === 'production') res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
+  next()
+})
 app.use(express.json({ limit: '10mb' }))
+app.use((req, _res, next) => {
+  const raw = req.headers.cookie || ''
+  req.cookies = Object.fromEntries(raw.split(';').map(p => {
+    const i = p.indexOf('=')
+    if (i === -1) return null
+    const k = p.slice(0, i).trim()
+    const v = decodeURIComponent(p.slice(i + 1).trim())
+    return k ? [k, v] : null
+  }).filter(Boolean))
+  next()
+})
+
+app.param('id', (req, res, next, value) => {
+  if (value && !isUuid(value)) return res.status(400).json({ error: 'Invalid id' })
+  next()
+})
+app.param('userId', (req, res, next, value) => {
+  if (value && !isUuid(value)) return res.status(400).json({ error: 'Invalid userId' })
+  next()
+})
 
 app.get('/api/health', async (req, res) => {
   res.json({ status: 'ok' })
 })
 
-app.post('/api/auth/signup', async (req, res) => {
+app.post('/api/auth/signup', strictAuthRateLimit, async (req, res) => {
   try {
     const { username, email, password, full_name, account_hint } = req.body
     if(!email || !password || !username) return res.status(400).json({ error: 'Missing fields' })
@@ -123,6 +298,9 @@ app.post('/api/auth/signup', async (req, res) => {
     const user = await userRepository.create({ username, email, password_hash: hash, full_name, account_hint: hint })
 
     const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '7d' })
+    setAuthCookie(res, token)
+    ensureCsrfCookie(req, res)
+    logAudit(req, { actorId: user.id, action: 'auth.login', entityType: 'user', entityId: user.id })
     res.json({ token, user: { id: user.id, username: user.username, email: user.email, full_name: user.full_name } })
   } catch (err) {
     console.error(err)
@@ -130,7 +308,7 @@ app.post('/api/auth/signup', async (req, res) => {
   }
 })
 
-app.post('/api/auth/login', async (req, res) => {
+app.post('/api/auth/login', authRateLimit, async (req, res) => {
   try {
     const { email, password } = req.body
     if(!email || !password) return res.status(400).json({ error: 'Missing fields' })
@@ -149,31 +327,60 @@ app.post('/api/auth/login', async (req, res) => {
   }
 })
 
-app.post('/api/auth/password-hint', async (req, res) => {
+app.post('/api/auth/password-hint', authRateLimit, async (req, res) => {
   try {
     const email = String(req.body?.email || '').trim().toLowerCase()
     if (!email) return res.status(400).json({ error: 'Email is required' })
 
     const user = await userRepository.findByEmail(email)
-    if (!user) return res.status(404).json({ error: 'No account found' })
-
-    res.json({ hint: user.account_hint || null })
+    // Generic response to reduce account enumeration.
+    if (!user || !user.account_hint) {
+      return res.json({ hint: null, message: 'If that account has a password hint, it will appear here.' })
+    }
+    res.json({ hint: user.account_hint, message: 'Use this hint to help remember your password.' })
   } catch (err) {
     console.error(err)
     res.status(500).json({ error: 'Server error' })
   }
 })
 
+app.get('/api/auth/csrf', (req, res) => {
+  const token = ensureCsrfCookie(req, res)
+  res.json({ csrfToken: token })
+})
+
+app.post('/api/auth/logout', (req, res) => {
+  const info = getAuthToken(req)
+  if (info?.via === 'cookie') {
+    req.authInfo = info
+    // best-effort CSRF check for cookie-auth logout
+    const headerToken = String(req.headers['x-csrf-token'] || '')
+    const cookieToken = String(req.cookies?.thoth_csrf || '')
+    const origin = String(req.headers.origin || '')
+    let originOk = false
+    if (origin) { try { originOk = new URL(origin).host === req.headers.host } catch {} }
+    const sfs = String(req.headers['sec-fetch-site'] || '').toLowerCase()
+    const sfsOk = ['same-origin','same-site','none'].includes(sfs)
+    if (!(sfsOk || originOk || (headerToken && cookieToken && headerToken === cookieToken))) {
+      return res.status(403).json({ error: 'CSRF validation failed' })
+    }
+  }
+  if (info) {
+    try { req.user = jwt.verify(info.token, JWT_SECRET) } catch {}
+  }
+  clearAuthCookie(res)
+  logAudit(req, { actorId: req.user?.id || null, action: 'auth.logout', entityType: 'user', entityId: req.user?.id || null })
+  res.json({ ok: true })
+})
+
 app.get('/api/me', async (req, res) => {
-  const auth = req.headers.authorization
-  if(!auth) return res.status(401).json({ error: 'Missing auth' })
-  const parts = auth.split(' ')
-  if(parts.length !== 2) return res.status(401).json({ error: 'Invalid auth' })
-  const token = parts[1]
+  const info = getAuthToken(req)
+  if (!info) return res.status(401).json({ error: 'Missing auth' })
   try {
-    const payload = jwt.verify(token, JWT_SECRET)
+    const payload = jwt.verify(info.token, JWT_SECRET)
     const user = await userRepository.findById(payload.id)
-    if(!user) return res.status(404).json({ error: 'User not found' })
+    if (!user) return res.status(404).json({ error: 'User not found' })
+    if (info.via === 'cookie') ensureCsrfCookie(req, res)
     res.json({ user: { id: user.id, username: user.username, email: user.email, full_name: user.full_name } })
   } catch (err) {
     console.error(err)
@@ -291,6 +498,10 @@ app.post('/api/projects', auth, async (req, res) => {
     const trimmedName = String(name || '').trim()
     if (!workspace_id || !trimmedName) return res.status(400).json({ error: 'Missing fields' })
     if (trimmedName.length > 16) return res.status(400).json({ error: 'Project name must be 16 characters or less' })
+    const requester = await requireWorkspaceMember(req, res, workspace_id)
+    if (!requester) return
+    const ws = await workspaceRepository.findById(workspace_id)
+    if (!requireWorkspaceModulePerm(req, res, { workspace: ws, requester, pageKey: 'projects', action: 'write' })) return
 
     const baseSlug = slug || `${trimmedName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')}-${Date.now().toString(36)}`
     let currentSlug = baseSlug || `project-${Date.now().toString(36)}`
@@ -331,6 +542,8 @@ app.post('/api/projects', auth, async (req, res) => {
 
 app.get('/api/workspaces/:id/members', auth, async (req, res) => {
   try {
+    const requester = await requireWorkspaceMember(req, res, req.params.id)
+    if (!requester) return
     const rows = await workspaceRepository.getMembers(req.params.id)
     res.json(rows.map((u) => ({
       id: u.id,
@@ -375,6 +588,8 @@ app.get('/api/workspaces/:id/available-users', auth, async (req, res) => {
 
 app.patch('/api/workspaces/:id', auth, async (req, res) => {
   try {
+    const requester = await requireWorkspaceMember(req, res, req.params.id, ['owner', 'admin'])
+    if (!requester) return
     const { name, settings } = req.body
     if ((name == null || !String(name).trim()) && settings == null) {
       return res.status(400).json({ error: 'Nothing to update' })
@@ -382,6 +597,9 @@ app.patch('/api/workspaces/:id', auth, async (req, res) => {
 
     let updated = await workspaceRepository.findById(req.params.id)
     if (!updated) return res.status(404).json({ error: 'Workspace not found' })
+    if (settings != null && requester.role !== 'owner') {
+      return res.status(403).json({ error: 'Only workspace owner can update workspace settings' })
+    }
 
     if (name != null) {
       const trimmedName = String(name).trim()
@@ -403,6 +621,8 @@ app.patch('/api/workspaces/:id', auth, async (req, res) => {
 
 app.delete('/api/workspaces/:id', auth, async (req, res) => {
   try {
+    const requester = await requireWorkspaceMember(req, res, req.params.id, ['owner'])
+    if (!requester) return
     const deleted = await workspaceRepository.deleteById(req.params.id)
     if (!deleted) return res.status(404).json({ error: 'Workspace not found' })
     res.json({ ok: true })
@@ -414,11 +634,16 @@ app.delete('/api/workspaces/:id', auth, async (req, res) => {
 
 app.post('/api/workspaces/:id/members', auth, async (req, res) => {
   try {
+    const requester = await requireWorkspaceMember(req, res, req.params.id, ['owner', 'admin'])
+    if (!requester) return
     const { email, role } = req.body
     if (!email || !email.trim()) return res.status(400).json({ error: 'Email is required' })
 
     const workspace = await workspaceRepository.findById(req.params.id)
     if (!workspace) return res.status(404).json({ error: 'Workspace not found' })
+    if (requester.role !== 'owner' && role === 'owner') {
+      return res.status(403).json({ error: 'Only owner can assign owner role' })
+    }
 
     const user = await userRepository.findByEmail(email.trim().toLowerCase())
     if (!user) return res.status(404).json({ error: 'No user found with that email' })
@@ -452,8 +677,19 @@ app.post('/api/workspaces/:id/members', auth, async (req, res) => {
 
 app.patch('/api/workspaces/:id/members/:userId', auth, async (req, res) => {
   try {
+    const requester = await requireWorkspaceMember(req, res, req.params.id, ['owner', 'admin'])
+    if (!requester) return
     const { role } = req.body
     if (!role) return res.status(400).json({ error: 'Role is required' })
+    const members = await workspaceRepository.getMembers(req.params.id)
+    const target = (members || []).find(m => String(m.id) === String(req.params.userId))
+    if (!target) return res.status(404).json({ error: 'Member not found' })
+    if (target.role === 'owner' && role !== 'owner') {
+      return res.status(400).json({ error: 'Workspace owner role cannot be changed here' })
+    }
+    if (requester.role !== 'owner' && (role === 'owner' || target.role === 'admin')) {
+      return res.status(403).json({ error: 'Only owner can manage owner/admin roles' })
+    }
 
     const row = await workspaceRepository.updateMemberRole(req.params.id, req.params.userId, role)
     if (!row) return res.status(404).json({ error: 'Member not found' })
@@ -476,8 +712,16 @@ app.patch('/api/workspaces/:id/members/:userId', auth, async (req, res) => {
 
 app.delete('/api/workspaces/:id/members/:userId', auth, async (req, res) => {
   try {
-    const memberCount = await workspaceRepository.countMembers(req.params.id)
-    if (memberCount <= 1) {
+    const requester = await requireWorkspaceMember(req, res, req.params.id, ['owner', 'admin'])
+    if (!requester) return
+    const members = await workspaceRepository.getMembers(req.params.id)
+    const target = (members || []).find(m => String(m.id) === String(req.params.userId))
+    if (!target) return res.status(404).json({ error: 'Member not found' })
+    if (target.role === 'owner') return res.status(400).json({ error: 'Workspace owner cannot be removed' })
+    if (requester.role !== 'owner' && target.role === 'admin') {
+      return res.status(403).json({ error: 'Only owner can remove admins' })
+    }
+    if ((members || []).length <= 1) {
       return res.status(400).json({ error: 'Cannot remove the last member — delete the workspace instead' })
     }
 
@@ -494,6 +738,8 @@ app.get('/api/milestones', auth, async (req, res) => {
   try {
     const { project_id } = req.query
     if (!project_id) return res.status(400).json({ error: 'project_id is required' })
+    const access = await requireProjectAccess(req, res, project_id)
+    if (!access) return
     const rows = await milestoneRepository.findByCondition('project_id = $1', [project_id])
     res.json(rows)
   } catch (err) {
@@ -509,8 +755,12 @@ app.post('/api/milestones', auth, async (req, res) => {
       return res.status(400).json({ error: 'project_id and name are required' })
     }
 
-    const project = await projectRepository.findById(project_id)
-    if (!project) return res.status(404).json({ error: 'Project not found' })
+    const access = await requireProjectAccess(req, res, project_id)
+    if (!access) return
+    const project = access.project
+    const ws = await workspaceRepository.findById(project.workspace_id)
+    const projectRole = await getProjectRoleForUser(project.id, req.user.id)
+    if (!requireWorkspaceModulePerm(req, res, { workspace: ws, requester: access.requester, pageKey: 'projects', action: 'write', projectRole })) return
 
     const created = await milestoneRepository.create({
       project_id,
@@ -545,6 +795,11 @@ app.patch('/api/milestones/:id', auth, async (req, res) => {
 
     const existing = await milestoneRepository.findById(req.params.id)
     if (!existing) return res.status(404).json({ error: 'Milestone not found' })
+    const access = await requireProjectAccess(req, res, existing.project_id)
+    if (!access) return
+    const ws = await workspaceRepository.findById(access.project.workspace_id)
+    const projectRole = await getProjectRoleForUser(access.project.id, req.user.id)
+    if (!requireWorkspaceModulePerm(req, res, { workspace: ws, requester: access.requester, pageKey: 'projects', action: 'write', projectRole })) return
 
     const updated = await milestoneRepository.updateById(req.params.id, data)
     if (!updated) return res.status(404).json({ error: 'Milestone not found' })
@@ -557,6 +812,13 @@ app.patch('/api/milestones/:id', auth, async (req, res) => {
 
 app.delete('/api/milestones/:id', auth, async (req, res) => {
   try {
+    const existing = await milestoneRepository.findById(req.params.id)
+    if (!existing) return res.status(404).json({ error: 'Milestone not found' })
+    const access = await requireProjectAccess(req, res, existing.project_id)
+    if (!access) return
+    const ws = await workspaceRepository.findById(access.project.workspace_id)
+    const projectRole = await getProjectRoleForUser(access.project.id, req.user.id)
+    if (!requireWorkspaceModulePerm(req, res, { workspace: ws, requester: access.requester, pageKey: 'projects', action: 'delete', projectRole })) return
     const deleted = await milestoneRepository.deleteById(req.params.id)
     if (!deleted) return res.status(404).json({ error: 'Milestone not found' })
     res.json({ ok: true })
@@ -572,6 +834,8 @@ app.get('/api/md-pages', auth, async (req, res) => {
   try {
     const { workspace_id, type, page_date, project_id } = req.query
     if (!workspace_id) return res.status(400).json({ error: 'workspace_id is required' })
+    const requester = await requireWorkspaceMember(req, res, workspace_id)
+    if (!requester) return
     let sql = 'SELECT * FROM md_pages WHERE workspace_id = $1'
     const params = [workspace_id]
     if (project_id) {
@@ -599,6 +863,17 @@ app.post('/api/md-pages', auth, async (req, res) => {
   try {
     const { workspace_id, title, content, page_type, page_date, attachments, project_id } = req.body
     if (!workspace_id) return res.status(400).json({ error: 'workspace_id is required' })
+    const requester = await requireWorkspaceMember(req, res, workspace_id)
+    if (!requester) return
+    if (project_id) {
+      const project = await projectRepository.findById(project_id)
+      if (!project || String(project.workspace_id) !== String(workspace_id)) {
+        return res.status(400).json({ error: 'Invalid project_id for workspace' })
+      }
+      if (!(await userCanAccessProject(project, req.user.id))) {
+        return res.status(403).json({ error: 'You do not have access to this project' })
+      }
+    }
     const created = await getOne(
       `INSERT INTO md_pages (workspace_id, title, content, page_type, page_date, attachments, created_by, project_id)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
@@ -628,8 +903,19 @@ const MD_PAGE_FIELDS = {
 
 app.patch('/api/md-pages/:id', auth, async (req, res) => {
   try {
+    const existing = await getOne(`SELECT * FROM md_pages WHERE id = $1`, [req.params.id])
+    if (!existing) return res.status(404).json({ error: 'Page not found' })
+    const requester = await requireWorkspaceMember(req, res, existing.workspace_id)
+    if (!requester) return
+    const ws = await workspaceRepository.findById(existing.workspace_id)
+    if (!requireWorkspaceModulePerm(req, res, { workspace: ws, requester, pageKey: 'markdown', action: 'write' })) return
+
     const sets = []
     const vals = []
+    if (req.body.attachments !== undefined) {
+      const attErr = validateAttachments(req.body.attachments)
+      if (attErr) return res.status(400).json({ error: attErr })
+    }
     for (const [field, kind] of Object.entries(MD_PAGE_FIELDS)) {
       if (req.body[field] === undefined) continue
       vals.push(kind === 'jsonb' ? JSON.stringify(req.body[field]) : req.body[field])
@@ -654,6 +940,12 @@ app.patch('/api/md-pages/:id', auth, async (req, res) => {
 
 app.delete('/api/md-pages/:id', auth, async (req, res) => {
   try {
+    const existing = await getOne(`SELECT workspace_id FROM md_pages WHERE id = $1`, [req.params.id])
+    if (!existing) return res.status(404).json({ error: 'Page not found' })
+    const requester = await requireWorkspaceMember(req, res, existing.workspace_id)
+    if (!requester) return
+    const ws = await workspaceRepository.findById(existing.workspace_id)
+    if (!requireWorkspaceModulePerm(req, res, { workspace: ws, requester, pageKey: 'markdown', action: 'delete' })) return
     const result = await query('DELETE FROM md_pages WHERE id = $1', [req.params.id])
     if (result.rowCount === 0) return res.status(404).json({ error: 'Page not found' })
     res.json({ ok: true })
@@ -667,9 +959,14 @@ app.get('/api/activity', auth, async (req, res) => {
   try {
     const { project_id, workspace_id } = req.query
     if (project_id) {
+      const project = await projectRepository.findById(project_id)
+      if (!project) return res.status(404).json({ error: 'Project not found' })
+      if (!(await userCanAccessProject(project, req.user.id))) return res.status(403).json({ error: 'You do not have access to this project' })
       return res.json(await activityRepository.getProjectActivity(project_id))
     }
     if (workspace_id) {
+      const requester = await requireWorkspaceMember(req, res, workspace_id)
+      if (!requester) return
       return res.json(await activityRepository.getWorkspaceActivity(workspace_id))
     }
     return res.status(400).json({ error: 'project_id or workspace_id is required' })
@@ -756,10 +1053,18 @@ app.post('/api/tasks', auth, async (req, res) => {
     if (!(await userCanAccessProject(project, req.user.id))) {
       return res.status(403).json({ error: 'You do not have access to this project' })
     }
+    const ws = await workspaceRepository.findById(project.workspace_id)
+    const requester = await getWorkspaceRequester(project.workspace_id, req.user.id)
+    const projectRole = await getProjectRoleForUser(project.id, req.user.id)
+    if (!requireWorkspaceModulePerm(req, res, { workspace: ws, requester, pageKey: 'tasks', action: 'write', projectRole })) return
 
     const data = {}
     for (const field of TASK_ALLOWED_FIELDS) {
       if (req.body[field] !== undefined) data[field] = req.body[field]
+    }
+    if (data.meta?.attachments) {
+      const attErr = validateAttachments(data.meta.attachments)
+      if (attErr) return res.status(400).json({ error: attErr })
     }
 
     // Human-readable code scoped to the project: Task-01, Task-02, ...
@@ -813,6 +1118,10 @@ app.patch('/api/tasks/:id', auth, async (req, res) => {
     if (!(await userCanAccessProject(project, req.user.id))) {
       return res.status(403).json({ error: 'You do not have access to this project' })
     }
+    const ws = await workspaceRepository.findById(project.workspace_id)
+    const requester = await getWorkspaceRequester(project.workspace_id, req.user.id)
+    const projectRole = await getProjectRoleForUser(project.id, req.user.id)
+    if (!requireWorkspaceModulePerm(req, res, { workspace: ws, requester, pageKey: 'tasks', action: 'write', projectRole })) return
 
     // Merge meta instead of overwriting so comments/checklist/files persist independently
     let toUpdate = data
@@ -868,6 +1177,10 @@ app.delete('/api/tasks/:id', auth, async (req, res) => {
     if (!(await userCanAccessProject(project, req.user.id))) {
       return res.status(403).json({ error: 'You do not have access to this project' })
     }
+    const ws = await workspaceRepository.findById(project.workspace_id)
+    const requester = await getWorkspaceRequester(project.workspace_id, req.user.id)
+    const projectRole = await getProjectRoleForUser(project.id, req.user.id)
+    if (!requireWorkspaceModulePerm(req, res, { workspace: ws, requester, pageKey: 'tasks', action: 'delete', projectRole })) return
     await ensureArchivedStage(taskStageRepository, project.workspace_id)
     const updated = await taskRepository.updateById(req.params.id, { status: 'Archived', deleted_at: null })
     if (!updated) return res.status(404).json({ error: 'Task not found' })
@@ -920,6 +1233,9 @@ app.patch('/api/projects/:id', auth, async (req, res) => {
     if (!(await userCanAccessProject(existing, req.user.id))) {
       return res.status(403).json({ error: 'You do not have access to this project' })
     }
+    const ws = await workspaceRepository.findById(existing.workspace_id)
+    const requester = await getWorkspaceRequester(existing.workspace_id, req.user.id)
+    if (!requireWorkspaceModulePerm(req, res, { workspace: ws, requester, pageKey: 'projects', action: 'write' })) return
 
     // Merge meta instead of overwriting so attachments persist independently
     let toUpdate = data
@@ -958,6 +1274,8 @@ app.delete('/api/projects/:id', auth, async (req, res) => {
     const members = await workspaceRepository.getMembers(project.workspace_id)
     const requester = members.find((m) => String(m.id) === requesterId)
     const requesterRole = requester?.role || null
+    const ws = await workspaceRepository.findById(project.workspace_id)
+    if (!requireWorkspaceModulePerm(req, res, { workspace: ws, requester, pageKey: 'projects', action: 'delete' })) return
 
     // Workspace owner can delete all projects in the workspace (including legacy)
     if (requesterRole === 'owner') {
@@ -1016,9 +1334,8 @@ app.put('/api/projects/:id/members', auth, async (req, res) => {
   try {
     const project = await projectRepository.findById(req.params.id)
     if (!project) return res.status(404).json({ error: 'Project not found' })
-    if (!(await userCanAccessProject(project, req.user.id))) {
-      return res.status(403).json({ error: 'You do not have access to this project' })
-    }
+    const requester = await requireWorkspaceMember(req, res, project.workspace_id, ['owner', 'admin'])
+    if (!requester) return
     const { member_ids, members } = req.body
     // Backward compatible: member_ids = [userId,...]; new: members = [{user_id, role}, ...]
     const entries = Array.isArray(members) ? members : (Array.isArray(member_ids) ? member_ids.filter(Boolean) : [])
@@ -1070,11 +1387,10 @@ app.put('/api/workspaces/:id/members/:userId/project-memberships', auth, async (
 
 app.get('/api/workspaces/:id/my-project-memberships', auth, async (req, res) => {
   try {
+    const requester = await requireWorkspaceMember(req, res, req.params.id)
+    if (!requester) return
     const workspace = await workspaceRepository.findById(req.params.id)
     if (!workspace) return res.status(404).json({ error: 'Workspace not found' })
-    const wsMembers = await workspaceRepository.getMembers(req.params.id)
-    const requester = wsMembers.find(m => String(m.id) === String(req.user?.id))
-    if (!requester) return res.status(403).json({ error: 'Not a workspace member' })
 
     if (requester.role === 'owner') {
       const projects = await projectRepository.findByWorkspace(req.params.id)
@@ -1216,7 +1532,13 @@ app.patch('/api/bugs/:id', auth, async (req, res) => {
     // The bugs table stores files in `attachments`, not a `meta` column —
     // translate task-style meta.attachments patches before persisting
     if (req.body.meta && Array.isArray(req.body.meta.attachments)) {
+      const attErr = validateAttachments(req.body.meta.attachments)
+      if (attErr) return res.status(400).json({ error: attErr })
       data.attachments = JSON.stringify(req.body.meta.attachments)
+    }
+    if (Array.isArray(req.body.attachments)) {
+      const attErr = validateAttachments(req.body.attachments)
+      if (attErr) return res.status(400).json({ error: attErr })
     }
 
     if (Object.keys(data).length === 0) {
@@ -1234,6 +1556,10 @@ app.patch('/api/bugs/:id', auth, async (req, res) => {
     if (!(await userCanAccessProject(project, req.user.id))) {
       return res.status(403).json({ error: 'You do not have access to this project' })
     }
+    const ws = await workspaceRepository.findById(project.workspace_id)
+    const requester = await getWorkspaceRequester(project.workspace_id, req.user.id)
+    const projectRole = await getProjectRoleForUser(project.id, req.user.id)
+    if (!requireWorkspaceModulePerm(req, res, { workspace: ws, requester, pageKey: 'bugs', action: 'write', projectRole })) return
 
     const updated = await bugRepository.updateById(req.params.id, data)
     if (!updated) return res.status(404).json({ error: 'Bug not found' })
@@ -1280,6 +1606,10 @@ app.delete('/api/bugs/:id', auth, async (req, res) => {
     if (!(await userCanAccessProject(project, req.user.id))) {
       return res.status(403).json({ error: 'You do not have access to this project' })
     }
+    const ws = await workspaceRepository.findById(project.workspace_id)
+    const requester = await getWorkspaceRequester(project.workspace_id, req.user.id)
+    const projectRole = await getProjectRoleForUser(project.id, req.user.id)
+    if (!requireWorkspaceModulePerm(req, res, { workspace: ws, requester, pageKey: 'bugs', action: 'delete', projectRole })) return
     await ensureArchivedStage(bugStageRepository, project.workspace_id)
     const updated = await bugRepository.updateById(req.params.id, { kanban_column: 'Archived', status: 'Archived', deleted_at: null })
     if (!updated) return res.status(404).json({ error: 'Bug not found' })
@@ -1373,10 +1703,13 @@ async function ensureStages(repo, workspaceId, defaults) {
 }
 
 function stageRoutes(basePath, repo, defaults) {
+  const pageKey = basePath.includes('bug') ? 'bugs' : 'tasks'
   app.get(basePath, auth, async (req, res) => {
     try {
       const { workspace_id } = req.query
       if (!workspace_id) return res.status(400).json({ error: 'workspace_id is required' })
+      const requester = await requireWorkspaceMember(req, res, workspace_id)
+      if (!requester) return
       const rows = await ensureStages(repo, workspace_id, defaults)
       res.json(rows)
     } catch (err) {
@@ -1391,6 +1724,10 @@ function stageRoutes(basePath, repo, defaults) {
       if (!workspace_id || !name || !name.trim()) {
         return res.status(400).json({ error: 'workspace_id and name are required' })
       }
+      const requester = await requireWorkspaceMember(req, res, workspace_id, ['owner', 'admin'])
+      if (!requester) return
+      const ws = await workspaceRepository.findById(workspace_id)
+      if (!requireWorkspaceModulePerm(req, res, { workspace: ws, requester, pageKey, action: 'write' })) return
       const existing = await repo.findByCondition('workspace_id = $1', [workspace_id], 'position ASC')
       const maxPos = existing.reduce((m, r) => Math.max(m, Number(r.position) || 0), -1)
       const created = await repo.create({
@@ -1412,7 +1749,16 @@ function stageRoutes(basePath, repo, defaults) {
   app.patch(`${basePath}/reorder`, auth, async (req, res) => {
     try {
       const { order } = req.body
-      if (!Array.isArray(order)) return res.status(400).json({ error: 'order array is required' })
+      if (!Array.isArray(order) || order.length === 0) return res.status(400).json({ error: 'order array is required' })
+      const first = await repo.findById(order[0])
+      if (!first) return res.status(404).json({ error: 'Stage not found' })
+      const requester = await requireWorkspaceMember(req, res, first.workspace_id, ['owner', 'admin'])
+      if (!requester) return
+      const ws = await workspaceRepository.findById(first.workspace_id)
+      if (!requireWorkspaceModulePerm(req, res, { workspace: ws, requester, pageKey, action: 'write' })) return
+      const stages = await repo.findByCondition('workspace_id = $1', [first.workspace_id], 'position ASC')
+      const allowed = new Set(stages.map((st) => String(st.id)))
+      if (order.some((id) => !allowed.has(String(id)))) return res.status(400).json({ error: 'Invalid stage order' })
       for (let i = 0; i < order.length; i++) {
         await repo.updateById(order[i], { position: i })
       }
@@ -1425,6 +1771,12 @@ function stageRoutes(basePath, repo, defaults) {
 
   app.patch(`${basePath}/:id`, auth, async (req, res) => {
     try {
+      const existingStage = await repo.findById(req.params.id)
+      if (!existingStage) return res.status(404).json({ error: 'Stage not found' })
+      const requester = await requireWorkspaceMember(req, res, existingStage.workspace_id, ['owner', 'admin'])
+      if (!requester) return
+      const ws = await workspaceRepository.findById(existingStage.workspace_id)
+      if (!requireWorkspaceModulePerm(req, res, { workspace: ws, requester, pageKey, action: 'write' })) return
       const data = {}
       if (req.body.name !== undefined) data.name = String(req.body.name).trim()
       if (req.body.color !== undefined) data.color = req.body.color
@@ -1467,6 +1819,8 @@ app.delete('/api/task-stages/:id', auth, async (req, res) => {
   try {
     const stage = await taskStageRepository.findById(req.params.id)
     if (!stage) return res.status(404).json({ error: 'Stage not found' })
+    const requester = await requireWorkspaceMember(req, res, stage.workspace_id, ['owner', 'admin'])
+    if (!requester) return
     if (stage.name === 'Archived') {
       return res.status(400).json({ error: 'The Archived stage cannot be deleted' })
     }
@@ -1495,6 +1849,8 @@ app.delete('/api/bug-stages/:id', auth, async (req, res) => {
   try {
     const stage = await bugStageRepository.findById(req.params.id)
     if (!stage) return res.status(404).json({ error: 'Stage not found' })
+    const requester = await requireWorkspaceMember(req, res, stage.workspace_id, ['owner', 'admin'])
+    if (!requester) return
     if (stage.name === 'Archived') {
       return res.status(400).json({ error: 'The Archived stage cannot be deleted' })
     }
@@ -1641,52 +1997,6 @@ app.post('/api/archive/projects/:id/recover', auth, async (req, res) => {
   }
 })
 
-app.get('/api/archive/tasks', auth, async (req, res) => {
-  try {
-    const { workspace_id, project_id } = req.query
-    if (!workspace_id) return res.status(400).json({ error: 'workspace_id is required' })
-    const requester = await getWorkspaceRequester(workspace_id, req.user.id)
-    if (!requester) return res.status(403).json({ error: 'Not a workspace member' })
-    let rows = await taskRepository.findDeletedByWorkspace(workspace_id)
-    if (project_id) rows = (rows || []).filter(t => String(t.project_id) === String(project_id))
-    if (requester.role !== 'owner') {
-      const assigned = await getMany(
-        `SELECT pm.project_id FROM project_members pm JOIN projects p ON p.id = pm.project_id WHERE p.workspace_id = $1 AND pm.user_id = $2`,
-        [workspace_id, req.user.id]
-      )
-      const allowed = new Set((assigned || []).map(r => String(r.project_id)))
-      rows = (rows || []).filter(t => allowed.has(String(t.project_id)))
-    }
-    res.json(rows)
-  } catch (err) {
-    console.error(err)
-    res.status(500).json({ error: 'Server error' })
-  }
-})
-
-app.get('/api/archive/bugs', auth, async (req, res) => {
-  try {
-    const { workspace_id, project_id } = req.query
-    if (!workspace_id) return res.status(400).json({ error: 'workspace_id is required' })
-    const requester = await getWorkspaceRequester(workspace_id, req.user.id)
-    if (!requester) return res.status(403).json({ error: 'Not a workspace member' })
-    let rows = await bugRepository.findDeletedByWorkspace(workspace_id)
-    if (project_id) rows = (rows || []).filter(b => String(b.project_id) === String(project_id))
-    if (requester.role !== 'owner') {
-      const assigned = await getMany(
-        `SELECT pm.project_id FROM project_members pm JOIN projects p ON p.id = pm.project_id WHERE p.workspace_id = $1 AND pm.user_id = $2`,
-        [workspace_id, req.user.id]
-      )
-      const allowed = new Set((assigned || []).map(r => String(r.project_id)))
-      rows = (rows || []).filter(b => allowed.has(String(b.project_id)))
-    }
-    res.json(rows)
-  } catch (err) {
-    console.error(err)
-    res.status(500).json({ error: 'Server error' })
-  }
-})
-
 
 // Serve static built frontend in production
 app.use(express.static(path.join(process.cwd(), 'dist')))
@@ -1694,23 +2004,28 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(process.cwd(), 'dist', 'index.html'))
 })
 
-const server = app.listen(PORT, '0.0.0.0', () => console.log(`Server listening on ${PORT}`))
+export { app }
 
-// Graceful shutdown for Docker/systemd: stop accepting requests, then close the pool.
-async function shutdown(signal) {
-  console.log(`\n${signal} received — shutting down`)
-  server.close(async () => {
-    try {
-      await closeDatabase()
-      process.exit(0)
-    } catch (err) {
-      console.error('Shutdown error:', err)
-      process.exit(1)
-    }
-  })
-  // Force exit if open connections keep the process alive.
-  setTimeout(() => process.exit(1), 10_000).unref()
+const isMain = process.argv[1] && path.resolve(process.argv[1]) === path.resolve(process.cwd(), 'server/index.js')
+if (isMain) {
+  const server = app.listen(PORT, '0.0.0.0', () => console.log(`Server listening on ${PORT}`))
+
+  // Graceful shutdown for Docker/systemd: stop accepting requests, then close the pool.
+  async function shutdown(signal) {
+    console.log(`\n${signal} received — shutting down`)
+    server.close(async () => {
+      try {
+        await closeDatabase()
+        process.exit(0)
+      } catch (err) {
+        console.error('Shutdown error:', err)
+        process.exit(1)
+      }
+    })
+    // Force exit if open connections keep the process alive.
+    setTimeout(() => process.exit(1), 10_000).unref()
+  }
+
+  process.on('SIGINT', () => shutdown('SIGINT'))
+  process.on('SIGTERM', () => shutdown('SIGTERM'))
 }
-
-process.on('SIGINT', () => shutdown('SIGINT'))
-process.on('SIGTERM', () => shutdown('SIGTERM'))

@@ -30,6 +30,8 @@ services:
       NODE_ENV: production
       PORT: 4000
       JWT_SECRET: "${JWT_SECRET:?Set JWT_SECRET in .env (openssl rand -hex 32)}"
+      # Optional for same-origin self-hosting. Set if accessing from a different origin.
+      CORS_ORIGIN: ${CORS_ORIGIN:-}
       # Bundled PostgreSQL. To use an external database instead, remove the
       # DB_* block and set DATABASE_URL here instead.
       DB_HOST: db

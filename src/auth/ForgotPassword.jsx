@@ -10,6 +10,7 @@ function navigate(path) {
 export default function ForgotPassword() {
   const [email, setEmail] = useState('')
   const [hint, setHint] = useState(null)
+  const [hintMessage, setHintMessage] = useState('')
   const [notFound, setNotFound] = useState(false)
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -18,6 +19,7 @@ export default function ForgotPassword() {
     e.preventDefault()
     setError(null)
     setHint(null)
+    setHintMessage('')
     setNotFound(false)
 
     const value = email.trim().toLowerCase()
@@ -30,13 +32,15 @@ export default function ForgotPassword() {
     try {
       const res = await fetch('/api/auth/password-hint', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', ...(typeof document !== 'undefined' && document.cookie.match(/(?:^|; )thoth_csrf=([^;]+)/) ? { 'X-CSRF-Token': decodeURIComponent(document.cookie.match(/(?:^|; )thoth_csrf=([^;]+)/)[1]) } : {}) },
         body: JSON.stringify({ email: value }),
       })
       const data = await res.json().catch(() => ({}))
 
       if (res.ok) {
         setHint(data.hint || null)
+        setHintMessage(data.message || '')
         setNotFound(false)
         return
       }
@@ -141,7 +145,7 @@ export default function ForgotPassword() {
                       Registered Password Hint
                     </div>
                     <div style={{ fontSize: '12.5px', color: '#d5dbdc' }}>
-                      No password hint was set for this account.
+                      {hintMessage || 'No password hint was set for this account.'}
                     </div>
                   </>
                 )}
