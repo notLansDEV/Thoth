@@ -277,9 +277,6 @@ export default function Sidebar({ collapsed }) {
           window.history.pushState({}, '', '/login')
           window.dispatchEvent(new PopStateEvent('popstate'))
         }}><span className="icon"><LogOut size={14} /></span><span className="label">Log out</span></a>
-        {!collapsed && (
-          <div className="status"><span className="status-dot" />PostgreSQL connected</div>
-        )}
       </div>
     </aside>
   )

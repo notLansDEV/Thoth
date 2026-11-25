@@ -14,6 +14,7 @@ import Login from '../auth/Login'
 import Signup from '../auth/Signup'
 import ForgotPassword from '../auth/ForgotPassword'
 import { getCurrentWorkspace, setCurrentWorkspace, getWorkspaces, canAccessModule, refreshMyProjectMemberships, getSelectedProjectId, setSelectedProjectId, getMyProjectMembershipsCache } from '../features/workspaces/workspaces.service.js'
+import PageSkeleton from '../components/PageSkeleton.jsx'
 
 const AUTH_PAGES = ['login', 'signup', 'forgot-password']
 
@@ -44,6 +45,13 @@ function parsePath(){
 export default function AppRouter(){
   const [route, setRoute] = useState(parsePath())
   const [, setWsSyncTick] = useState(0)
+  const [pageLoading, setPageLoading] = useState(false)
+
+  useEffect(() => {
+    setPageLoading(true)
+    const t = setTimeout(() => setPageLoading(false), 350)
+    return () => clearTimeout(t)
+  }, [route.page, route.id, route.workspace])
 
   useEffect(() => {
     const onPop = () => setRoute(parsePath())
@@ -144,7 +152,7 @@ export default function AppRouter(){
     const wsKey = getCurrentWorkspace()?.id || 'none'
     return (
       <ErrorBoundary>
-        <AppLayout key={wsKey}>{element}</AppLayout>
+        <AppLayout key={wsKey}>{pageLoading ? <PageSkeleton /> : element}</AppLayout>
       </ErrorBoundary>
     )
   }

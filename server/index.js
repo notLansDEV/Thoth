@@ -281,6 +281,14 @@ app.post('/api/auth/signup', strictAuthRateLimit, async (req, res) => {
   try {
     const { username, email, password, full_name, account_hint } = req.body
     if(!email || !password || !username) return res.status(400).json({ error: 'Missing fields' })
+    const cleanUsername = String(username).trim()
+    const cleanFullName = String(full_name || '').trim()
+    if (cleanUsername.length > 16 || !/^[A-Za-z]+$/.test(cleanUsername)) {
+      return res.status(400).json({ error: 'Username must be 1-16 letters only' })
+    }
+    if (cleanFullName.length > 16 || !/^[A-Za-z ]+$/.test(cleanFullName)) {
+      return res.status(400).json({ error: 'Full name must be 1-16 letters/spaces only' })
+    }
 
     const strongPassword = typeof password === 'string'
       && password.length >= 8
@@ -295,12 +303,12 @@ app.post('/api/auth/signup', strictAuthRateLimit, async (req, res) => {
 
     const hint = typeof account_hint === 'string' && account_hint.trim() ? account_hint.trim().slice(0, 255) : null
     const hash = await bcrypt.hash(password, 10)
-    const user = await userRepository.create({ username, email, password_hash: hash, full_name, account_hint: hint })
+    const user = await userRepository.create({ username: cleanUsername, email, password_hash: hash, full_name: cleanFullName, account_hint: hint })
 
     const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '7d' })
     setAuthCookie(res, token)
     ensureCsrfCookie(req, res)
-    logAudit(req, { actorId: user.id, action: 'auth.login', entityType: 'user', entityId: user.id })
+    logAudit(req, { actorId: user.id, action: 'auth.signup', entityType: 'user', entityId: user.id })
     res.json({ token, user: { id: user.id, username: user.username, email: user.email, full_name: user.full_name } })
   } catch (err) {
     console.error(err)
@@ -320,6 +328,9 @@ app.post('/api/auth/login', authRateLimit, async (req, res) => {
     if(!ok) return res.status(401).json({ error: 'Invalid credentials' })
 
     const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '7d' })
+    setAuthCookie(res, token)
+    ensureCsrfCookie(req, res)
+    logAudit(req, { actorId: user.id, action: 'auth.login', entityType: 'user', entityId: user.id })
     res.json({ token, user: { id: user.id, username: user.username, email: user.email, full_name: user.full_name } })
   } catch (err) {
     console.error(err)

@@ -2,7 +2,7 @@ const SETTINGS_KEY = 'thoth_settings'
 
 const DEFAULTS = {
   theme: 'dark',
-  font: 'Inter',
+  font: 'JetBrains Mono',
   compact: false,
 }
 
@@ -36,7 +36,9 @@ export function applySettings(settings = getSettings()) {
     root.setAttribute('data-theme', 'dark')
   }
 
-  root.style.setProperty('--font-family', settings.font)
+  const font = String(settings.font || 'JetBrains Mono')
+  const fontValue = /\s/.test(font) ? `"${font}"` : font
+  root.style.setProperty('--font-family', fontValue)
 
   if (settings.compact) root.classList.add('compact-mode')
   else root.classList.remove('compact-mode')

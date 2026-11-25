@@ -16,6 +16,13 @@ function passwordChecks(password) {
   }
 }
 
+function lettersOnly(value) {
+  return value.replace(/[^A-Za-z]/g, '')
+}
+function lettersAndSpacesOnly(value) {
+  return value.replace(/[^A-Za-z ]/g, '')
+}
+
 export default function Signup() {
   const [username, setUsername] = useState('')
   const [fullName, setFullName] = useState('')
@@ -35,8 +42,26 @@ export default function Signup() {
     e.preventDefault()
     setError(null)
 
-    if (!username.trim() || !fullName.trim() || !email.trim() || !password || !confirmPassword) {
+    const cleanUsername = lettersOnly(username).slice(0, 16)
+    const cleanFullName = lettersAndSpacesOnly(fullName).trim().slice(0, 16)
+    if (!cleanUsername || !cleanFullName || !email.trim() || !password || !confirmPassword) {
       setError('Please fill in all required fields.')
+      return
+    }
+    if (cleanUsername.length > 16) {
+      setError('Username must be 16 characters max.')
+      return
+    }
+    if (!/^[A-Za-z]+$/.test(cleanUsername)) {
+      setError('Username must contain letters only.')
+      return
+    }
+    if (cleanFullName.length > 16) {
+      setError('Full name must be 16 characters max.')
+      return
+    }
+    if (!/^[A-Za-z ]+$/.test(cleanFullName)) {
+      setError('Full name must contain letters and spaces only.')
       return
     }
     if (!passwordStrong) {
@@ -55,10 +80,10 @@ export default function Signup() {
         credentials: 'include',
         headers: { 'Content-Type': 'application/json', ...(typeof document !== 'undefined' && document.cookie.match(/(?:^|; )thoth_csrf=([^;]+)/) ? { 'X-CSRF-Token': decodeURIComponent(document.cookie.match(/(?:^|; )thoth_csrf=([^;]+)/)[1]) } : {}) },
         body: JSON.stringify({
-          username: username.trim(),
+          username: cleanUsername,
           email: email.trim(),
           password,
-          full_name: fullName.trim(),
+          full_name: cleanFullName,
           account_hint: accountHint.trim() || null,
         })
       })
@@ -167,9 +192,11 @@ export default function Signup() {
                   autoComplete="username"
                   placeholder="Choose a username"
                   value={username}
-                  onChange={(e) => setUsername(e.target.value)}
+                  maxLength={16}
+                  onChange={(e) => setUsername(lettersOnly(e.target.value).slice(0, 16))}
                   required
                 />
+                <div style={{ fontSize: 11, color: 'var(--muted2, #9aa0aa)', marginTop: 4 }}>{username.length}/16 · letters only</div>
               </div>
 
               <div className="auth-group">
@@ -184,9 +211,11 @@ export default function Signup() {
                   autoComplete="name"
                   placeholder="Enter your full name"
                   value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
+                  maxLength={16}
+                  onChange={(e) => setFullName(lettersAndSpacesOnly(e.target.value).slice(0, 16))}
                   required
                 />
+                <div style={{ fontSize: 11, color: 'var(--muted2, #9aa0aa)', marginTop: 4 }}>{fullName.length}/16 · letters only</div>
               </div>
 
               <div className="auth-group">
