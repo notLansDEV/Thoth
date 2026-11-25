@@ -110,11 +110,11 @@ export function setSelectedProjectId(projectId, workspaceId = null) {
       return
     }
     localStorage.setItem(SELECTED_PROJECT_KEY, JSON.stringify({ workspaceId: wsId, projectId }))
-  } catch {}
+  } catch { /* ignore storage errors */ }
 }
 
 export function clearSelectedProjectId() {
-  try { localStorage.removeItem(SELECTED_PROJECT_KEY) } catch {}
+  try { localStorage.removeItem(SELECTED_PROJECT_KEY) } catch { /* ignore storage errors */ }
 }
 
 export async function getMyProjectMemberships(workspaceId) {
@@ -133,7 +133,7 @@ export function setMyProjectMembershipsCache(workspaceId, rows) {
       rows: Array.isArray(rows) ? rows : [],
       updatedAt: Date.now(),
     }))
-  } catch {}
+  } catch { /* ignore storage errors */ }
 }
 
 export function getMyProjectMembershipsCache(workspaceId = null) {
@@ -176,7 +176,6 @@ const MODULE_KEYS = {
   settings: 'Settings',
 }
 
-const MODULE_NAMES = ['Dashboard', 'Projects', 'Task', 'Bugs', 'Calendar', 'Report', 'Markdown', 'Workspace', 'Settings']
 const ROLES = ['owner', 'admin', 'member']
 
 const PERM_MATRIX = [
@@ -478,20 +477,6 @@ function deriveModulePerms(granular, role) {
       if (p.delete) del = true
     }
     out[mod.key] = { read, write, delete: del }
-  }
-  return out
-}
-
-function mergeModulePermsUnion(permsList) {
-  const out = {}
-  for (const mod of PERM_MATRIX) out[mod.key] = { read: false, write: false, delete: false }
-  for (const perms of (permsList || [])) {
-    for (const mod of PERM_MATRIX) {
-      const p = perms?.[mod.key] || {}
-      out[mod.key].read = out[mod.key].read || !!p.read
-      out[mod.key].write = out[mod.key].write || !!p.write
-      out[mod.key].delete = out[mod.key].delete || !!p.delete
-    }
   }
   return out
 }

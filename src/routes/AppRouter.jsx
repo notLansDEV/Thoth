@@ -13,7 +13,7 @@ import Workspaces from '../pages/Workspaces'
 import Login from '../auth/Login'
 import Signup from '../auth/Signup'
 import ForgotPassword from '../auth/ForgotPassword'
-import { getCurrentWorkspace, setCurrentWorkspace, getWorkspaces, canAccessModule, refreshMyProjectMemberships, getSelectedProjectId, setSelectedProjectId, getMyProjectMembershipsCache } from '../features/workspaces/workspaces.service.js'
+import { getCurrentWorkspace, setCurrentWorkspace, getWorkspaces, canAccessModule, refreshMyProjectMemberships, getSelectedProjectId, setSelectedProjectId } from '../features/workspaces/workspaces.service.js'
 import PageSkeleton from '../components/PageSkeleton.jsx'
 
 const AUTH_PAGES = ['login', 'signup', 'forgot-password']
@@ -45,13 +45,14 @@ function parsePath(){
 export default function AppRouter(){
   const [route, setRoute] = useState(parsePath())
   const [, setWsSyncTick] = useState(0)
-  const [pageLoading, setPageLoading] = useState(false)
+  const routeKey = `${route.page}:${route.id || ''}:${route.workspace || ''}`
+  const [readyKey, setReadyKey] = useState('')
+  const pageLoading = readyKey !== routeKey
 
   useEffect(() => {
-    setPageLoading(true)
-    const t = setTimeout(() => setPageLoading(false), 350)
+    const t = setTimeout(() => setReadyKey(routeKey), 350)
     return () => clearTimeout(t)
-  }, [route.page, route.id, route.workspace])
+  }, [routeKey])
 
   useEffect(() => {
     const onPop = () => setRoute(parsePath())

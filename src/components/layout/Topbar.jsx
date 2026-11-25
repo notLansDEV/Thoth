@@ -2,6 +2,7 @@
 import { LogOut, Menu, PanelLeftClose, ChevronDown, Bell, Sun, Moon } from 'lucide-react'
 import {
   getCurrentWorkspace,
+  setCurrentWorkspace,
   getProjectRole,
   refreshMyProjectMemberships,
   getSelectedProjectId,
@@ -14,7 +15,7 @@ import {
   relativeTime,
 } from '../../features/notifications/notifications.service.js'
 import { getSettings, saveSettings } from '../../features/settings/settings.service.js'
-import { clearSession } from '../../features/auth/account.service.js'
+
 
 const PAGE_LABELS = {
   dashboard: 'Dashboard',
@@ -48,12 +49,12 @@ function getUser() {
 }
 
 function logout() {
-  try { setCurrentWorkspace(null) } catch {}
+  try { setCurrentWorkspace(null) } catch { /* ignore */ }
   try {
     localStorage.removeItem('token')
     localStorage.removeItem('thoth_user')
     localStorage.removeItem('thoth_workspace')
-  } catch {}
+  } catch { /* ignore */ }
   window.location.href = '/login'
 }
 
@@ -96,6 +97,7 @@ export default function Topbar({ collapsed, onToggleCollapse }) {
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial notification fetch + subscriptions
     refreshNotifications()
     const onDataChanged = () => refreshNotifications()
     window.addEventListener('thoth:data-changed', onDataChanged)
@@ -191,6 +193,7 @@ export default function Topbar({ collapsed, onToggleCollapse }) {
   const pageLabel = PAGE_LABELS[pageKey] || pageKey
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- sync selected project from route/workspace
     setSelectedProjectIdState(getSelectedProjectId(getCurrentWorkspace()?.id))
   }, [ws?.id, pageKey, subSeg])
 
@@ -207,6 +210,7 @@ export default function Topbar({ collapsed, onToggleCollapse }) {
   // Resolve the crumb tail: project name on detail pages, otherwise sub-page label
   const [projectName, setProjectName] = useState(null)
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset before async project lookup
     setProjectName(null)
     if (!(pageKey === 'projects' && subSeg)) return undefined
     let alive = true

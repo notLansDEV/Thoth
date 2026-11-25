@@ -214,7 +214,7 @@ function csrfProtect(req, res, next) {
       const u = new URL(origin)
       const host = req.headers.host
       if (host && u.host === host) return next()
-    } catch {}
+    } catch { /* invalid origin */ }
   }
   return res.status(403).json({ error: 'CSRF validation failed' })
 }
@@ -369,7 +369,7 @@ app.post('/api/auth/logout', (req, res) => {
     const cookieToken = String(req.cookies?.thoth_csrf || '')
     const origin = String(req.headers.origin || '')
     let originOk = false
-    if (origin) { try { originOk = new URL(origin).host === req.headers.host } catch {} }
+    if (origin) { try { originOk = new URL(origin).host === req.headers.host } catch { /* invalid origin */ } }
     const sfs = String(req.headers['sec-fetch-site'] || '').toLowerCase()
     const sfsOk = ['same-origin','same-site','none'].includes(sfs)
     if (!(sfsOk || originOk || (headerToken && cookieToken && headerToken === cookieToken))) {
@@ -377,7 +377,7 @@ app.post('/api/auth/logout', (req, res) => {
     }
   }
   if (info) {
-    try { req.user = jwt.verify(info.token, JWT_SECRET) } catch {}
+    try { req.user = jwt.verify(info.token, JWT_SECRET) } catch { /* stale/invalid token */ }
   }
   clearAuthCookie(res)
   logAudit(req, { actorId: req.user?.id || null, action: 'auth.logout', entityType: 'user', entityId: req.user?.id || null })

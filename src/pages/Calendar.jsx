@@ -18,7 +18,7 @@ import TaskPreviewModal from '../features/tasks/components/TaskPreviewModal.jsx'
 import BugPreviewModal from '../features/bugs/components/BugPreviewModal.jsx'
 
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-const WEEK_DAYS = [1, 2, 3, 4, 5, 6, 0]
+const _WEEK_DAYS = [1, 2, 3, 4, 5, 6, 0]
 
 const VIEWS = [
   { key: 'month', label: 'Month', Icon: CalendarDays },
@@ -26,7 +26,7 @@ const VIEWS = [
   { key: 'day', label: 'Day', Icon: CalendarClock },
 ]
 
-export default function Calendar({ workspace }) {
+export default function Calendar({ workspace: _workspace }) {
   const ws = getCurrentWorkspace()
   const [view, setView] = useState('month')
   const [anchor, setAnchor] = useState(() => new Date())
