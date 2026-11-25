@@ -13,6 +13,7 @@ import CreateMilestoneModal from './CreateMilestoneModal.jsx'
 import AttachmentsTab from './AttachmentsTab.jsx'
 import ListToolbar from '../../../components/ListToolbar.jsx'
 import ConfirmModal from '../../../components/ConfirmModal.jsx'
+import DescriptionPreview from '../../../components/DescriptionPreview.jsx'
 
 const TABS = ['Overview', 'Team', 'Milestone', 'Task', 'Bugs', 'Attachments', 'Activity', 'Notes']
 
@@ -176,9 +177,13 @@ export default function ProjectDetail({ projectId, onBack }) {
       {tab === 'Overview' && (
         <div className="card">
           <label style={labelStyle}>Description</label>
-          <p style={{ margin: '0 0 14px', fontSize: '12px', color: 'var(--text-soft)', lineHeight: 1.55 }}>
-            {project.description || 'No description yet.'}
-          </p>
+          <DescriptionPreview
+            text={project.description || ''}
+            maxChars={16}
+            className="md-rendered"
+            style={{ margin: '0 0 14px', fontSize: '12px', color: 'var(--text-soft)', lineHeight: 1.55 }}
+            emptyText="No description yet."
+          />
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px' }}>
             <div>
               <label style={labelStyle}>Start date</label>
