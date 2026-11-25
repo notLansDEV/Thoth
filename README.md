@@ -9,76 +9,24 @@
 
 ## What is Thoth?
 
-Thoth helps teams keep project work and project knowledge in one place. You can manage workspaces, projects, tasks, bugs, markdown notes, calendars, reports, and team permissions while keeping your data on your own infrastructure.
+Thoth helps teams keep project work and project knowledge in one place. Manage workspaces, projects, tasks, bugs, markdown notes, calendars, reports, and team permissions while keeping your data on your own infrastructure.
 
 ## Key Features
 
-- **Workspaces & Projects** — Organize work by workspace, switch projects, and control project access per member.
+- **Workspaces & Projects** — Organize work by workspace, switch projects, and control access per member.
 - **Tasks & Bugs** — Kanban boards, priorities, assignees, attachments, comments, and archived stages.
-- **Markdown Notes** — Project-scoped markdown pages/journal for documentation and meeting notes.
-- **Calendar & Reports** — View scheduled work and export/report project progress.
-- **Roles & Permissions** — Granular workspace/project role permissions with owner/admin/member controls.
-- **Archive & Recovery** — Deleted projects can be reviewed and recovered (with retention cleanup).
-- **Self-Hosted** — Runs with Node.js + PostgreSQL, or via Docker Compose.
-
-## Tech Stack
-
-- **Frontend:** React, Vite, Tailwind, Lucide
-- **Backend:** Node.js, Express
-- **Database:** PostgreSQL
-- **Auth:** JWT (Bearer + httpOnly cookie support) with CSRF protection for cookie-auth requests
+- **Markdown Notes** — Project-scoped markdown pages and journals for documentation and meeting notes.
+- **Calendar & Reports** — View scheduled work and export project progress reports.
+- **Roles & Permissions** — Granular workspace and project role controls for owners, admins, and members.
+- **Archive & Recovery** — Review and recover deleted projects with configurable retention cleanup.
 
 ---
 
-## Quick Start (Local Development)
+## Quick Start (Docker)
 
-### 1. Prerequisites
+### Option 1: All-in-One Container (Recommended)
 
-- Node.js 20+ (Node 24 recommended)
-- npm
-- PostgreSQL running locally
-
-### 2. Install and configure
-
-```bash
-npm install
-createdb thoth
-cp .env.example .env
-```
-
-Edit `.env` and set at least:
-
-```env
-DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/thoth
-JWT_SECRET=replace-with-a-long-random-secret
-```
-
-Generate a secure secret:
-
-```bash
-openssl rand -hex 32
-```
-
-> `.env` and `.env.local` are git-ignored. Never commit real secrets.
-
-### 3. Run the app
-
-```bash
-npm run dev
-```
-
-- **Frontend:** http://localhost:5173
-- **API health:** http://localhost:4000/api/health
-
-The app applies idempotent schema/bootstrap updates on startup.
-
----
-
-## Self-Hosting with Docker (Recommended)
-
-### Quick start (all-in-one)
-
-The easiest way to run Thoth is the all-in-one image (app + PostgreSQL in one container):
+Run Thoth and PostgreSQL together in a single container with zero external database setup:
 
 ```bash
 docker build -f Dockerfile.allinone -t thoth .
@@ -89,98 +37,77 @@ docker run -d \
   thoth
 ```
 
-Open **http://localhost:5232** and create your first account.
+Open **http://localhost:5232** in your browser and create your first account.
 
-Everything Thoth stores is in `~/.thoth`, so backing up that one folder backs up your data.
+All application and database data lives in `~/.thoth` on your host machine, so backing up that single directory backs up everything.
 
-**Useful commands:**
+**Container management:**
 
 ```bash
-docker logs -f thoth
-docker stop thoth
-docker start thoth
-docker rm -f thoth   # data stays in ~/.thoth
+docker logs -f thoth      # Follow logs
+docker stop thoth         # Stop container
+docker start thoth        # Start container
+docker rm -f thoth        # Remove container (data remains in ~/.thoth)
 ```
 
-### Advanced: Docker Compose (separate app + DB)
+---
 
-Use this if you want a separate PostgreSQL container/service.
+### Option 2: Docker Compose (Separate App & Database)
 
-1. Create `.env`:
+Use Docker Compose if you want separate containers for the Thoth server and PostgreSQL.
+
+1. **Create your `.env` file:**
 
 ```bash
 cp .env.example .env
 ```
 
-Set required values:
+Set the required secrets in `.env`:
 
 ```env
-JWT_SECRET=<openssl rand -hex 32>
-POSTGRES_PASSWORD=<openssl rand -hex 24>
+JWT_SECRET=<output of: openssl rand -hex 32>
+POSTGRES_PASSWORD=<output of: openssl rand -hex 24>
 APP_PORT=5232
 ```
 
-2. Start:
+2. **Build and start the stack:**
 
 ```bash
 docker compose up -d --build
 ```
 
-Open **http://localhost:5232**
+Open **http://localhost:5232** in your browser.
 
-3. Status/logs:
-
-```bash
-docker compose ps
-docker compose logs -f app
-curl http://localhost:5232/api/health
-```
-
-4. Stop/reset:
+3. **Useful Compose commands:**
 
 ```bash
-docker compose down
-# DESTROYS DATA
-docker compose down -v
+docker compose ps                     # Check container status
+docker compose logs -f app            # View app logs
+curl http://localhost:5232/api/health # Verify API health
+docker compose down                   # Stop stack (preserves data)
+docker compose down -v                # Stop stack and delete database volume
 ```
 
 ---
 
-## Useful Commands
+## Configuration & Security
 
-```bash
-npm run dev            # Run client + server in dev
-npm run dev:client     # Vite frontend only
-npm run dev:server     # API server only (watch)
-npm run build          # Production frontend build
-npm run lint           # ESLint
-npm test               # Unit tests (Node test runner)
-npm run test:integration  # DB-backed integration tests (requires TEST_DATABASE_URL)
-npm run start:server   # Start API server
-```
-
-## Configuration Notes
-
-- **`JWT_SECRET`** is required in production and should be long/random.
-- **`DATABASE_URL`** or `DB_*` variables configure PostgreSQL.
-- **`CORS_ORIGIN`** should be set when frontend and API are on different origins. For same-origin Docker self-hosting, leave it empty.
-- **Uploads/attachments** are currently stored as data payloads in app data; keep attachment sizes reasonable.
-
-## Security Notes
-
-- Cookie auth uses `httpOnly`, `SameSite=Lax`, and `Secure` in production.
-- CSRF protection is enforced for cookie-authenticated state-changing requests.
-- See [`SECURITY.md`](./SECURITY.md) for current controls and limitations.
+- **`JWT_SECRET`** — Required in production; use a long, random hex string (`openssl rand -hex 32`).
+- **`CORS_ORIGIN`** — Leave empty for same-origin Docker self-hosting. Only set this if your frontend and API run on different origins.
+- **HTTPS / Reverse Proxy** — Place **Caddy**, **Nginx**, or **Traefik** in front of port `5232` for TLS/HTTPS.
+- **Security** — Cookie authentication uses `httpOnly`, `SameSite=Lax`, and `Secure` in production with CSRF protection enabled. See [`SECURITY.md`](./SECURITY.md) for details.
 
 ## Troubleshooting
 
-- **App won't start:** check `.env` values, especially `JWT_SECRET` and DB credentials.
-- **Docker app unhealthy:** run `docker compose logs app` and `docker compose logs db`.
-- **Port already in use:** change `APP_PORT` in `.env`, then `docker compose up -d`.
-- **CORS/CSRF issues on custom domain:** set `CORS_ORIGIN` to the exact frontend origin and use HTTPS.
+- **Container fails to start:** Check logs with `docker logs thoth` (or `docker compose logs app` and `docker compose logs db`).
+- **Port `5232` already in use:** Map a different host port using `-p 8080:5232` or change `APP_PORT` in `.env`.
+- **Database backup (Compose):**
+  ```bash
+  docker compose exec db sh -c 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' > backup.sql
+  ```
 
----
+## Tech Stack
 
-## Development Status
-
-Thoth is actively evolving. Core workflows are usable, and security/testing hardening is ongoing. See `SECURITY.md` and tests for current coverage.
+- **Frontend:** React, Vite, Tailwind CSS, Lucide Icons
+- **Backend:** Node.js, Express
+- **Database:** PostgreSQL
