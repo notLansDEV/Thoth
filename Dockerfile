@@ -2,6 +2,9 @@
 
 # ---- build stage: install deps, build the SPA, prune dev dependencies ----
 FROM node:24-bookworm-slim AS build
+ARG APP_VERSION=dev
+ENV APP_VERSION=$APP_VERSION
+ENV VITE_APP_VERSION=$APP_VERSION
 WORKDIR /app
 
 COPY package.json package-lock.json ./
@@ -13,7 +16,9 @@ RUN npm run build \
 
 # ---- runtime stage: only production deps + built assets ----
 FROM node:24-bookworm-slim AS runtime
+ARG APP_VERSION=dev
 ENV NODE_ENV=production
+ENV APP_VERSION=$APP_VERSION
 WORKDIR /app
 
 COPY --from=build /app/package.json /app/package-lock.json ./

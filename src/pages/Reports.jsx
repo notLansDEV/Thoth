@@ -314,7 +314,7 @@ function ReportDetail({ project, tasksAll, membersCount, onBack }) {
 
   // Milestone avg progress
   const avgMilestone = milestones.length > 0
-    ? Math.round(milestones.reduce((sum, m) => sum + (Number(m.progress) || 0), 0) / milestones.length)
+    ? Math.round(milestones.reduce((sum, m) => sum + (m.status === 'completed' ? 100 : (Number(m.progress) || 0)), 0) / milestones.length)
     : null
 
   // Priority distribution

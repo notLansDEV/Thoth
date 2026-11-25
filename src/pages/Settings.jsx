@@ -2461,7 +2461,7 @@ export default function Settings() {
                   <img src="/favicon.svg" alt="Thoth logo" style={{ width: 28, height: 28, borderRadius: 6 }} />
                   <h2 style={{ margin: 0, fontSize: 28, fontWeight: 600, letterSpacing: '-0.02em', color: 'var(--text-strong)', lineHeight: 1.1, fontFamily: "Georgia, 'Times New Roman', serif" }}>Thoth</h2>
                 </div>
-                <span style={{ display: 'inline-block', marginTop: 12, padding: '4px 10px', borderRadius: 6, background: 'var(--panel3)', border: '1px solid var(--border)', color: 'var(--muted)', fontSize: 12, fontWeight: 500 }}>v1.0.0</span>
+                <span style={{ display: 'inline-block', marginTop: 12, padding: '4px 10px', borderRadius: 6, background: 'var(--panel3)', border: '1px solid var(--border)', color: 'var(--muted)', fontSize: 12, fontWeight: 500 }}>{import.meta.env.VITE_APP_VERSION || 'dev'}</span>
                 <h3 style={{ margin: '22px 0 14px', fontSize: 34, fontWeight: 500, lineHeight: 1.15, letterSpacing: '-0.03em', color: 'var(--text-strong)', maxWidth: '14ch', fontFamily: "Georgia, 'Times New Roman', serif" }}>Your project’s memory, self-hosted.</h3>
                 <p style={{ margin: 0, fontSize: 14, lineHeight: 1.65, color: 'var(--muted)', maxWidth: 420 }}>
                   Thoth is a local-first project management and knowledge workspace backed by PostgreSQL. Track tasks, bugs, notes, and team workflows in one place while keeping your data under your control.

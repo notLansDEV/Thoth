@@ -28,7 +28,7 @@ function toDateInput(value) {
 }
 
 export default function EditProjectModal({ project, onSaved, onClose }) {
-  const [name, setName] = useState((project.name || '').slice(0, 16))
+  const [name, setName] = useState((project.name || '').slice(0, 32))
   const [description, setDescription] = useState(project.description || '')
   const [status, setStatus] = useState(project.status || 'planning')
   const [priority, setPriority] = useState(project.priority || 'medium')
@@ -40,7 +40,7 @@ export default function EditProjectModal({ project, onSaved, onClose }) {
   async function handleSubmit(e) {
     e.preventDefault()
     setError(null)
-    const trimmedName = name.trim().slice(0, 16)
+    const trimmedName = name.trim().slice(0, 32)
     if (!trimmedName) return setError('Project title is required.')
 
     setLoading(true)
@@ -87,8 +87,8 @@ export default function EditProjectModal({ project, onSaved, onClose }) {
 
           <div style={{ marginBottom: '14px' }}>
             <label style={labelStyle}>Project Title</label>
-            <input type="text" value={name} maxLength={16} onChange={(e) => setName(e.target.value.slice(0, 16))} style={inputStyle} autoFocus />
-            <div style={{ marginTop: 6, fontSize: 11, color: 'var(--muted2)', textAlign: 'right' }}>{name.length}/16</div>
+            <input type="text" value={name} maxLength={32} onChange={(e) => setName(e.target.value.slice(0, 32))} style={inputStyle} autoFocus />
+            <div style={{ marginTop: 6, fontSize: 11, color: 'var(--muted2)', textAlign: 'right' }}>{name.length}/32</div>
           </div>
 
           <div style={{ marginBottom: '14px' }}>
