@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import {
-  Check, X, Pencil, Paperclip, FileImage, FileText, FileArchive, FileType2, FileSpreadsheet, Reply,
+  Check, X, Pencil, Paperclip, FileImage, FileText, FileArchive, FileType2, FileSpreadsheet, Reply, Eye,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
@@ -177,6 +177,7 @@ export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated,
   const [comments, setComments] = useState(task.meta?.comments || [])
   const [checklist, setChecklist] = useState(task.meta?.checklist || [])
   const [files, setFiles] = useState(task.meta?.files || [])
+  const [previewFile, setPreviewFile] = useState(null)
   const [tab, setTab] = useState('description')
   const [newComment, setNewComment] = useState('')
   const [replyTarget, setReplyTarget] = useState(null)
@@ -309,7 +310,7 @@ export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated,
   }
 
   async function saveEditCheck() {
-    const text = editCheckText.trim()
+    const text = editCheckText.trim().slice(0, 32)
     if (!text || editCheckIndex == null) { cancelEditCheck(); return }
     const next = checklist.map((item, i) =>
       i === editCheckIndex ? { ...item, text } : item
@@ -324,7 +325,7 @@ export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated,
   async function addCheckItem(e) {
     e.preventDefault()
     if (!newCheckItem.trim()) return
-    const next = [...checklist, { text: newCheckItem.trim(), done: false }]
+    const next = [...checklist, { text: newCheckItem.trim().slice(0, 32), done: false }]
     setChecklist(next)
     setNewCheckItem('')
     const updated = await patch({ meta: { checklist: next }, progress: taskProgress(next, stage) })
@@ -360,7 +361,9 @@ export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated,
         added_at: new Date().toISOString(),
         added_by: currentUser().name,
       }
-      if ((f.type || '').startsWith('image/')) {
+      const isImage = (f.type || '').startsWith('image/')
+      const isPreviewText = /\.(md|txt|log|csv|json|xml|ya?ml)$/i.test(f.name || '') || (f.type || '').startsWith('text/')
+      if (isImage || isPreviewText) {
         entry.dataUrl = await readFileAsDataUrl(f)
       }
       return entry
@@ -566,7 +569,7 @@ export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated,
                         <input
                           autoFocus
                           value={editCheckText}
-                          onChange={(e) => setEditCheckText(e.target.value)}
+                          onChange={(e) => setEditCheckText(e.target.value.slice(0, 32))}
                           onBlur={saveEditCheck}
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') { e.preventDefault(); saveEditCheck() }
@@ -613,10 +616,10 @@ export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated,
                 <input
                   type="text" value={newCheckItem}
                   onChange={(e) => setNewCheckItem(e.target.value)}
-                  placeholder="+ Add an item"
+                  placeholder="+ Add an item" maxLength={32}
                   style={{ ...inputStyle, padding: '5px 8px' }}
                 />
-                {newCheckItem.trim() && (
+                {newCheckItem.trim().slice(0, 32) && (
                   <button type="submit" className="btn primary" style={{ cursor: 'pointer', flexShrink: 0 }}>Add</button>
                 )}
               </form>
@@ -702,7 +705,7 @@ export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated,
                       className="check-row"
                       style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px', borderRadius: '4px' }}
                     >
-                      {f.dataUrl ? (
+                      {String(f.dataUrl || '').startsWith('data:image/') ? (
                         <img
                           src={f.dataUrl}
                           alt={f.name}
@@ -711,6 +714,10 @@ export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated,
                             borderRadius: '3px', border: '1px solid var(--border)', flexShrink: 0,
                           }}
                         />
+                      ) : (/\.md$/i.test(f.name || '') || /\.txt$/i.test(f.name || '')) ? (
+                        <span style={{ width: '34px', height: '34px', flexShrink: 0, borderRadius: '3px', border: '1px solid var(--border)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '9px', fontWeight: 700, color: 'var(--muted)', background: 'var(--panel3)' }}>
+                          {/\.md$/i.test(f.name || '') ? 'MD' : 'TXT'}
+                        </span>
                       ) : (
                         <span style={{ display: 'inline-flex', color: 'var(--muted)' }}>{fileIcon(f.name)}</span>
                       )}
@@ -725,8 +732,20 @@ export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated,
                       <button
                         type="button"
                         className="row-delete"
+                        onClick={() => setPreviewFile(f)}
+                        aria-label="Preview file"
+                        title="Preview"
+                        style={{
+                          background: 'transparent', border: 0, color: 'var(--muted2)', cursor: 'pointer',
+                          padding: '2px 4px', opacity: 0, display: 'inline-flex',
+                        }}
+                      ><Eye size={11} /></button>
+                      <button
+                        type="button"
+                        className="row-delete"
                         onClick={() => removeFile(i)}
                         aria-label="Remove file"
+                        title="Remove"
                         style={{
                           background: 'transparent', border: 0, color: 'var(--muted2)', cursor: 'pointer',
                           padding: '2px 4px', opacity: 0, display: 'inline-flex',
@@ -850,6 +869,57 @@ export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated,
           </div>
         </div>
       </div>
+
+      {previewFile && (() => {
+        const name = previewFile.name || 'file'
+        const lower = name.toLowerCase()
+        const isHtml = /\.html?$/i.test(name)
+        const isImage = /\.(png|jpg|jpeg|gif|webp|svg)$/.test(lower) || String(previewFile.dataUrl || '').startsWith('data:image/')
+        const isMd = /\.md$/i.test(name)
+        const isText = !isHtml && /\.(txt|log|csv|json|xml|ya?ml)$/i.test(name)
+        let textContent = null
+        const dataUrl = String(previewFile.dataUrl || '')
+        if ((isMd || isText) && dataUrl.startsWith('data:')) {
+          try {
+            const b64 = dataUrl.split(',')[1] || ''
+            textContent = decodeURIComponent(escape(atob(b64)))
+          } catch {
+            try { textContent = atob((dataUrl.split(',')[1] || '')) } catch { textContent = null }
+          }
+        }
+        return (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.72)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10050 }} onClick={() => setPreviewFile(null)}>
+            <div style={{ width: 'min(900px, calc(100vw - 32px))', maxHeight: 'calc(100vh - 32px)', background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden', display: 'flex', flexDirection: 'column' }} onClick={(e) => e.stopPropagation()}>
+              <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-soft)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</div>
+                <button type="button" onClick={() => setPreviewFile(null)} style={{ background: 'transparent', border: 0, color: 'var(--muted)', cursor: 'pointer', display: 'inline-flex' }} aria-label="Close preview"><X size={16} /></button>
+              </div>
+              <div style={{ padding: 14, overflow: 'auto', flex: 1 }}>
+                {isImage && dataUrl ? (
+                  <img src={dataUrl} alt={name} style={{ maxWidth: '100%', maxHeight: 'calc(100vh - 180px)', objectFit: 'contain', display: 'block', margin: '0 auto', borderRadius: 6 }} />
+                ) : isMd && textContent != null ? (
+                  <div className="md-preview" dangerouslySetInnerHTML={{ __html: renderMarkdown(textContent, { emptyHtml: '<div style="color:var(--muted2)">Empty file.</div>' }) }} />
+                ) : isText && textContent != null ? (
+                  <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: 12, color: 'var(--text-soft)', fontFamily: 'var(--mono, monospace)' }}>{textContent}</pre>
+                ) : !isHtml && dataUrl && dataUrl.startsWith('data:text/') ? (
+                  <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: 12, color: 'var(--text-soft)', fontFamily: 'var(--mono, monospace)' }}>{textContent || 'Unable to decode text preview.'}</pre>
+                ) : (
+                  <div style={{ color: 'var(--muted)', fontSize: 12 }}>Preview not available for this file type.</div>
+                )}
+              </div>
+              <div style={{ padding: '10px 14px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end' }}>
+                {dataUrl ? (
+                  <a href={dataUrl} download={name} className="btn" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, textDecoration: 'none' }}>
+                    Download
+                  </a>
+                ) : (
+                  <button type="button" className="btn" disabled style={{ opacity: 0.5, cursor: 'not-allowed' }}>Download</button>
+                )}
+              </div>
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }

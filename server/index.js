@@ -1,6 +1,7 @@
 import { env } from './env.js'
 import { isUuid, createRateLimiter, validateAttachments } from './utils.js'
 import { requireWorkspaceModulePerm } from './rbac.js'
+import fs from 'node:fs'
 import express from 'express'
 import cors from 'cors'
 import bcrypt from 'bcrypt'
@@ -18,6 +19,16 @@ import bugRepository from '../src/db/repositories/bug.repository.js'
 import { ActivityRepository } from '../src/db/repositories/activity.repository.js'
 import { BaseRepository } from '../src/db/repositories/base.repository.js'
 import notificationRepository from '../src/db/repositories/notification.repository.js'
+
+function resolveAppVersion() {
+  if (process.env.APP_VERSION && process.env.APP_VERSION.trim()) return process.env.APP_VERSION.trim()
+  try {
+    const pkg = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
+    if (pkg?.version && pkg.version !== '0.0.0') return pkg.version
+  } catch { /* ignore */ }
+  return process.env.npm_package_version || 'dev'
+}
+const APP_VERSION = resolveAppVersion()
 
 const taskStageRepository = new BaseRepository('task_stages')
 const bugStageRepository = new BaseRepository('bug_stages')
@@ -274,7 +285,11 @@ app.param('userId', (req, res, next, value) => {
 })
 
 app.get('/api/health', async (req, res) => {
-  res.json({ status: 'ok' })
+  res.json({ status: 'ok', version: APP_VERSION })
+})
+
+app.get('/api/version', (req, res) => {
+  res.json({ version: APP_VERSION })
 })
 
 app.post('/api/auth/signup', strictAuthRateLimit, async (req, res) => {
@@ -508,7 +523,7 @@ app.post('/api/projects', auth, async (req, res) => {
     const { workspace_id, name, description, slug, status, priority, start_date, deadline } = req.body
     const trimmedName = String(name || '').trim()
     if (!workspace_id || !trimmedName) return res.status(400).json({ error: 'Missing fields' })
-    if (trimmedName.length > 16) return res.status(400).json({ error: 'Project name must be 16 characters or less' })
+    if (trimmedName.length > 32) return res.status(400).json({ error: 'Project name must be 32 characters or less' })
     const requester = await requireWorkspaceMember(req, res, workspace_id)
     if (!requester) return
     const ws = await workspaceRepository.findById(workspace_id)
@@ -1259,7 +1274,7 @@ app.patch('/api/projects/:id', auth, async (req, res) => {
     if (toUpdate.name !== undefined) {
       const trimmedName = String(toUpdate.name || '').trim()
       if (!trimmedName) return res.status(400).json({ error: 'Project name is required' })
-      if (trimmedName.length > 16) return res.status(400).json({ error: 'Project name must be 16 characters or less' })
+      if (trimmedName.length > 32) return res.status(400).json({ error: 'Project name must be 32 characters or less' })
       toUpdate.name = trimmedName
     }
 
@@ -1530,7 +1545,7 @@ app.get('/api/bugs', auth, async (req, res) => {
 const BUG_ALLOWED_FIELDS = [
   'title', 'description', 'priority', 'kanban_column', 'status',
   'assigned_to', 'steps_to_reproduce', 'expected_behavior', 'actual_behavior',
-  'milestone_id', 'start_date', 'due_date',
+  'milestone_id', 'start_date', 'due_date', 'meta',
 ]
 
 app.patch('/api/bugs/:id', auth, async (req, res) => {
@@ -1560,6 +1575,10 @@ app.patch('/api/bugs/:id', auth, async (req, res) => {
       data.status = data.kanban_column
     }
 
+    if (data.meta && typeof data.meta !== 'object') {
+      return res.status(400).json({ error: 'meta must be an object' })
+    }
+
     const existing = await bugRepository.findById(req.params.id)
     if (!existing) return res.status(404).json({ error: 'Bug not found' })
     const project = await projectRepository.findById(existing.project_id)
@@ -1572,7 +1591,12 @@ app.patch('/api/bugs/:id', auth, async (req, res) => {
     const projectRole = await getProjectRoleForUser(project.id, req.user.id)
     if (!requireWorkspaceModulePerm(req, res, { workspace: ws, requester, pageKey: 'bugs', action: 'write', projectRole })) return
 
-    const updated = await bugRepository.updateById(req.params.id, data)
+    let toUpdate = data
+    if (data.meta) {
+      toUpdate = { ...data, meta: { ...(existing.meta || {}), ...data.meta } }
+    }
+
+    const updated = await bugRepository.updateById(req.params.id, toUpdate)
     if (!updated) return res.status(404).json({ error: 'Bug not found' })
 
     // Track kanban moves as explicit activity entries

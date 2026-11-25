@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import {
-  X, Paperclip, Send, FileImage, FileText, FileArchive, FileType2, FileSpreadsheet, Reply,
+  X, Paperclip, Send, FileImage, FileText, FileArchive, FileType2, FileSpreadsheet, Reply, Eye, Check, Pencil,
 } from 'lucide-react'
 import {
   BUG_STAGES,
@@ -91,9 +91,14 @@ export default function BugPreviewModal({ bug, workspaceId, projectName, stages,
   const [tab, setTab] = useState('description')
   const [comments, setComments] = useState([])
   const [newComment, setNewComment] = useState('')
+  const [checklist, setChecklist] = useState(bug.meta?.checklist || bug.checklist || [])
+  const [newCheckItem, setNewCheckItem] = useState('')
+  const [editCheckIndex, setEditCheckIndex] = useState(null)
+  const [editCheckText, setEditCheckText] = useState('')
   const [replyTarget, setReplyTarget] = useState(null)
   const [expandedReplies, setExpandedReplies] = useState({})
   const [files, setFiles] = useState(bug.attachments || bug.meta?.attachments || [])
+  const [previewFile, setPreviewFile] = useState(null)
   const [stepsToReproduce, setStepsToReproduce] = useState(bug.steps_to_reproduce || '')
   const [expectedBehavior, setExpectedBehavior] = useState(bug.expected_behavior || '')
   const [actualBehavior, setActualBehavior] = useState(bug.actual_behavior || '')
@@ -232,7 +237,9 @@ export default function BugPreviewModal({ bug, workspaceId, projectName, stages,
         added_at: new Date().toISOString(),
         added_by: currentUser().name,
       }
-      if ((f.type || '').startsWith('image/')) {
+      const isImage = (f.type || '').startsWith('image/')
+      const isPreviewText = /\.(md|txt|log|csv|json|xml|ya?ml)$/i.test(f.name || '') || (f.type || '').startsWith('text/')
+      if (isImage || isPreviewText) {
         entry.dataUrl = await readFileAsDataUrl(f)
       }
       return entry
@@ -280,6 +287,54 @@ export default function BugPreviewModal({ bug, workspaceId, projectName, stages,
     const updated = await patch({ meta: { attachments: next } })
     if (!updated) setFiles(files)
   }
+
+  async function toggleCheck(index) {
+    const next = checklist.map((item, i) => (i === index ? { ...item, done: !item.done } : item))
+    setChecklist(next)
+    const updated = await patch({ meta: { ...(bug.meta || {}), checklist: next } })
+    if (!updated) setChecklist(checklist)
+  }
+
+  async function removeCheckItem(index) {
+    const next = checklist.filter((_, i) => i !== index)
+    setChecklist(next)
+    const updated = await patch({ meta: { ...(bug.meta || {}), checklist: next } })
+    if (!updated) setChecklist(checklist)
+  }
+
+  function startEditCheck(index) {
+    setEditCheckIndex(index)
+    setEditCheckText(checklist[index]?.text || '')
+  }
+
+  function cancelEditCheck() {
+    setEditCheckIndex(null)
+    setEditCheckText('')
+  }
+
+  async function saveEditCheck() {
+    const text = editCheckText.trim().slice(0, 32)
+    if (editCheckIndex == null) return
+    if (!text) { cancelEditCheck(); return }
+    const next = checklist.map((item, i) => (i === editCheckIndex ? { ...item, text } : item))
+    setChecklist(next)
+    setEditCheckIndex(null)
+    setEditCheckText('')
+    const updated = await patch({ meta: { ...(bug.meta || {}), checklist: next } })
+    if (!updated) setChecklist(checklist)
+  }
+
+  async function addCheckItem(e) {
+    e.preventDefault()
+    if (!newCheckItem.trim()) return
+    const next = [...checklist, { text: newCheckItem.trim().slice(0, 32), done: false }]
+    setChecklist(next)
+    setNewCheckItem('')
+    const updated = await patch({ meta: { ...(bug.meta || {}), checklist: next } })
+    if (!updated) setChecklist(checklist)
+  }
+
+  const checkDoneCount = checklist.filter((c) => c.done).length
 
   return (
     <div onClick={onClose} style={{
@@ -337,6 +392,7 @@ export default function BugPreviewModal({ bug, workspaceId, projectName, stages,
           <div style={{ display: 'flex', gap: '2px', borderBottom: '1px solid var(--border)', marginBottom: '16px' }}>
             {[
               { key: 'description', label: 'Description' },
+              { key: 'checklist', label: `Checklist${checklist.length ? ` (${checkDoneCount}/${checklist.length})` : ''}` },
               { key: 'comments', label: `Comments${comments.length ? ` (${comments.length})` : ''}` },
               { key: 'files', label: `Files${files.length ? ` (${files.length})` : ''}` },
             ].map((t) => (
@@ -426,6 +482,57 @@ export default function BugPreviewModal({ bug, workspaceId, projectName, stages,
                   dangerouslySetInnerHTML={{ __html: renderMarkdown(actualBehavior, { emptyHtml: '<div style="color:var(--muted2)">No actual behavior provided.</div>' }) }} />
               )}
             </div>
+          )}
+
+          {tab === 'checklist' && (
+            <>
+              <div style={{ background: 'var(--panel3)', border: '1px solid var(--border-soft)', borderRadius: '4px', padding: '10px 12px', marginBottom: '10px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '7px' }}>
+                  <span style={{ fontSize: '10px', fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Checklist</span>
+                  <span style={{ fontSize: '10px', color: checkDoneCount === checklist.length && checklist.length > 0 ? '#20d96b' : 'var(--muted)' }}>{checkDoneCount}/{checklist.length} done</span>
+                </div>
+                <div className="progress" style={{ height: '4px' }}>
+                  <span style={{ width: `${checklist.length ? Math.round((checkDoneCount / checklist.length) * 100) : 0}%`, background: checkDoneCount === checklist.length && checklist.length > 0 ? '#20d96b' : undefined }} />
+                </div>
+              </div>
+
+              {checklist.length === 0 ? (
+                <div style={{ color: 'var(--muted2)', fontSize: '11px', marginBottom: '8px' }}>No checklist items yet</div>
+              ) : (
+                <div style={{ marginBottom: '10px' }}>
+                  {checklist.map((item, i) => (
+                    <div key={i} className="check-row" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px', borderRadius: '4px' }}>
+                      <button
+                        type="button"
+                        onClick={() => toggleCheck(i)}
+                        aria-label={item.done ? 'Mark as not done' : 'Mark as done'}
+                        style={{ width: '15px', height: '15px', flexShrink: 0, borderRadius: '3px', border: item.done ? '0' : '1px solid var(--hover-border)', background: item.done ? '#695df0' : 'transparent', color: '#fff', fontSize: '9px', lineHeight: 1, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                      >
+                        {item.done && <Check size={9} strokeWidth={3} />}
+                      </button>
+                      {editCheckIndex === i ? (
+                        <input
+                          autoFocus
+                          value={editCheckText}
+                          onChange={(e) => setEditCheckText(e.target.value.slice(0, 32))}
+                          onBlur={saveEditCheck}
+                          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); saveEditCheck() } if (e.key === 'Escape') cancelEditCheck() }}
+                          style={{ flex: 1, background: 'var(--hover)', border: '1px solid var(--hover-border)', borderRadius: '3px', color: 'var(--text-soft)', fontSize: '11.5px', fontFamily: 'inherit', padding: '2px 6px', outline: 'none' }}
+                        />
+                      ) : (
+                        <span style={{ flex: 1, fontSize: '11.5px', color: item.done ? 'var(--muted2)' : 'var(--text-soft)', textDecoration: item.done ? 'line-through' : 'none' }}>{item.text}</span>
+                      )}
+                      <button type="button" className="row-delete" onClick={() => startEditCheck(i)} aria-label="Edit item" title="Edit" style={{ background: 'transparent', border: 0, color: 'var(--muted2)', cursor: 'pointer', padding: '2px 4px', opacity: 0, display: 'inline-flex' }}><Pencil size={11} /></button>
+                      <button type="button" className="row-delete" onClick={() => removeCheckItem(i)} aria-label="Delete item" title="Remove" style={{ background: 'transparent', border: 0, color: 'var(--muted2)', cursor: 'pointer', padding: '2px 4px', opacity: 0, display: 'inline-flex' }}><X size={11} /></button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <form onSubmit={addCheckItem} style={{ display: 'flex', gap: '6px', marginBottom: '18px' }}>
+                <input type="text" value={newCheckItem} onChange={(e) => setNewCheckItem(e.target.value)} placeholder="+ Add an item" maxLength={32} style={{ ...inputStyle, padding: '5px 8px' }} />
+                {newCheckItem.trim().slice(0, 32) && <button type="submit" className="btn primary" style={{ cursor: 'pointer', flexShrink: 0 }}>Add</button>}
+              </form>
+            </>
           )}
 
           {tab === 'comments' && (
@@ -588,7 +695,7 @@ export default function BugPreviewModal({ bug, workspaceId, projectName, stages,
                       className="check-row"
                       style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px', borderRadius: '4px' }}
                     >
-                      {f.dataUrl ? (
+                      {String(f.dataUrl || '').startsWith('data:image/') ? (
                         <img
                           src={f.dataUrl}
                           alt={f.name}
@@ -597,6 +704,10 @@ export default function BugPreviewModal({ bug, workspaceId, projectName, stages,
                             borderRadius: '3px', border: '1px solid var(--border)', flexShrink: 0,
                           }}
                         />
+                      ) : (/\.md$/i.test(f.name || '') || /\.txt$/i.test(f.name || '')) ? (
+                        <span style={{ width: '34px', height: '34px', flexShrink: 0, borderRadius: '3px', border: '1px solid var(--border)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '9px', fontWeight: 700, color: 'var(--muted)', background: 'var(--panel3)' }}>
+                          {/\.md$/i.test(f.name || '') ? 'MD' : 'TXT'}
+                        </span>
                       ) : (
                         <span style={{ display: 'inline-flex', color: 'var(--muted)' }}>{fileIcon(f.name)}</span>
                       )}
@@ -611,8 +722,20 @@ export default function BugPreviewModal({ bug, workspaceId, projectName, stages,
                       <button
                         type="button"
                         className="row-delete"
+                        onClick={() => setPreviewFile(f)}
+                        aria-label="Preview file"
+                        title="Preview"
+                        style={{
+                          background: 'transparent', border: 0, color: 'var(--muted2)', cursor: 'pointer',
+                          padding: '2px 4px', opacity: 0, display: 'inline-flex',
+                        }}
+                      ><Eye size={11} /></button>
+                      <button
+                        type="button"
+                        className="row-delete"
                         onClick={() => removeFile(i)}
                         aria-label="Remove file"
+                        title="Remove"
                         style={{
                           background: 'transparent', border: 0, color: 'var(--muted2)', cursor: 'pointer',
                           padding: '2px 4px', opacity: 0, display: 'inline-flex',
@@ -730,6 +853,57 @@ export default function BugPreviewModal({ bug, workspaceId, projectName, stages,
           </div>
         </div>
       </div>
+
+      {previewFile && (() => {
+        const name = previewFile.name || 'file'
+        const lower = name.toLowerCase()
+        const isHtml = /\.html?$/i.test(name)
+        const isImage = /\.(png|jpg|jpeg|gif|webp|svg)$/.test(lower) || String(previewFile.dataUrl || '').startsWith('data:image/')
+        const isMd = /\.md$/i.test(name)
+        const isText = !isHtml && /\.(txt|log|csv|json|xml|ya?ml)$/i.test(name)
+        let textContent = null
+        const dataUrl = String(previewFile.dataUrl || '')
+        if ((isMd || isText) && dataUrl.startsWith('data:')) {
+          try {
+            const b64 = dataUrl.split(',')[1] || ''
+            textContent = decodeURIComponent(escape(atob(b64)))
+          } catch {
+            try { textContent = atob((dataUrl.split(',')[1] || '')) } catch { textContent = null }
+          }
+        }
+        return (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.72)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10050 }} onClick={() => setPreviewFile(null)}>
+            <div style={{ width: 'min(900px, calc(100vw - 32px))', maxHeight: 'calc(100vh - 32px)', background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden', display: 'flex', flexDirection: 'column' }} onClick={(e) => e.stopPropagation()}>
+              <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-soft)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</div>
+                <button type="button" onClick={() => setPreviewFile(null)} style={{ background: 'transparent', border: 0, color: 'var(--muted)', cursor: 'pointer', display: 'inline-flex' }} aria-label="Close preview"><X size={16} /></button>
+              </div>
+              <div style={{ padding: 14, overflow: 'auto', flex: 1 }}>
+                {isImage && dataUrl ? (
+                  <img src={dataUrl} alt={name} style={{ maxWidth: '100%', maxHeight: 'calc(100vh - 180px)', objectFit: 'contain', display: 'block', margin: '0 auto', borderRadius: 6 }} />
+                ) : isMd && textContent != null ? (
+                  <div className="md-preview" dangerouslySetInnerHTML={{ __html: renderMarkdown(textContent, { emptyHtml: '<div style="color:var(--muted2)">Empty file.</div>' }) }} />
+                ) : isText && textContent != null ? (
+                  <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: 12, color: 'var(--text-soft)', fontFamily: 'var(--mono, monospace)' }}>{textContent}</pre>
+                ) : !isHtml && dataUrl && dataUrl.startsWith('data:text/') ? (
+                  <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: 12, color: 'var(--text-soft)', fontFamily: 'var(--mono, monospace)' }}>{textContent || 'Unable to decode text preview.'}</pre>
+                ) : (
+                  <div style={{ color: 'var(--muted)', fontSize: 12 }}>Preview not available for this file type.</div>
+                )}
+              </div>
+              <div style={{ padding: '10px 14px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end' }}>
+                {dataUrl ? (
+                  <a href={dataUrl} download={name} className="btn" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, textDecoration: 'none' }}>
+                    Download
+                  </a>
+                ) : (
+                  <button type="button" className="btn" disabled style={{ opacity: 0.5, cursor: 'not-allowed' }}>Download</button>
+                )}
+              </div>
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }

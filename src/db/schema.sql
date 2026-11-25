@@ -178,6 +178,7 @@ CREATE TABLE IF NOT EXISTS bugs (
   expected_behavior TEXT,
   actual_behavior TEXT,
   attachments JSONB DEFAULT '[]',
+  meta JSONB DEFAULT '{}',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   UNIQUE(project_id, bug_id)
@@ -185,6 +186,7 @@ CREATE TABLE IF NOT EXISTS bugs (
 
 -- Ensure new columns on existing installs
 ALTER TABLE bugs ADD COLUMN IF NOT EXISTS attachments JSONB DEFAULT '[]';
+ALTER TABLE bugs ADD COLUMN IF NOT EXISTS meta JSONB DEFAULT '{}';
 ALTER TABLE bugs ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP;
 ALTER TABLE bugs ADD COLUMN IF NOT EXISTS steps_to_reproduce TEXT;
 ALTER TABLE bugs ADD COLUMN IF NOT EXISTS expected_behavior TEXT;

@@ -40,53 +40,6 @@ Open **http://localhost:5232** in your browser and create your first account.
 
 All application and database data lives in `~/.thoth` on your host machine, so backing up that single directory backs up everything.
 
-**Container management:**
-
-```bash
-docker logs -f thoth      # Follow logs
-docker stop thoth         # Stop container
-docker start thoth        # Start container
-docker rm -f thoth        # Remove container (data remains in ~/.thoth)
-```
-
----
-
-### Option 2: Docker Compose (Separate App & Database)
-
-Use Docker Compose if you want separate containers for the Thoth server and PostgreSQL.
-
-1. **Create your `.env` file:**
-
-```bash
-cp .env.example .env
-```
-
-Set the required secrets in `.env`:
-
-```env
-JWT_SECRET=<output of: openssl rand -hex 32>
-POSTGRES_PASSWORD=<output of: openssl rand -hex 24>
-APP_PORT=5232
-```
-
-2. **Build and start the stack:**
-
-```bash
-docker compose up -d --build
-```
-
-Open **http://localhost:5232** in your browser.
-
-3. **Useful Compose commands:**
-
-```bash
-docker compose ps                     # Check container status
-docker compose logs -f app            # View app logs
-curl http://localhost:5232/api/health # Verify API health
-docker compose down                   # Stop stack (preserves data)
-docker compose down -v                # Stop stack and delete database volume
-```
-
 ---
 
 ## Configuration & Security

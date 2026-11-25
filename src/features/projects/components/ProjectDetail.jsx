@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Plus, Pencil, Trash2, Users, Clock, CheckCircle2, Bug as BugIcon, ListChecks, CircleDashed, CircleDot, XCircle, ArrowLeft } from 'lucide-react'
+import { Plus, Pencil, Trash2, Users, Clock, CheckCircle2, Bug as BugIcon, ListChecks, CircleDashed, CircleDot, XCircle, ArrowLeft, Eye } from 'lucide-react'
 import {
   PROJECT_STATUSES,
   PROJECT_PRIORITIES,
@@ -13,6 +13,7 @@ import CreateMilestoneModal from './CreateMilestoneModal.jsx'
 import AttachmentsTab from './AttachmentsTab.jsx'
 import ListToolbar from '../../../components/ListToolbar.jsx'
 import ConfirmModal from '../../../components/ConfirmModal.jsx'
+import DescriptionPreview from '../../../components/DescriptionPreview.jsx'
 
 const TABS = ['Overview', 'Team', 'Milestone', 'Task', 'Bugs', 'Attachments', 'Activity', 'Notes']
 
@@ -52,7 +53,8 @@ export default function ProjectDetail({ projectId, onBack }) {
   const [milestones, setMilestones] = useState([])
   const [activities, setActivities] = useState([])
   const [showNewMilestone, setShowNewMilestone] = useState(false)
-  const [editingMilestone, setEditingMilestone] = useState(null)
+  const [editingMilestone, setEditingMilestone] = useState(null) // { milestone, stats }
+  const [viewingMilestone, setViewingMilestone] = useState(null) // { milestone, stats }
   const [confirmDeleteMs, setConfirmDeleteMs] = useState(null)
   const [deletingMs, setDeletingMs] = useState(false)
   const [activityQuery, setActivityQuery] = useState('')
@@ -176,9 +178,13 @@ export default function ProjectDetail({ projectId, onBack }) {
       {tab === 'Overview' && (
         <div className="card">
           <label style={labelStyle}>Description</label>
-          <p style={{ margin: '0 0 14px', fontSize: '12px', color: 'var(--text-soft)', lineHeight: 1.55 }}>
-            {project.description || 'No description yet.'}
-          </p>
+          <DescriptionPreview
+            text={project.description || ''}
+            maxChars={16}
+            className="md-rendered"
+            style={{ margin: '0 0 14px', fontSize: '12px', color: 'var(--text-soft)', lineHeight: 1.55 }}
+            emptyText="No description yet."
+          />
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px' }}>
             <div>
               <label style={labelStyle}>Start date</label>
@@ -257,8 +263,14 @@ export default function ProjectDetail({ projectId, onBack }) {
                       </span>
                       <button
                         className="icon-btn"
+                        title="View milestone"
+                        onClick={() => setViewingMilestone({ milestone: ms, stats: { totalTasks: msTasks.length, completedTasks: msDoneTasks, openBugs: openBugsCount, closedBugs: closedBugsCount } })}
+                        style={{ display: 'inline-flex', alignItems: 'center' }}
+                      ><Eye size={12} /></button>
+                      <button
+                        className="icon-btn"
                         title="Edit milestone"
-                        onClick={() => setEditingMilestone(ms)}
+                        onClick={() => setEditingMilestone({ milestone: ms, stats: { totalTasks: msTasks.length, completedTasks: msDoneTasks, openBugs: openBugsCount, closedBugs: closedBugsCount } })}
                         style={{ display: 'inline-flex', alignItems: 'center' }}
                       ><Pencil size={12} /></button>
                       <button
@@ -273,9 +285,12 @@ export default function ProjectDetail({ projectId, onBack }) {
                     </div>
 
                     {ms.description && (
-                      <div style={{ fontSize: '11px', color: 'var(--muted)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                        {ms.description}
-                      </div>
+                      <DescriptionPreview
+                        text={ms.description}
+                        maxChars={32}
+                        className="md-rendered"
+                        style={{ fontSize: '11px', color: 'var(--muted)', lineHeight: 1.45 }}
+                      />
                     )}
 
                     {/* Start / due dates */}
@@ -288,9 +303,9 @@ export default function ProjectDetail({ projectId, onBack }) {
                     {/* Full-row progress bar */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '9px' }}>
                       <div className="progress" style={{ width: '100%' }}>
-                        <span style={{ width: `${Number(ms.progress) || 0}%` }} />
+                        <span style={{ width: `${ms.status === 'completed' ? 100 : (Number(ms.progress) || 0)}%` }} />
                       </div>
-                      <span style={{ fontSize: '10px', color: 'var(--muted2)', flexShrink: 0 }}>{Number(ms.progress) || 0}%</span>
+                      <span style={{ fontSize: '10px', color: 'var(--muted2)', flexShrink: 0 }}>{ms.status === 'completed' ? 100 : (Number(ms.progress) || 0)}%</span>
                     </div>
 
                     {/* 4 stat cards */}
@@ -321,9 +336,21 @@ export default function ProjectDetail({ projectId, onBack }) {
           {(showNewMilestone || editingMilestone) && (
             <CreateMilestoneModal
               projectId={projectId}
-              milestone={editingMilestone}
+              milestone={editingMilestone?.milestone || null}
+              stats={editingMilestone?.stats || null}
               onClose={() => { setShowNewMilestone(false); setEditingMilestone(null) }}
               onSaved={() => { setShowNewMilestone(false); setEditingMilestone(null); setReloadKey((k) => k + 1) }}
+            />
+          )}
+
+          {viewingMilestone && (
+            <CreateMilestoneModal
+              projectId={projectId}
+              milestone={viewingMilestone.milestone}
+              stats={viewingMilestone.stats}
+              readOnly
+              onClose={() => { setViewingMilestone(null); setReloadKey((k) => k + 1) }}
+              onSaved={() => { setViewingMilestone(null); setReloadKey((k) => k + 1) }}
             />
           )}
 

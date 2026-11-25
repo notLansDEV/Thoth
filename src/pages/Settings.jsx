@@ -547,10 +547,10 @@ export default function Settings() {
       if (!available.includes(selectedRole)) setSelectedRole(available.includes('admin') ? 'admin' : (available[0] || 'member'))
     } else if (isAdmin) {
       // Admins can only view/manage lower-level permissions (member)
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+       
       if (selectedRole !== 'member') setSelectedRole('member')
     } else {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+       
       if (selectedRole !== 'member') setSelectedRole('member')
     }
   }, [currentUserRole, ws?.id, isAdmin, isOwner, selectedRole, rolePerms])
@@ -911,7 +911,7 @@ export default function Settings() {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     if (tab === 'team') loadMembers()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab])
 
@@ -1585,19 +1585,19 @@ export default function Settings() {
               return (
                 <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
                   <style>{`
-                    .rpm-role-tab{display:inline-flex;align-items:center;gap:7px;height:32px;padding:0 12px;border-radius:9px;border:1px solid var(--border);background:var(--panel3);color:var(--text-soft);font-size:12px;font-weight:600;cursor:pointer;transition:all .15s ease;white-space:nowrap}
+                    .rpm-role-tab{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;border-radius:6px;border:1px solid var(--border);background:var(--panel3);color:var(--text-soft);font-size:11px;font-weight:600;cursor:pointer;transition:all .15s ease;white-space:nowrap}
                     .rpm-role-tab:hover{background:var(--hover);border-color:var(--hover-border);color:var(--text-strong)}
                     .rpm-role-tab.active{background:rgba(110,97,255,.14);border-color:rgba(110,97,255,.55);color:var(--text-strong)}
-                    .rpm-role-tab .rpm-role-dot{width:6px;height:6px;border-radius:50%;background:var(--muted2);flex-shrink:0;transition:all .15s ease}
-                    .rpm-role-tab.active .rpm-role-dot{background:#6e61ff;box-shadow:0 0 0 3px rgba(110,97,255,.2)}
-                    .rpm-more-toggle{background:none;border:none;padding:4px 2px;margin-left:2px;color:var(--muted);font-size:12px;font-weight:500;text-decoration:underline;text-underline-offset:4px;text-decoration-thickness:1px;cursor:pointer}
+                    .rpm-role-tab .rpm-role-dot{width:5px;height:5px;border-radius:50%;background:var(--muted2);flex-shrink:0;transition:all .15s ease}
+                    .rpm-role-tab.active .rpm-role-dot{background:#6e61ff;box-shadow:0 0 0 2px rgba(110,97,255,.2)}
+                    .rpm-more-toggle{background:none;border:none;padding:2px 2px;margin-left:2px;color:var(--muted);font-size:11px;font-weight:500;text-decoration:underline;text-underline-offset:3px;text-decoration-thickness:1px;cursor:pointer}
                     .rpm-more-toggle:hover{color:var(--text-soft)}
-                    .rpm-add-role-btn{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px;border-radius:9px;border:1px solid rgba(110,97,255,.45);background:#6e61ff;color:#fff;font-size:12px;font-weight:600;cursor:pointer;box-shadow:0 2px 8px rgba(110,97,255,.24);transition:all .15s ease}
+                    .rpm-add-role-btn{display:inline-flex;align-items:center;gap:5px;height:28px;padding:0 10px;border-radius:6px;border:1px solid rgba(110,97,255,.45);background:#6e61ff;color:#fff;font-size:11px;font-weight:600;cursor:pointer;box-shadow:none;transition:all .15s ease}
                     .rpm-add-role-btn:hover{background:#7b70ff;border-color:rgba(110,97,255,.65)}
                     .rpm-add-role-btn:active{transform:translateY(1px)}
-                    .rpm-search-wrap{position:relative;width:100%;max-width:320px}
-                    .rpm-search{border:1px solid var(--border);border-radius:999px;padding:9px 12px 9px 34px;font-size:12.5px;width:100%;outline:none;background:var(--panel3);color:var(--text-soft)}
-                    .rpm-search:focus{border-color:rgba(110,97,255,.5);box-shadow:0 0 0 3px rgba(110,97,255,.12)}
+                    .rpm-search-wrap{position:relative;width:100%;max-width:280px}
+                    .rpm-search{border:1px solid var(--border);border-radius:6px;padding:6px 10px 6px 30px;font-size:11px;width:100%;outline:none;background:var(--panel3);color:var(--text-soft)}
+                    .rpm-search:focus{border-color:rgba(110,97,255,.5);box-shadow:0 0 0 2px rgba(110,97,255,.12)}
                     .rpm-cb{appearance:none;-webkit-appearance:none;width:16px;height:16px;border:1.5px solid var(--border);border-radius:4px;outline:none;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;background:var(--panel2);vertical-align:middle;transition:all .12s ease}
                     .rpm-cb:hover:not(:disabled){border-color:var(--hover-border);background:var(--hover)}
                     .rpm-cb:checked{background:#6e61ff;border-color:#6e61ff}
@@ -1617,28 +1617,28 @@ export default function Settings() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
                   {/* Top bar: role pills + search */}
-                  <div style={{ background: 'var(--panel2)', border: '1px solid var(--border)', borderRadius: 8, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted2)', textTransform: 'uppercase', letterSpacing: '.08em' }}>Workspace Roles</span>
-                        <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 22, height: 22, padding: '0 7px', borderRadius: 999, background: 'var(--panel3)', border: '1px solid var(--border)', color: 'var(--muted)', fontSize: 11, fontWeight: 700 }}>{roleTabKeys.length}</span>
+                  <div style={{ background: 'var(--panel2)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted2)', textTransform: 'uppercase', letterSpacing: '.07em' }}>Workspace Roles</span>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 18, height: 18, padding: '0 6px', borderRadius: 999, background: 'var(--panel3)', border: '1px solid var(--border)', color: 'var(--muted)', fontSize: 10, fontWeight: 700 }}>{roleTabKeys.length}</span>
                       </div>
 
-                      <div className="rpm-search-wrap" style={{ maxWidth: 320 }}>
-                        <Search size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--muted2)', pointerEvents: 'none' }} />
+                      <div className="rpm-search-wrap" style={{ maxWidth: 280 }}>
+                        <Search size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--muted2)', pointerEvents: 'none' }} />
                         <input
                           type="text"
                           className="rpm-search"
                           placeholder={`Search permissions in ${getRoleMeta(selectedRole).title || selectedRole}...`}
                           value={(rolePerms && rolePerms._uiSearch) || ''}
                           onChange={(e) => setSearch(e.target.value)}
-                          style={{ height: 34, paddingLeft: 34, borderRadius: 8, background: 'var(--panel3)' }}
+                          style={{ height: 28, paddingLeft: 30, borderRadius: 6, background: 'var(--panel3)' }}
                         />
                       </div>
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', minWidth: 0, flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', minWidth: 0, flex: 1 }}>
                         {(() => {
                           const maxVisible = 3
                           const activeIndex = roleTabKeys.indexOf(selectedRole)
@@ -1760,14 +1760,14 @@ export default function Settings() {
                   )}
 
                   {/* Role detail card */}
-                  <div style={{ background: 'var(--panel2)', border: '1px solid var(--border)', borderRadius: 8, padding: 18, display: 'flex', flexDirection: 'column', gap: 14 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 14, flexWrap: 'wrap', paddingBottom: 14, borderBottom: '1px solid var(--border)' }}>
-                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, minWidth: 0 }}>
+                  <div style={{ background: 'var(--panel2)', border: '1px solid var(--border)', borderRadius: 8, padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, flexWrap: 'wrap', paddingBottom: 10, borderBottom: '1px solid var(--border)' }}>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, minWidth: 0 }}>
                         <div style={{ minWidth: 0 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                            <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--text-strong)' }}>{getRoleMeta(selectedRole).title || selectedRole}</h3>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                            <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: 'var(--text-strong)' }}>{getRoleMeta(selectedRole).title || selectedRole}</h3>
                             <span style={{
-                              fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 6, letterSpacing: '.04em', textTransform: 'uppercase',
+                              fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 4, letterSpacing: '.04em', textTransform: 'uppercase',
                               background: isCustomSelectedRole ? 'rgba(110,97,255,.14)' : 'rgba(32,217,107,.12)',
                               color: isCustomSelectedRole ? '#a89cff' : '#20d96b',
                               border: `1px solid ${isCustomSelectedRole ? 'rgba(110,97,255,.3)' : 'rgba(32,217,107,.25)'}`
@@ -1775,14 +1775,14 @@ export default function Settings() {
                               {isCustomSelectedRole ? 'CUSTOM ROLE' : 'BUILT-IN ROLE'}
                             </span>
                           </div>
-                          <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--muted)', lineHeight: 1.45 }}>
+                          <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--muted)', lineHeight: 1.4 }}>
                             {getRoleMeta(selectedRole).description || 'Configure permissions for this role.'}
                           </p>
                         </div>
                       </div>
 
-                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--panel3)', border: '1px solid var(--border)', borderRadius: 8, padding: 4, flexShrink: 0 }}>
-                        <span style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--muted2)', letterSpacing: '.05em', padding: '0 8px', textTransform: 'uppercase' }}>Presets:</span>
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'var(--panel3)', border: '1px solid var(--border)', borderRadius: 6, padding: 3, flexShrink: 0 }}>
+                        <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--muted2)', letterSpacing: '.05em', padding: '0 6px', textTransform: 'uppercase' }}>Presets:</span>
                         {[
                           { key: 'custom', label: 'Custom' },
                           { key: 'readonly', label: 'Read-Only' },
@@ -1815,7 +1815,7 @@ export default function Settings() {
                               toast.success(p.key === 'readonly' ? 'Read-only preset applied. Save permissions to persist.' : 'Full contributor preset applied. Save permissions to persist.')
                             }}
                             style={{
-                              padding: '6px 10px', borderRadius: 8, fontSize: 11.5, fontWeight: 600, cursor: editable ? 'pointer' : 'not-allowed',
+                              padding: '4px 8px', borderRadius: 5, fontSize: 10.5, fontWeight: 600, cursor: editable ? 'pointer' : 'not-allowed',
                               border: '1px solid transparent', background: p.key === 'custom' ? '#6e61ff' : 'transparent',
                               color: p.key === 'custom' ? '#fff' : 'var(--text-soft)', opacity: editable ? 1 : 0.6
                             }}
@@ -1826,8 +1826,8 @@ export default function Settings() {
                       </div>
                     </div>
 
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                      <label style={{ display: 'inline-flex', alignItems: 'center', gap: 10, cursor: editable ? 'pointer' : 'default', userSelect: 'none' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                      <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, cursor: editable ? 'pointer' : 'default', userSelect: 'none' }}>
                         <input
                           type="checkbox"
                           className="rpm-cb"
@@ -1847,13 +1847,13 @@ export default function Settings() {
                           }}
                           title="Apply standard member baseline permissions"
                         />
-                        <span style={{ fontSize: 13 }}>
+                        <span style={{ fontSize: 11 }}>
                           <strong style={{ color: 'var(--text-strong)' }}>Inherit baseline permissions</strong>
-                          <span style={{ color: 'var(--muted)', fontSize: 12 }}> (Applies standard "Member" defaults automatically)</span>
+                          <span style={{ color: 'var(--muted)', fontSize: 10 }}> (Applies standard "Member" defaults automatically)</span>
                         </span>
                       </label>
 
-                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, fontSize: 12, color: 'var(--muted)' }}>
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 11, color: 'var(--muted)' }}>
                         <button
                           type="button"
                           disabled={!editable}
@@ -1875,9 +1875,9 @@ export default function Settings() {
                             })
                             toast.success('All view permissions selected. Save permissions to persist.')
                           }}
-                          style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: editable ? 'pointer' : 'not-allowed', display: 'inline-flex', alignItems: 'center', gap: 6, padding: 4 }}
+                          style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: editable ? 'pointer' : 'not-allowed', display: 'inline-flex', alignItems: 'center', gap: 5, padding: 2 }}
                         >
-                          <Eye size={14} /> <span>Select All View</span>
+                          <Eye size={13} /> <span>Select All View</span>
                         </button>
                         <span style={{ color: 'var(--border)' }}>|</span>
                         <button
@@ -1900,9 +1900,9 @@ export default function Settings() {
                             })
                             toast.success('All delete permissions cleared. Save permissions to persist.')
                           }}
-                          style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: editable ? 'pointer' : 'not-allowed', display: 'inline-flex', alignItems: 'center', gap: 6, padding: 4 }}
+                          style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: editable ? 'pointer' : 'not-allowed', display: 'inline-flex', alignItems: 'center', gap: 5, padding: 2 }}
                         >
-                          <Trash2 size={14} /> <span>Clear All Delete</span>
+                          <Trash2 size={13} /> <span>Clear All Delete</span>
                         </button>
                       </div>
                     </div>
@@ -2461,7 +2461,7 @@ export default function Settings() {
                   <img src="/favicon.svg" alt="Thoth logo" style={{ width: 28, height: 28, borderRadius: 6 }} />
                   <h2 style={{ margin: 0, fontSize: 28, fontWeight: 600, letterSpacing: '-0.02em', color: 'var(--text-strong)', lineHeight: 1.1, fontFamily: "Georgia, 'Times New Roman', serif" }}>Thoth</h2>
                 </div>
-                <span style={{ display: 'inline-block', marginTop: 12, padding: '4px 10px', borderRadius: 6, background: 'var(--panel3)', border: '1px solid var(--border)', color: 'var(--muted)', fontSize: 12, fontWeight: 500 }}>v1.0.0</span>
+                <span style={{ display: 'inline-block', marginTop: 12, padding: '4px 10px', borderRadius: 6, background: 'var(--panel3)', border: '1px solid var(--border)', color: 'var(--muted)', fontSize: 12, fontWeight: 500 }}>{import.meta.env.VITE_APP_VERSION || 'dev'}</span>
                 <h3 style={{ margin: '22px 0 14px', fontSize: 34, fontWeight: 500, lineHeight: 1.15, letterSpacing: '-0.03em', color: 'var(--text-strong)', maxWidth: '14ch', fontFamily: "Georgia, 'Times New Roman', serif" }}>Your project’s memory, self-hosted.</h3>
                 <p style={{ margin: 0, fontSize: 14, lineHeight: 1.65, color: 'var(--muted)', maxWidth: 420 }}>
                   Thoth is a local-first project management and knowledge workspace backed by PostgreSQL. Track tasks, bugs, notes, and team workflows in one place while keeping your data under your control.

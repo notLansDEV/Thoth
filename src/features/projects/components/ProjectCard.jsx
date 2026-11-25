@@ -1,5 +1,6 @@
 import { Eye, Pencil, Trash2, CalendarClock, Clock } from 'lucide-react'
 import { PROJECT_PRIORITIES } from '../projects.service.js'
+import DescriptionPreview from '../../../components/DescriptionPreview.jsx'
 
 const STATUS_COLORS = {
   planning: '#5f74ff',
@@ -90,7 +91,7 @@ export default function ProjectCard({ project, onView, onEdit, onDelete, canWrit
       </div>
 
       {project.description && (
-        <div className="description">{project.description}</div>
+        <DescriptionPreview text={project.description} maxChars={16} className="description md-rendered" />
       )}
 
       {(start || deadline) && (
