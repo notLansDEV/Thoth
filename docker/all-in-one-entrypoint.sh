@@ -14,10 +14,14 @@ if [ ! -f "$APP_ENV" ]; then
 JWT_SECRET=$JWT_SECRET
 POSTGRES_PASSWORD=$DB_PASSWORD
 EOF
+  chmod 600 "$APP_ENV"
 fi
 
 # shellcheck disable=SC1090
+set -a
 source "$APP_ENV"
+set +a
+
 export JWT_SECRET="${JWT_SECRET:?missing}"
 export POSTGRES_PASSWORD="${POSTGRES_PASSWORD:?missing}"
 export NODE_ENV=production
@@ -28,6 +32,11 @@ export DB_NAME="${DB_NAME:-thoth}"
 export DB_USER="${DB_USER:-thoth}"
 export DB_PASSWORD="$POSTGRES_PASSWORD"
 export DATABASE_URL=""
+
+# Escape single quotes for safe SQL string literals
+SQL_DB_USER="${DB_USER//\'/\'\'}"
+SQL_DB_NAME="${DB_NAME//\'/\'\'}"
+SQL_DB_PASSWORD="${DB_PASSWORD//\'/\'\'}"
 
 # Init Postgres data dir
 if [ ! -s "$PGDATA/PG_VERSION" ]; then
@@ -44,16 +53,23 @@ chown -R postgres:postgres "$PGDATA"
 # Start Postgres
 su - postgres -c "/usr/lib/postgresql/16/bin/pg_ctl -D '$PGDATA' -o '-c listen_addresses=127.0.0.1 -c port=5432' -w start"
 
-# Create user/db
-su - postgres -c "psql -v ON_ERROR_STOP=1 --username=postgres <<SQL
-DO \$\$ BEGIN
-  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '$DB_USER') THEN
-    CREATE ROLE \"$DB_USER\" LOGIN PASSWORD '$DB_PASSWORD';
+# Create user/db safely without $$ expansion
+su - postgres -c 'psql -v ON_ERROR_STOP=1 --username=postgres' <<SQL
+DO \$do\$
+BEGIN
+  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '${SQL_DB_USER}') THEN
+    CREATE ROLE "${DB_USER}" LOGIN PASSWORD '${SQL_DB_PASSWORD}';
   END IF;
-END \$\$;
-SQL"
-su - postgres -c "psql -v ON_ERROR_STOP=1 --username=postgres -tc \"SELECT 1 FROM pg_database WHERE datname='$DB_NAME'\" | grep -q 1 || psql --username=postgres -c \"CREATE DATABASE \\\"$DB_NAME\\\" OWNER \\\"$DB_USER\\\"\""
-su - postgres -c "psql -v ON_ERROR_STOP=1 --username=postgres -c \"ALTER ROLE \\\"$DB_USER\\\" WITH PASSWORD '$DB_PASSWORD'; GRANT ALL PRIVILEGES ON DATABASE \\\"$DB_NAME\\\" TO \\\"$DB_USER\\\";\""
+END
+\$do\$;
+
+ALTER ROLE "${DB_USER}" WITH PASSWORD '${SQL_DB_PASSWORD}';
+
+SELECT 'CREATE DATABASE "${DB_NAME}" OWNER "${DB_USER}"'
+WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = '${SQL_DB_NAME}')\gexec
+
+GRANT ALL PRIVILEGES ON DATABASE "${DB_NAME}" TO "${DB_USER}";
+SQL
 
 echo "[thoth] Starting Thoth on port $PORT..."
 node /app/server/index.js &
