@@ -29,12 +29,11 @@ Thoth helps teams keep project work and project knowledge in one place. Manage w
 Run Thoth and PostgreSQL together in a single container with zero external database setup:
 
 ```bash
-docker build -f Dockerfile.allinone -t thoth .
 docker run -d \
   --name thoth \
   -p 5232:5232 \
   -v ~/.thoth:/var/opt/thoth \
-  thoth
+  ghcr.io/notlansdev/thoth:latest
 ```
 
 Open **http://localhost:5232** in your browser and create your first account.
