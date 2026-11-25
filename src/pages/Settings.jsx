@@ -547,10 +547,10 @@ export default function Settings() {
       if (!available.includes(selectedRole)) setSelectedRole(available.includes('admin') ? 'admin' : (available[0] || 'member'))
     } else if (isAdmin) {
       // Admins can only view/manage lower-level permissions (member)
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+       
       if (selectedRole !== 'member') setSelectedRole('member')
     } else {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+       
       if (selectedRole !== 'member') setSelectedRole('member')
     }
   }, [currentUserRole, ws?.id, isAdmin, isOwner, selectedRole, rolePerms])
@@ -911,7 +911,7 @@ export default function Settings() {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     if (tab === 'team') loadMembers()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab])
 

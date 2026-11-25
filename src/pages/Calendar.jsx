@@ -66,7 +66,7 @@ export default function Calendar({ workspace: _workspace }) {
       .catch(() => { if (alive) setByDay({}) })
       .finally(() => { if (alive) setLoading(false) })
     return () => { alive = false }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [ws?.id])
 
   const today = todayKey()

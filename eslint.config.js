@@ -28,4 +28,10 @@ export default defineConfig([
       parserOptions: { sourceType: 'module' },
     },
   },
+  {
+    files: ['*.config.js', 'scripts/**/*.{js,mjs,cjs}'],
+    languageOptions: {
+      globals: { ...globals.node },
+    },
+  },
 ])
