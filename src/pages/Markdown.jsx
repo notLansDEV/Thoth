@@ -10,6 +10,7 @@ import { getPages, createPage, updatePage, deletePage } from '../features/markdo
 import { getCurrentWorkspace, getSelectedProjectId } from '../features/workspaces/workspaces.service.js'
 import { getWorkspaceMembers } from '../features/tasks/tasks.service.js'
 import ConfirmModal from '../components/ConfirmModal.jsx'
+import { renderMarkdown } from '../utils/renderMarkdown.js'
 
 function fmtLocalDate(d) {
   const p = (n) => String(n).padStart(2, '0')
@@ -142,9 +143,6 @@ function readFileAsDataUrl(file) {
   })
 }
 
-// ---------- tiny markdown renderer ----------
-export { renderMarkdown } from '../utils/renderMarkdown.js'
-
 // ---------- main module ----------
 export default function Markdown({ subPage }) {
   const ws = getCurrentWorkspace()
@@ -161,6 +159,7 @@ export default function Markdown({ subPage }) {
   const [confirmDelete, setConfirmDelete] = useState(null)
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- sync project selection from workspace/external event
     setSelectedProjectIdState(getSelectedProjectId(wsId) || '')
     const onProjectChanged = (event) => {
       const detail = event?.detail || {}
@@ -192,7 +191,11 @@ export default function Markdown({ subPage }) {
     }
   }
 
-  useEffect(() => { refresh() }, [wsId, selectedProjectId])
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- data fetch triggers async state updates
+    refresh()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wsId, selectedProjectId])
 
   // author lookup for feed cards
   const [authors, setAuthors] = useState({})
@@ -234,7 +237,11 @@ export default function Markdown({ subPage }) {
   const [showToolbar, setShowToolbar] = useState(true)
 
   // switching submodule resets the open editor
-  useEffect(() => { setOpenPage(null); setShowRecents(false) }, [view])
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset local UI state on view change
+    setOpenPage(null)
+    setShowRecents(false)
+  }, [view])
 
   // leaving the module clears the open editor
   useEffect(() => () => setOpenPage(null), [])
@@ -325,6 +332,7 @@ export default function Markdown({ subPage }) {
       {view === 'pages' ? (
         openPage ? (
           <PageEditor
+            key={openPage.id}
             page={openPage}
             onChange={(patch) => handlePagePatch(openPage.id, patch)}
             onDelete={() => setConfirmDelete(openPage)}
@@ -522,14 +530,6 @@ function DatePager({ jDate, onShift, pages }) {
   )
 }
 
-function shortDate(dateStr) {
-  try {
-    return new Date(`${dateStr}T12:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
-  } catch {
-    return dateStr
-  }
-}
-
 function toLocalDate(d) {
   if (!d) return ''
   const dt = d instanceof Date ? d : new Date(d)
@@ -664,10 +664,7 @@ function PageEditor({ page, onChange, onDelete }) {
   const [mode, setMode] = useState('editor') // editor | preview | split
   const taRef = useRef(null)
 
-  useEffect(() => {
-    setContent(page.content || '')
-    setTitle(page.title || '')
-  }, [page.id])
+
 
   const stats = useMemo(() => ({
     words: content.trim() ? content.trim().split(/\s+/).filter(Boolean).length : 0,
@@ -833,14 +830,13 @@ function JournalFeed({ entries, loaded, authors, myId, myName, patchPage, onDele
   )
 }
 
-function NoteCard({ page, authorName, myId, myName, patchPage, onDeleteConfirm, focusMode, showToolbar, onToggleFocus, onToggleToolbar, onFocusPage }) {
+function NoteCard({ page, authorName: _authorName, myId, myName, patchPage, onDeleteConfirm, focusMode: _focusMode, showToolbar, onToggleFocus: _onToggleFocus, onToggleToolbar, onFocusPage }) {
   const [expanded, setExpanded] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [reactOpen, setReactOpen] = useState(false)
   const [cText, setCText] = useState('')
   const [replyTo, setReplyTo] = useState(null)
   const [expandedReplies, setExpandedReplies] = useState(new Set())
-  const [showAllComments, setShowAllComments] = useState(false)
   const [copied, setCopied] = useState(null)
   const [editing, setEditing] = useState(false)
   const [editTitle, setEditTitle] = useState(page.title || '')
@@ -853,6 +849,7 @@ function NoteCard({ page, authorName, myId, myName, patchPage, onDeleteConfirm, 
   const reactions = page.reactions || {}
   const comments = page.comments || []
   const attachments = page.attachments || []
+  // eslint-disable-next-line react-hooks/purity -- relative "new" badge; acceptable impure read during render
   const isNew = page.created_at && (Date.now() - new Date(page.created_at).getTime()) < NEW_WINDOW_MS
   const myTint = avatarTint(myName)
   const myInitials = (myName || '?').split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase()
@@ -1226,12 +1223,7 @@ function Composer({ dateStr, wsId, projectId, focusMode, showToolbar, onToggleFo
   const taRef = useRef(null)
   const attFileRef = useRef(null)
 
-  useEffect(() => {
-    if (editPage) {
-      setText(editPage.content || '')
-      setAtts([])
-    }
-  }, [editPage?.id])
+
 
   function autoGrow(el) {
     if (!el) return

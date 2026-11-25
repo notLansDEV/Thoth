@@ -202,7 +202,10 @@ export default function Tasks({ subPage }) {
   useEffect(() => {
     if (!subPage || subPage === 'stages' || subPage === 'all') return
     const found = tasks.find((t) => t.id === subPage || t.task_code === subPage)
-    if (found) setPreview(found)
+    if (found) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- sync preview from route param
+      setPreview(found)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [subPage, tasks.length])
 

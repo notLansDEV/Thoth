@@ -19,15 +19,13 @@ import {
   getWorkspaceProjectMemberships,
   setUserProjectMemberships,
 } from '../features/projects/projects.service.js'
-import { ArrowLeft, Settings, UserPlus, Users, Eye, Trash2, Check, X, Search } from 'lucide-react'
+import { ArrowLeft, Settings, UserPlus, Users, Eye, Trash2, X, Search } from 'lucide-react'
 import ConfirmModal from '../components/ConfirmModal.jsx'
 
 function navigate(path) {
   window.history.pushState({}, '', path)
   window.dispatchEvent(new PopStateEvent('popstate'))
 }
-
-const ROLES = ['owner', 'admin', 'member']
 
 const labelStyle = {
   display: 'block',
@@ -170,7 +168,7 @@ export default function Workspaces() {
           setWorkspaces(all)
           freshWs = all.find(w => String(w.id) === String(ws.id)) || ws
         }
-      } catch {}
+      } catch { /* ignore workspace refresh errors */ }
       setPreview(freshWs)
       const rows = await getMembers(freshWs.id)
       const arr = Array.isArray(rows) ? rows : []
@@ -252,7 +250,7 @@ export default function Workspaces() {
     }
   }
 
-  async function handleRoleSave() {
+  async function _handleRoleSave() {
     if (!editingRole || !preview) return
     setSavingPanel(true)
     setPanelError(null)
@@ -376,7 +374,7 @@ export default function Workspaces() {
     return { label: 'Custom Restricted', type: 'custom', sub: `${assignmentCount} of ${total} projects visible` }
   }
 
-  function memberProjectPermissionRole(member) {
+  function _memberProjectPermissionRole(member) {
     return defaultPermissionRoleForMember(member)
   }
 
@@ -640,7 +638,7 @@ export default function Workspaces() {
                           const canManageAccess = preview.role === 'owner' && !isOwnerMember
                           const visibleAssignments = isOwnerMember ? [] : assignments.slice(0,3)
                           const extra = !isOwnerMember ? Math.max(0, assignments.length - 3) : 0
-                          const editingWsRole = editingRole?.userId === m.id
+                          const _editingWsRole = editingRole?.userId === m.id
                           return (
                             <tr key={uid} className="wpt-row">
                               <td className="wpt-td" style={{ minWidth: 260 }}>

@@ -3,7 +3,7 @@ import { toast } from 'sonner'
 import {
   Settings2, Palette, Users, Bell, Database, Info, Monitor, Moon, Sun, Save,
   User, LogOut, Trash2, UserPlus, Check, X, Shield,
-  Search, Sparkles, Pencil, Plus, Eye, FolderOpen, ArrowRight, Globe,
+  Search, Sparkles, Pencil, Plus, Eye, ArrowRight, Globe,
 } from 'lucide-react'
 import ConfirmModal from '../components/ConfirmModal.jsx'
 import { getSettings, saveSettings } from '../features/settings/settings.service.js'
@@ -24,8 +24,6 @@ import {
 } from '../features/auth/account.service.js'
 import {
   getProjects,
-  getProjectMembers,
-  setProjectMembers,
   getWorkspaceProjectMemberships,
   setUserProjectMemberships,
 } from '../features/projects/projects.service.js'
@@ -357,7 +355,9 @@ export default function Settings() {
   const [settings, setSettings] = useState(getSettings())
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (!allowedTabs.includes(tab)) setTab(allowedTabs[0] || 'account')
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUserRole, ws?.id, tab])
 
   // General
@@ -369,7 +369,7 @@ export default function Settings() {
   // Team & Members
   const [members, setMembers] = useState([])
   const [membersLoading, setMembersLoading] = useState(false)
-  const [teamBusy, setTeamBusy] = useState(false)
+  const [_teamBusy, _setTeamBusy] = useState(false)
   const [teamMsg, setTeamMsg] = useState(null)
   const [editingRole, setEditingRole] = useState(null)
   const [showAddMemberModal, setShowAddMemberModal] = useState(false)
@@ -525,35 +525,39 @@ export default function Settings() {
   const [showRolesModal, setShowRolesModal] = useState(false)
   const [rolePerms, setRolePerms] = useState(() => normalizeGranularRolePerms(ws?.settings?.rolePermissions))
   const [savingPerms, setSavingPerms] = useState(false)
-  const [collapsedModules, setCollapsedModules] = useState({})
+  const [_collapsedModules, _setCollapsedModules] = useState({})
   const [showAddRoleModal, setShowAddRoleModal] = useState(false)
   const [newRoleTitle, setNewRoleTitle] = useState('')
   const [newRoleDesc, setNewRoleDesc] = useState('')
   const [showRoleSuggestions, setShowRoleSuggestions] = useState(false)
   const [selectedRolePresetKey, setSelectedRolePresetKey] = useState(null)
-  const [rolesEditMode, setRolesEditMode] = useState(false)
+  const [_rolesEditMode, _setRolesEditMode] = useState(false)
   const [editRoleModal, setEditRoleModal] = useState(null) // { key, title, description }
   const [confirmDeleteRole, setConfirmDeleteRole] = useState(null) // role key
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- sync role permissions from workspace settings
     setRolePerms(normalizeGranularRolePerms(ws?.settings?.rolePermissions))
   }, [ws?.id, ws?.settings, ws?.role])
 
   useEffect(() => {
     if (isOwner) {
       const available = Object.keys(rolePerms || {}).filter(k => !k.startsWith('_') && k !== 'owner')
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- clamp selected role to available roles
       if (!available.includes(selectedRole)) setSelectedRole(available.includes('admin') ? 'admin' : (available[0] || 'member'))
     } else if (isAdmin) {
       // Admins can only view/manage lower-level permissions (member)
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       if (selectedRole !== 'member') setSelectedRole('member')
     } else {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       if (selectedRole !== 'member') setSelectedRole('member')
     }
   }, [currentUserRole, ws?.id, isAdmin, isOwner, selectedRole, rolePerms])
 
-  const ownerBaseline = rolePerms?.owner || normalizeGranularRolePerms(ws?.settings?.rolePermissions).owner
+  const _ownerBaseline = rolePerms?.owner || normalizeGranularRolePerms(ws?.settings?.rolePermissions).owner
 
-  const ROLE_BANNERS = {
+  const _ROLE_BANNERS = {
     owner: <><strong>Workspace Owner:</strong> Supreme authority for the current workspace. Configure permissions for owner, admin, and member roles.</>,
     admin: <><strong>Workspace Admin:</strong> Can manage lower-level permissions for members. Owner and Admin permission tiers are locked.</>,
     member: <><strong>Workspace Member:</strong> Role definition for the current workspace. Members have no control over permissions in this settings page.</>,
@@ -576,7 +580,7 @@ export default function Settings() {
     return false
   }
 
-  function canEditSelectedRoleMatrix() {
+  function _canEditSelectedRoleMatrix() {
     if (selectedRole === 'owner' || String(selectedRole).startsWith('_')) return false
     if (isMemberUser) return false
     if (isOwner) return canViewRoleTab(selectedRole)
@@ -591,7 +595,7 @@ export default function Settings() {
     setSettings(next)
   }
 
-  const isSelf = (id) => user && id === user.id
+  const _isSelf = (id) => user && id === user.id
 
   async function handleSaveGeneral() {
     const nextName = wsName.trim().slice(0, 16)
@@ -614,7 +618,7 @@ export default function Settings() {
     }
   }
 
-  function setPerm(role, mod, perm, value) {
+  function _setPerm(role, mod, perm, value) {
     setRolePerms((cur) => ({
       ...cur,
       [role]: {
@@ -804,7 +808,7 @@ export default function Settings() {
     return normalizeShowAndLogic(base)
   }
 
-  function openAddRoleModal() {
+  function __openAddRoleModal() {
     if (!isOwner) return
     setNewRoleTitle('')
     setNewRoleDesc('')
@@ -905,8 +909,10 @@ export default function Settings() {
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (tab === 'team') loadMembers()
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab])
 
   useEffect(() => {
@@ -992,7 +998,7 @@ export default function Settings() {
     return { label: 'Custom Restricted', type: 'custom', sub: `${assignmentCount} of ${total} projects visible` }
   }
 
-  function memberProjectPermissionRole(member) {
+  function _memberProjectPermissionRole(member) {
     return defaultPermissionRoleForMember(member)
   }
 
@@ -1115,7 +1121,7 @@ export default function Settings() {
     }
   }
 
-  async function handleRoleSave() {
+  async function _handleRoleSave() {
     if (!ws || !editingRole) return
     const target = members.find((m) => m.id === editingRole.userId)
     if (isAdmin && (target?.role === 'owner' || editingRole.role === 'owner' || editingRole.role === 'admin' && target?.role === 'admin')) {
@@ -1132,7 +1138,7 @@ export default function Settings() {
       setEditingRole(null)
       return
     }
-    setTeamBusy(true)
+    _setTeamBusy(true)
     setTeamMsg(null)
     try {
       await updateMemberRole(ws.id, editingRole.userId, editingRole.role)
@@ -1141,7 +1147,7 @@ export default function Settings() {
     } catch (err) {
       setTeamMsg({ type: 'error', text: err.message || 'Could not update role' })
     } finally {
-      setTeamBusy(false)
+      _setTeamBusy(false)
     }
   }
 
@@ -1156,7 +1162,7 @@ export default function Settings() {
       return
     }
     if (!window.confirm(`Remove ${m.full_name || m.username} from this workspace?`)) return
-    setTeamBusy(true)
+    _setTeamBusy(true)
     setTeamMsg(null)
     try {
       await removeMember(ws.id, m.id)
@@ -1165,7 +1171,7 @@ export default function Settings() {
     } catch (err) {
       setTeamMsg({ type: 'error', text: err.message || 'Could not remove member' })
     } finally {
-      setTeamBusy(false)
+      _setTeamBusy(false)
     }
   }
 
@@ -1470,7 +1476,7 @@ export default function Settings() {
               const search = ((rolePerms && rolePerms._uiSearch) || '').toLowerCase()
               const collapsed = (rolePerms && rolePerms._collapsed) || {}
               const selectedRoleTitle = getRoleMeta(selectedRole).title
-              const bannerHtml = isMemberUserRole
+              const _bannerHtml = isMemberUserRole
                 ? `<strong>Read-Only Access (${ws?.name || 'Workspace'}):</strong> You are signed in as a Workspace Member. Role and permission configuration requires Workspace Owner or Admin privileges.`
                 : isAdminUser
                   ? `<strong>Admin Role Control (${ws?.name || 'Workspace'}):</strong> You are configuring permissions for the <strong>Member</strong> role. Owner and Admin privilege tabs are restricted.`
@@ -1487,7 +1493,7 @@ export default function Settings() {
               const toggleAllSections = (collapseVal) => setRolePerms(cur => ({ ...(cur || {}), _collapsed: Object.fromEntries(PERM_MATRIX.map(m => [m.key, collapseVal])) }))
               const setSearch = (v) => setRolePerms(cur => ({ ...(cur || {}), _uiSearch: v }))
               const roleTabKeys = Object.keys(rolePerms || {}).filter(k => !k.startsWith('_') && k !== 'owner' && canViewRoleTab(k))
-              const selectedRoleMeta = (rolePerms?.[selectedRole]?._meta || {})
+              const _selectedRoleMeta = (rolePerms?.[selectedRole]?._meta || {})
               const isCustomSelectedRole = !['admin', 'member', 'owner'].includes(selectedRole)
               const resetDefaults = () => {
                 if (!editable) return
@@ -1503,7 +1509,7 @@ export default function Settings() {
                 })
                 toast.success(`Reset ${String(selectedRole).toUpperCase()} permissions to default template.`)
               }
-              const ROLE_PRESETS = [
+              const _ROLE_PRESETS = [
                 { key: 'project_lead', title: 'Project Lead', description: 'Scope: Full operational authority across the assigned project. Permissions: Edit project details, manage milestones, assign team members, upload attachments/notes, full Task/Bug Kanban CRUD & stage management, reports, and markdown access.', base: 'admin' },
                 { key: 'editor', title: 'Editor (Contributor)', description: 'Scope: Day-to-day building and execution without structural configuration. Permissions: View project overview/milestones, create/edit tasks and bugs, drag-and-drop Kanban cards, manage markdown notes, and view reports. Cannot modify workflow stages.', base: 'member' },
                 { key: 'qa_tester', title: 'QA / Tester', description: 'Scope: Bug verification, tracking, and triage. Permissions: Full bug Kanban CRUD and stage management, view task boards, upload bug attachments, and view project reports.', base: 'member' },
@@ -1512,7 +1518,7 @@ export default function Settings() {
                 { key: 'devops', title: 'DevOps / Infrastructure', description: 'Scope: System-level maintenance, automation, and pipeline triage. Permissions: Full dashboard, project edit access, full task/bug Kanban and stage management, full reports/calendar, markdown logs, plus database storage status and app settings. Excludes team/role workspace management.', base: 'admin' },
                 { key: 'guest_vendor', title: 'Guest / External Vendor', description: 'Scope: Single-project contractor access with strict workspace isolation. Permissions: Limited strictly to assigned project dashboard metrics, tasks, bugs, and calendar schedules. Workspace-wide reports, markdown journals, workspace switcher, and core settings are hidden.', base: 'member' },
               ]
-              const addRoleFromPreset = (preset) => {
+              const _addRoleFromPreset = (preset) => {
                 if (!isOwnerUser || !preset) return
                 let createdSlug = preset.key
                 const existing = rolePerms || {}
@@ -1529,7 +1535,7 @@ export default function Settings() {
                 setSelectedRole(createdSlug)
                 toast.success(`Added role "${preset.title}". Configure its permissions and save.`)
               }
-              const openAddRoleModal = () => {
+              const _openAddRoleModal = () => {
                 if (!isOwnerUser) return
                 setNewRoleTitle('')
                 setNewRoleDesc('')
@@ -1675,7 +1681,7 @@ export default function Settings() {
                       </div>
 
                       {isOwnerUser && (
-                        <button type="button" className="rpm-add-role-btn" onClick={openAddRoleModal}>
+                        <button type="button" className="rpm-add-role-btn" onClick={_openAddRoleModal}>
                           <Plus size={12} />
                           <span>Add role</span>
                         </button>
@@ -2117,8 +2123,8 @@ export default function Settings() {
                           const canManageAccess = isOwner && !isOwnerMember
                           const visibleAssignments = isOwnerMember ? [] : assignments.slice(0,3)
                           const extra = !isOwnerMember ? Math.max(0, assignments.length - 3) : 0
-                          const editingWsRole = editingRole?.userId === m.id
-                          const adminCannotAlterTier = isAdmin && (isOwnerMember || m.role === 'admin')
+                          const _editingWsRole = editingRole?.userId === m.id
+                          const _adminCannotAlterTier = isAdmin && (isOwnerMember || m.role === 'admin')
                           return (
                             <tr key={uid} className="wpt-row">
                               <td className="wpt-td" style={{ minWidth: 260 }}>

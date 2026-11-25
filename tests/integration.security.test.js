@@ -1,5 +1,6 @@
-import test, { before, after } from 'node:test'
+import test from 'node:test'
 import assert from 'node:assert/strict'
+import process from 'node:process'
 
 const shouldRun = !!process.env.TEST_DATABASE_URL
 const baseEnv = {
@@ -11,7 +12,6 @@ const baseEnv = {
 
 let server
 let baseUrl
-let pool
 let app
 let initializeSchema
 let closeDatabase
@@ -48,7 +48,7 @@ async function api(jar, method, path, body, extraHeaders = {}) {
   })
   jar.setFromResponse(res)
   const text = await res.text()
-  let data = null
+  let data
   try { data = text ? JSON.parse(text) : null } catch { data = text }
   return { res, data }
 }
@@ -74,7 +74,6 @@ test('DB-backed integration security suite', { skip: !shouldRun && 'Set TEST_DAT
   app = serverMod.app
   initializeSchema = dbMod.initializeSchema
   closeDatabase = dbMod.closeDatabase
-  pool = dbMod.getPool?.()
 
   await initializeSchema()
   server = app.listen(0)
@@ -88,7 +87,6 @@ test('DB-backed integration security suite', { skip: !shouldRun && 'Set TEST_DAT
   })
 
   const jarA = cookieJar()
-  const jarB = cookieJar()
 
   await t.test('cookie auth + CSRF + logout flow', async () => {
     const s = await signup(jarA, 'alice', `alice_${Date.now()}@example.com`)
