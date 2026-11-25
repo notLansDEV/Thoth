@@ -1,0 +1,21 @@
+node_modules
+dist
+dist-ssr
+coverage
+
+# Never bake local secrets or VCS data into the image.
+.git
+.gitignore
+.env
+.env.*
+!.env.example
+
+# Editor / OS noise
+.vscode
+.idea
+.DS_Store
+
+# Docs and logs are not needed at runtime or build time.
+docs
+*.md
+*.log

@@ -1,0 +1,390 @@
+-- Thoth Database Schema
+-- PostgreSQL
+
+-- Enable UUID extension
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+-- Workspaces Table
+CREATE TABLE IF NOT EXISTS workspaces (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name VARCHAR(255) NOT NULL,
+  description TEXT,
+  slug VARCHAR(255) UNIQUE NOT NULL,
+  settings JSONB DEFAULT '{}',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Projects Table
+CREATE TABLE IF NOT EXISTS projects (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  name VARCHAR(255) NOT NULL,
+  description TEXT,
+  slug VARCHAR(255) NOT NULL,
+  status VARCHAR(50) DEFAULT 'active',
+  color VARCHAR(7),
+  icon VARCHAR(50),
+  order_index INTEGER DEFAULT 0,
+  archived BOOLEAN DEFAULT FALSE,
+  start_date TIMESTAMP,
+  deadline TIMESTAMP,
+  priority VARCHAR(50) DEFAULT 'medium',
+  created_by UUID,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(workspace_id, slug)
+);
+
+-- Ensure new columns on existing installs
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS start_date TIMESTAMP;
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS deadline TIMESTAMP;
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS priority VARCHAR(50) DEFAULT 'medium';
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS meta JSONB DEFAULT '{}';
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS created_by UUID;
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP;
+CREATE INDEX IF NOT EXISTS idx_projects_deleted_at ON projects(deleted_at);
+CREATE INDEX IF NOT EXISTS idx_tasks_deleted_at ON tasks(deleted_at);
+CREATE INDEX IF NOT EXISTS idx_bugs_deleted_at ON bugs(deleted_at);
+
+-- Markdown Pages Table (Logseq-style journal + pages)
+CREATE TABLE IF NOT EXISTS md_pages (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  title VARCHAR(255) NOT NULL DEFAULT 'Untitled',
+  content TEXT DEFAULT '',
+  page_type VARCHAR(20) DEFAULT 'page',
+  page_date DATE,
+  reactions JSONB DEFAULT '{}',
+  comments JSONB DEFAULT '[]',
+  attachments JSONB DEFAULT '[]',
+  pinned BOOLEAN DEFAULT FALSE,
+  archived BOOLEAN DEFAULT FALSE,
+  created_by UUID,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+ALTER TABLE md_pages ADD COLUMN IF NOT EXISTS reactions JSONB DEFAULT '{}';
+ALTER TABLE md_pages ADD COLUMN IF NOT EXISTS comments JSONB DEFAULT '[]';
+ALTER TABLE md_pages ADD COLUMN IF NOT EXISTS attachments JSONB DEFAULT '[]';
+ALTER TABLE md_pages ADD COLUMN IF NOT EXISTS pinned BOOLEAN DEFAULT FALSE;
+ALTER TABLE md_pages ADD COLUMN IF NOT EXISTS archived BOOLEAN DEFAULT FALSE;
+ALTER TABLE md_pages ADD COLUMN IF NOT EXISTS project_id UUID REFERENCES projects(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_md_pages_workspace ON md_pages(workspace_id);
+CREATE INDEX IF NOT EXISTS idx_md_pages_project ON md_pages(project_id);
+CREATE INDEX IF NOT EXISTS idx_md_pages_updated ON md_pages(updated_at DESC);
+
+-- Milestones Table
+CREATE TABLE IF NOT EXISTS milestones (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  name VARCHAR(255) NOT NULL,
+  description TEXT,
+  start_date TIMESTAMP,
+  due_date TIMESTAMP,
+  status VARCHAR(50) DEFAULT 'planned',
+  progress INTEGER DEFAULT 0,
+  meta JSONB DEFAULT '{}',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Tasks Table
+CREATE TABLE IF NOT EXISTS tasks (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  milestone_id UUID REFERENCES milestones(id) ON DELETE SET NULL,
+  title VARCHAR(255) NOT NULL,
+  description TEXT,
+  status VARCHAR(50) DEFAULT 'todo',
+  priority VARCHAR(50) DEFAULT 'medium',
+  assigned_to UUID,
+  created_by UUID,
+  start_date TIMESTAMP,
+  due_date TIMESTAMP,
+  completed_at TIMESTAMP,
+  order_index INTEGER DEFAULT 0,
+  parent_task_id UUID REFERENCES tasks(id) ON DELETE SET NULL,
+  progress INTEGER DEFAULT 0,
+  meta JSONB DEFAULT '{}',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Ensure new columns on existing installs
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS progress INTEGER DEFAULT 0;
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS meta JSONB DEFAULT '{}';
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS task_code VARCHAR(50);
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP;
+
+-- Backfill human-readable codes for tasks created before the column existed
+WITH numbered AS (
+  SELECT id, 'Task-' || LPAD((ROW_NUMBER() OVER (PARTITION BY project_id ORDER BY created_at))::text, 2, '0') AS code
+  FROM tasks
+  WHERE task_code IS NULL
+)
+UPDATE tasks t SET task_code = n.code FROM numbered n WHERE t.id = n.id AND t.task_code IS NULL;
+
+-- Milestone checklist/meta storage on existing installs
+ALTER TABLE milestones ADD COLUMN IF NOT EXISTS meta JSONB DEFAULT '{}';
+
+-- Task Stages Table (workspace-level, user-manageable)
+CREATE TABLE IF NOT EXISTS task_stages (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  name VARCHAR(100) NOT NULL,
+  color VARCHAR(20) DEFAULT '#6e61ff',
+  position INTEGER DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(workspace_id, name)
+);
+
+-- Bug Stages Table (workspace-level, user-manageable)
+CREATE TABLE IF NOT EXISTS bug_stages (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  name VARCHAR(100) NOT NULL,
+  color VARCHAR(20) DEFAULT '#ff4040',
+  position INTEGER DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(workspace_id, name)
+);
+
+-- Migrate legacy hardcoded task statuses to stage names
+UPDATE tasks SET status = 'To Do' WHERE status = 'todo';
+UPDATE tasks SET status = 'In Progress' WHERE status = 'in_progress';
+UPDATE tasks SET status = 'Review' WHERE status = 'review';
+UPDATE tasks SET status = 'Done' WHERE status = 'done';
+
+-- Bugs Table
+CREATE TABLE IF NOT EXISTS bugs (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  kanban_column VARCHAR(50) DEFAULT 'new',
+  bug_id VARCHAR(50),
+  title VARCHAR(255) NOT NULL,
+  description TEXT,
+  priority VARCHAR(50) DEFAULT 'medium',
+  status VARCHAR(50) DEFAULT 'new',
+  assigned_to UUID,
+  created_by UUID,
+  milestone_id UUID REFERENCES milestones(id) ON DELETE SET NULL,
+  start_date DATE,
+  due_date DATE,
+  steps_to_reproduce TEXT,
+  expected_behavior TEXT,
+  actual_behavior TEXT,
+  attachments JSONB DEFAULT '[]',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(project_id, bug_id)
+);
+
+-- Ensure new columns on existing installs
+ALTER TABLE bugs ADD COLUMN IF NOT EXISTS attachments JSONB DEFAULT '[]';
+ALTER TABLE bugs ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP;
+ALTER TABLE bugs ADD COLUMN IF NOT EXISTS steps_to_reproduce TEXT;
+ALTER TABLE bugs ADD COLUMN IF NOT EXISTS expected_behavior TEXT;
+ALTER TABLE bugs ADD COLUMN IF NOT EXISTS actual_behavior TEXT;
+ALTER TABLE bugs ADD COLUMN IF NOT EXISTS milestone_id UUID REFERENCES milestones(id) ON DELETE SET NULL;
+ALTER TABLE bugs ADD COLUMN IF NOT EXISTS start_date DATE;
+ALTER TABLE bugs ADD COLUMN IF NOT EXISTS due_date DATE;
+
+-- Project member access: which workspace members are allowed to work in a project
+CREATE TABLE IF NOT EXISTS project_members (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  role VARCHAR(50) DEFAULT 'member',
+  UNIQUE(project_id, user_id)
+);
+ALTER TABLE project_members ADD COLUMN IF NOT EXISTS role VARCHAR(50) DEFAULT 'member';
+
+-- Bug Comments Table
+CREATE TABLE IF NOT EXISTS bug_comments (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  bug_id UUID NOT NULL REFERENCES bugs(id) ON DELETE CASCADE,
+  author_id UUID NOT NULL,
+  content TEXT NOT NULL,
+  attachments JSONB DEFAULT '[]',
+  parent_comment_id UUID REFERENCES bug_comments(id) ON DELETE SET NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+ALTER TABLE bug_comments ADD COLUMN IF NOT EXISTS parent_comment_id UUID REFERENCES bug_comments(id) ON DELETE SET NULL;
+
+-- Kanban Columns Table
+CREATE TABLE IF NOT EXISTS kanban_columns (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  name VARCHAR(255) NOT NULL,
+  slug VARCHAR(50) NOT NULL,
+  order_index INTEGER DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(project_id, slug)
+);
+
+-- Kanban Cards Table (tasks in kanban view)
+CREATE TABLE IF NOT EXISTS kanban_cards (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  column_id UUID NOT NULL REFERENCES kanban_columns(id) ON DELETE CASCADE,
+  task_id UUID REFERENCES tasks(id) ON DELETE SET NULL,
+  bug_id UUID REFERENCES bugs(id) ON DELETE SET NULL,
+  title VARCHAR(255) NOT NULL,
+  description TEXT,
+  order_index INTEGER DEFAULT 0,
+  assigned_to UUID,
+  priority VARCHAR(50),
+  labels JSONB DEFAULT '[]',
+  checklist JSONB DEFAULT '[]',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Calendar Events Table
+CREATE TABLE IF NOT EXISTS calendar_events (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  title VARCHAR(255) NOT NULL,
+  description TEXT,
+  start_time TIMESTAMP NOT NULL,
+  end_time TIMESTAMP NOT NULL,
+  color VARCHAR(7),
+  is_all_day BOOLEAN DEFAULT FALSE,
+  created_by UUID,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Markdown Documents Table
+CREATE TABLE IF NOT EXISTS markdown_documents (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  title VARCHAR(255) NOT NULL,
+  slug VARCHAR(255) NOT NULL,
+  content TEXT,
+  created_by UUID,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(project_id, slug)
+);
+
+-- Reports Table
+CREATE TABLE IF NOT EXISTS reports (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  title VARCHAR(255) NOT NULL,
+  report_date DATE NOT NULL,
+  tasks_done INTEGER DEFAULT 0,
+  tasks_backlog INTEGER DEFAULT 0,
+  bugs_fixed INTEGER DEFAULT 0,
+  bugs_added INTEGER DEFAULT 0,
+  notes TEXT,
+  created_by UUID,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(project_id, report_date)
+);
+
+-- Activity Log Table
+CREATE TABLE IF NOT EXISTS activity_logs (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  project_id UUID REFERENCES projects(id) ON DELETE SET NULL,
+  entity_type VARCHAR(50) NOT NULL,
+  entity_id UUID,
+  action VARCHAR(50) NOT NULL,
+  actor_id UUID,
+  changes JSONB,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Notifications Table
+CREATE TABLE IF NOT EXISTS notifications (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+  entity_type VARCHAR(50),
+  entity_id UUID,
+  title VARCHAR(255) NOT NULL,
+  body TEXT,
+  is_read BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Users Table (for future auth integration)
+CREATE TABLE IF NOT EXISTS users (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  username VARCHAR(255) UNIQUE NOT NULL,
+  email VARCHAR(255) UNIQUE NOT NULL,
+  password_hash VARCHAR(255),
+  full_name VARCHAR(255),
+  avatar_url VARCHAR(255),
+  bio TEXT,
+  status VARCHAR(50) DEFAULT 'active',
+  account_hint TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS account_hint TEXT;
+
+-- Workspace Members Table
+CREATE TABLE IF NOT EXISTS workspace_members (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  role VARCHAR(50) DEFAULT 'member',
+  joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(workspace_id, user_id)
+);
+
+-- Indexes for Performance
+CREATE INDEX idx_projects_workspace_id ON projects(workspace_id);
+CREATE INDEX idx_tasks_project_id ON tasks(project_id);
+CREATE INDEX idx_tasks_milestone_id ON tasks(milestone_id);
+CREATE INDEX idx_tasks_assigned_to ON tasks(assigned_to);
+CREATE INDEX idx_bugs_project_id ON bugs(project_id);
+CREATE INDEX idx_bugs_status ON bugs(status);
+CREATE INDEX idx_bugs_priority ON bugs(priority);
+CREATE INDEX idx_bugs_assigned_to ON bugs(assigned_to);
+CREATE INDEX idx_kanban_cards_project_id ON kanban_cards(project_id);
+CREATE INDEX idx_kanban_cards_column_id ON kanban_cards(column_id);
+CREATE INDEX idx_calendar_events_project_id ON calendar_events(project_id);
+CREATE INDEX idx_calendar_events_start_time ON calendar_events(start_time);
+CREATE INDEX idx_reports_project_id ON reports(project_id);
+CREATE INDEX idx_reports_report_date ON reports(report_date);
+CREATE INDEX idx_activity_logs_workspace_id ON activity_logs(workspace_id);
+CREATE INDEX idx_activity_logs_created_at ON activity_logs(created_at);
+CREATE INDEX idx_notifications_user_id ON notifications(user_id);
+CREATE INDEX idx_notifications_user_read ON notifications(user_id, is_read);
+
+
+
+
+-- Minimal migration tracking (schema.sql bootstrap model)
+CREATE TABLE IF NOT EXISTS schema_migrations (
+  id SERIAL PRIMARY KEY,
+  name VARCHAR(255) NOT NULL UNIQUE,
+  applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_md_pages_project_id ON md_pages(project_id);
+CREATE INDEX IF NOT EXISTS idx_md_pages_workspace_id ON md_pages(workspace_id);
+
+-- Audit logs (security/activity trail)
+CREATE TABLE IF NOT EXISTS audit_logs (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  actor_id UUID,
+  action VARCHAR(100) NOT NULL,
+  entity_type VARCHAR(100),
+  entity_id UUID,
+  meta JSONB DEFAULT '{}'::jsonb,
+  ip VARCHAR(64),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_actor_id ON audit_logs(actor_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at);

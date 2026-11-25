@@ -1,0 +1,365 @@
+import { useEffect, useRef, useState } from 'react'
+import { createBug, getWorkspaceMembers, getMilestones } from '../bugs.service.js'
+import { TASK_PRIORITIES } from '../../tasks/tasks.service.js'
+import { Paperclip, X, FileImage, FileText, FileArchive, FileType2, FileSpreadsheet } from 'lucide-react'
+import { toast } from 'sonner'
+
+const inputStyle = {
+  width: '100%',
+  padding: '8px 9px',
+  border: '1px solid var(--border)',
+  background: 'var(--panel3)',
+  color: 'var(--text-soft)',
+  borderRadius: '4px',
+  fontSize: '12px',
+  boxSizing: 'border-box',
+  outline: 'none',
+}
+
+const labelStyle = {
+  display: 'block',
+  marginBottom: '6px',
+  fontSize: '12px',
+  fontWeight: '600',
+  color: 'var(--text-soft)',
+}
+
+const MAX_FILE_BYTES = 2 * 1024 * 1024
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolve) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result)
+    reader.onerror = () => resolve(null)
+    reader.readAsDataURL(file)
+  })
+}
+
+function formatSize(bytes) {
+  if (bytes == null) return ''
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function fileIcon(name) {
+  if (!name) return <Paperclip size={13} />
+  const ext = name.split('.').pop().toLowerCase()
+  if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'].includes(ext)) return <FileImage size={13} />
+  if (['pdf'].includes(ext)) return <FileText size={13} />
+  if (['zip', 'rar', '7z', 'tar', 'gz'].includes(ext)) return <FileArchive size={13} />
+  if (['doc', 'docx'].includes(ext)) return <FileType2 size={13} />
+  if (['xls', 'xlsx', 'csv'].includes(ext)) return <FileSpreadsheet size={13} />
+  return <Paperclip size={13} />
+}
+
+export default function ReportBugModal({ projects, workspaceId, stages, defaultStageName, defaultProjectId, onCreated, onClose }) {
+  const [projectId, setProjectId] = useState(defaultProjectId || projects[0]?.id || '')
+  const [milestoneId, setMilestoneId] = useState('')
+  const [title, setTitle] = useState('')
+  const [description, setDescription] = useState('')
+  const [assignee, setAssignee] = useState('')
+  const [steps, setSteps] = useState('')
+  const [expected, setExpected] = useState('')
+  const [actual, setActual] = useState('')
+  const [priority, setPriority] = useState('medium')
+  const [attachments, setAttachments] = useState([])
+  const [startDate, setStartDate] = useState('')
+  const [dueDate, setDueDate] = useState('')
+  const [members, setMembers] = useState([])
+  const [milestones, setMilestones] = useState([])
+  const stageOptions = (stages && stages.length > 0)
+    ? stages.filter((s) => s.name !== 'Archived').map((s) => s.name)
+    : ['New']
+  const [stage, setStage] = useState(defaultStageName || stageOptions[0] || 'New')
+  const [error, setError] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const fileInputRef = useRef(null)
+
+  useEffect(() => {
+    let alive = true
+    getWorkspaceMembers(workspaceId || projects[0]?.workspace_id || '')
+      .then((rows) => { if (alive) setMembers(rows) })
+      .catch(() => {})
+    return () => { alive = false }
+  }, [workspaceId, projects])
+
+  useEffect(() => {
+    if (!projectId) return
+    let alive = true
+    getMilestones(projectId)
+      .then((rows) => { if (alive) setMilestones(Array.isArray(rows) ? rows : []) })
+      .catch(() => { if (alive) setMilestones([]) })
+    return () => { alive = false }
+  }, [projectId])
+
+  async function onFilesPicked(e) {
+    const picked = Array.from(e.target.files || [])
+    e.target.value = ''
+    let tooLarge = false
+    for (const file of picked) {
+      if (file.size > MAX_FILE_BYTES) {
+        tooLarge = true
+        continue
+      }
+      const entry = { name: file.name, size: file.size, type: file.type }
+      if ((file.type || '').startsWith('image/') && file.size <= MAX_FILE_BYTES) {
+        entry.dataUrl = await readFileAsDataUrl(file)
+      }
+      setAttachments((cur) => [...cur, entry])
+    }
+    if (tooLarge) toast.error('File is too large (max 2 MB).')
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    setError(null)
+
+    if (!projectId) return setError('Please select a project.')
+    if (!title.trim()) return setError('Please enter a bug title.')
+
+    setLoading(true)
+    try {
+      const bug = await createBug({
+        project_id: projectId,
+        title: title.trim(),
+        description: description.trim() || null,
+        priority,
+        kanban_column: stage,
+        assigned_to: assignee || null,
+        milestone_id: milestoneId || null,
+        steps_to_reproduce: steps.trim() || null,
+        expected_behavior: expected.trim() || null,
+        actual_behavior: actual.trim() || null,
+        start_date: startDate || null,
+        due_date: dueDate || null,
+        ...(attachments.length > 0 ? { meta: { attachments } } : {}),
+      })
+      onCreated(bug)
+    } catch (err) {
+      const msg = err.message || 'Could not report bug'
+      setError(msg)
+      toast.error(msg)
+      setLoading(false)
+    }
+  }
+
+  const priorityColor = (TASK_PRIORITIES.find((p) => p.value === priority) || {}).color
+
+  return (
+    <div onClick={onClose} style={{
+      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+      background: 'rgba(0,0,0,0.6)', display: 'flex',
+      alignItems: 'center', justifyContent: 'center', zIndex: 1100,
+    }}>
+      <div onClick={(e) => e.stopPropagation()} style={{
+        background: 'var(--panel2)', border: '1px solid var(--border)', borderRadius: '6px',
+        padding: '24px', width: '100%', maxWidth: '560px', maxHeight: '90vh',
+        overflowY: 'auto', boxShadow: '0 20px 25px rgba(0,0,0,0.3)',
+      }}>
+        <div style={{ marginBottom: '16px' }}>
+          <h2 style={{ margin: '0 0 8px 0', fontSize: '16px', fontWeight: '700' }}>Report a Bug</h2>
+          <p style={{ margin: 0, color: 'var(--muted)', fontSize: '12px' }}>Describe the issue so it can be tracked and fixed</p>
+        </div>
+
+        <form onSubmit={handleSubmit} noValidate>
+          {error && (
+            <div style={{
+              marginBottom: '14px', padding: '8px 11px',
+              border: '1px solid rgba(255,64,64,0.35)', borderRadius: '4px',
+              background: 'rgba(255,64,64,0.07)', color: '#ff8a8a', fontSize: '11px',
+            }} role="alert">{error}</div>
+          )}
+
+          {/* Row: Project + Milestone */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '14px' }}>
+            <div>
+              <label style={labelStyle}>Project</label>
+              <select value={projectId} onChange={(e) => { setProjectId(e.target.value); setMilestoneId('') }} style={inputStyle}>
+                {projects.length === 0 && <option value="">No projects available</option>}
+                {projects.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label style={labelStyle}>Milestone</label>
+              <select value={milestoneId} onChange={(e) => setMilestoneId(e.target.value)} style={inputStyle}>
+                <option value="">No milestone</option>
+                {milestones.map((m) => (
+                  <option key={m.id} value={m.id}>{m.name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Title */}
+          <div style={{ marginBottom: '14px' }}>
+            <label style={labelStyle}>Title</label>
+            <input
+              type="text" value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Short summary of the bug"
+              style={inputStyle} autoFocus
+            />
+          </div>
+
+          {/* Description */}
+          <div style={{ marginBottom: '14px' }}>
+            <label style={labelStyle}>Description</label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="What happened?"
+              style={{ ...inputStyle, minHeight: '60px', resize: 'vertical' }}
+            />
+          </div>
+
+          {/* Assign to */}
+          <div style={{ marginBottom: '14px' }}>
+            <label style={labelStyle}>Assign to</label>
+            <select value={assignee} onChange={(e) => setAssignee(e.target.value)} style={inputStyle}>
+              <option value="">Unassigned</option>
+              {members.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.full_name || m.username}{m.role ? ` (${m.role})` : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Row: Stage + Priority */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '14px' }}>
+            <div>
+              <label style={labelStyle}>Stage</label>
+              <select value={stage} onChange={(e) => setStage(e.target.value)} style={inputStyle}>
+                {stageOptions.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label style={labelStyle}>Priority</label>
+              <select
+                value={priority}
+                onChange={(e) => setPriority(e.target.value)}
+                style={{ ...inputStyle, borderColor: `${priorityColor || 'var(--border)'}66` }}
+              >
+                {TASK_PRIORITIES.map((p) => (
+                  <option key={p.value} value={p.value}>{p.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Steps to reproduce */}
+          <div style={{ marginBottom: '14px' }}>
+            <label style={labelStyle}>Steps to reproduce</label>
+            <textarea
+              value={steps}
+              onChange={(e) => setSteps(e.target.value)}
+              placeholder={'1. Go to…\n2. Click on…\n3. See error'}
+              style={{ ...inputStyle, minHeight: '70px', resize: 'vertical' }}
+            />
+          </div>
+
+          {/* Row: Expected + Actual */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '14px' }}>
+            <div>
+              <label style={labelStyle}>Expected behavior</label>
+              <textarea
+                value={expected}
+                onChange={(e) => setExpected(e.target.value)}
+                placeholder="What should have happened?"
+                style={{
+                  ...inputStyle, minHeight: '54px', resize: 'vertical',
+                  borderColor: 'rgba(32,217,107,0.4)',
+                  background: 'rgba(32,217,107,0.04)',
+                }}
+              />
+            </div>
+            <div>
+              <label style={labelStyle}>Actual behavior</label>
+              <textarea
+                value={actual}
+                onChange={(e) => setActual(e.target.value)}
+                placeholder="What actually happened?"
+                style={{
+                  ...inputStyle, minHeight: '54px', resize: 'vertical',
+                  borderColor: 'rgba(255,64,64,0.4)',
+                  background: 'rgba(255,64,64,0.05)',
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Attachment */}
+          <div style={{ marginBottom: '14px' }}>
+            <label style={labelStyle}>Attachment</label>
+            <input ref={fileInputRef} type="file" multiple hidden onChange={onFilesPicked} />
+            <button
+              type="button"
+              className="btn"
+              onClick={() => fileInputRef.current?.click()}
+              style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '7px 10px', width: 'fit-content' }}
+            >
+              <Paperclip size={12} /> Attach files
+            </button>
+            {attachments.length > 0 && (
+              <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {attachments.map((f, i) => (
+                  <span key={`${f.name}-${i}`} style={{
+                    display: 'flex', alignItems: 'center', gap: '8px',
+                    fontSize: '10.5px', color: 'var(--muted)', background: 'var(--panel3)',
+                    border: '1px solid var(--hover)', borderRadius: '4px', padding: '5px 7px',
+                  }}>
+                    {f.dataUrl && (f.type || '').startsWith('image/') ? (
+                      <img
+                        src={f.dataUrl}
+                        alt={f.name}
+                        style={{ width: '34px', height: '34px', objectFit: 'cover', borderRadius: '3px', border: '1px solid var(--border)', flexShrink: 0 }}
+                      />
+                    ) : (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '34px', height: '34px', borderRadius: '3px', border: '1px solid var(--border)', flexShrink: 0, color: 'var(--muted2)' }}>
+                        {fileIcon(f.name)}
+                      </span>
+                    )}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-soft)' }}>{f.name}</div>
+                      <div style={{ fontSize: '9.5px', color: 'var(--muted2)' }}>{formatSize(f.size)}</div>
+                    </div>
+                    <button
+                      type="button" className="icon-btn" title="Remove"
+                      onClick={() => setAttachments((cur) => cur.filter((_, x) => x !== i))}
+                      style={{ display: 'inline-flex', alignItems: 'center' }}
+                    ><X size={11} /></button>
+                  </span>
+                ))}
+              </div>
+            )}
+            <div style={{ fontSize: '9.5px', color: 'var(--muted2)', marginTop: '5px' }}>Files up to 2 MB each.</div>
+          </div>
+
+          {/* Row: Start Date + Due Date */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '20px' }}>
+            <div>
+              <label style={labelStyle}>Start date</label>
+              <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} style={inputStyle} />
+            </div>
+            <div>
+              <label style={labelStyle}>Due date</label>
+              <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} style={inputStyle} />
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+            <button type="button" className="btn" onClick={onClose} style={{ cursor: 'pointer' }}>Cancel</button>
+            <button type="submit" className="btn primary" disabled={loading} style={{ cursor: 'pointer' }}>
+              {loading ? 'Reporting…' : 'Report Bug'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}

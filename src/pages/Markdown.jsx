@@ -1,0 +1,1391 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  ChevronLeft, ChevronRight, ChevronDown, CalendarDays, FileText, Plus, Trash2, Clock,
+  Heading1, Heading2, Bold, Italic, Code, FileCode2, Minus, List, ListTodo,
+  PencilLine, Eye, Columns2, ArrowLeft, MoreHorizontal, Smile,
+  Paperclip, Check, ListFilter, Pin, Copy, Archive,
+} from 'lucide-react'
+import { toast } from 'sonner'
+import { getPages, createPage, updatePage, deletePage } from '../features/markdown/markdown.service.js'
+import { getCurrentWorkspace, getSelectedProjectId } from '../features/workspaces/workspaces.service.js'
+import { getWorkspaceMembers } from '../features/tasks/tasks.service.js'
+import ConfirmModal from '../components/ConfirmModal.jsx'
+
+function fmtLocalDate(d) {
+  const p = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
+}
+
+function shiftDate(dateStr, days) {
+  const d = new Date(`${dateStr}T12:00:00`)
+  d.setDate(d.getDate() + days)
+  return fmtLocalDate(d)
+}
+
+function prettyDate(dateStr) {
+  try {
+    return new Date(`${dateStr}T12:00:00`).toLocaleDateString(undefined, {
+      weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
+    })
+  } catch {
+    return dateStr
+  }
+}
+
+function relTime(iso) {
+  if (!iso) return ''
+  const diff = Date.now() - new Date(iso).getTime()
+  const m = Math.floor(diff / 60000)
+  if (m < 1) return 'just now'
+  if (m < 60) return `${m}m ago`
+  const h = Math.floor(m / 60)
+  if (h < 24) return `${h}h ago`
+  const d = Math.floor(h / 24)
+  if (d < 30) return `${d}d ago`
+  return new Date(iso).toLocaleDateString()
+}
+
+function localDateStr(d) {
+  const p = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
+}
+
+function feedTime(iso) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  const diff = Date.now() - d.getTime()
+  if (diff < 60000) return 'Just now'
+  const m = Math.floor(diff / 60000)
+  if (m < 60) return `${m} min${m === 1 ? '' : 's'} ago`
+  const h = Math.floor(m / 60)
+  if (h < 24) return `${h} hour${h === 1 ? '' : 's'} ago`
+  const yesterday = new Date()
+  yesterday.setDate(yesterday.getDate() - 1)
+  if (localDateStr(d) === localDateStr(yesterday)) return 'Yesterday'
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+const AVATAR_TINTS = [
+  { bg: 'rgba(91,141,255,0.16)', fg: '#7ea6ff' },
+  { bg: 'rgba(139,127,245,0.16)', fg: '#a99dff' },
+  { bg: 'rgba(32,216,107,0.14)', fg: '#5ad48c' },
+  { bg: 'rgba(255,170,64,0.15)', fg: '#ffb86b' },
+  { bg: 'rgba(255,107,157,0.15)', fg: '#ff8ab5' },
+  { bg: 'rgba(64,206,255,0.14)', fg: '#6fd3ff' },
+]
+
+function avatarTint(name) {
+  let sum = 0
+  for (let i = 0; i < name.length; i++) sum += name.charCodeAt(i)
+  return AVATAR_TINTS[sum % AVATAR_TINTS.length]
+}
+
+const EMOJIS = ['💡', '🔥', '✅', '🦖', '❤️', '😂', '😮', '🎉', '🚀', '👀', '☕', '🧠', '📌', '👍', '⚡', '😎']
+
+function toggleReaction(reactions, emoji, userId) {
+  const rx = { ...(reactions || {}) }
+  const arr = [...(rx[emoji] || [])]
+  const i = arr.indexOf(userId)
+  if (i >= 0) arr.splice(i, 1)
+  else arr.push(userId)
+  if (arr.length) rx[emoji] = arr
+  else delete rx[emoji]
+  return rx
+}
+
+function getMe() {
+  try { return JSON.parse(localStorage.getItem('thoth_user') || 'null') || {} } catch { return {} }
+}
+
+// shared markdown insertion for toolbars
+function mdInsert(ta, tool) {
+  if (!ta) return null
+  const { selectionStart: s, selectionEnd: e, value } = ta
+  const sel = value.slice(s, e)
+  let next = value
+  let caret = e
+  const lineStart = value.lastIndexOf('\n', s - 1) + 1
+  switch (tool) {
+    case 'h1':
+    case 'h2': {
+      const prefix = tool === 'h1' ? '# ' : '## '
+      if (value.slice(lineStart, s).startsWith(prefix)) {
+        next = value.slice(0, lineStart) + value.slice(lineStart + prefix.length)
+        caret = e - prefix.length
+      } else {
+        next = value.slice(0, lineStart) + prefix + value.slice(lineStart)
+        caret = e + prefix.length
+      }
+      break
+    }
+    case 'bold': next = `${value.slice(0, s)}**${sel || 'bold text'}**${value.slice(e)}`; caret = s + 2 + (sel || 'bold text').length + 2; break
+    case 'italic': next = `${value.slice(0, s)}*${sel || 'italic text'}*${value.slice(e)}`; caret = s + 1 + (sel || 'italic text').length + 1; break
+    case 'code': next = `${value.slice(0, s)}\`${sel || 'code'}\`${value.slice(e)}`; caret = s + 1 + (sel || 'code').length + 1; break
+    case 'fence': next = `${value.slice(0, s)}\`\`\`\n${sel}\n\`\`\`${value.slice(e)}`; caret = s + 4 + sel.length; break
+    case 'hr': next = `${value.slice(0, s)}\n\n---\n\n${value.slice(e)}`; caret = s + 6; break
+    case 'ul': next = `${value.slice(0, lineStart)}- ${value.slice(lineStart)}`; caret = e + 2; break
+    case 'todo': next = `${value.slice(0, lineStart)}- [ ] ${value.slice(lineStart)}`; caret = e + 6; break
+    case 'img': next = `${value.slice(0, s)}![${sel || 'image'}](${''})${value.slice(e)}`; caret = s + (sel ? 7 : 8) + sel.length; break
+    default: break
+  }
+  return { next, caret }
+}
+
+const MAX_FILE_BYTES = 2 * 1024 * 1024
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolve) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result))
+    reader.onerror = () => resolve(null)
+    reader.readAsDataURL(file)
+  })
+}
+
+// ---------- tiny markdown renderer ----------
+export { renderMarkdown } from '../utils/renderMarkdown.js'
+
+// ---------- main module ----------
+export default function Markdown({ subPage }) {
+  const ws = getCurrentWorkspace()
+  const wsId = ws?.id
+  const view = subPage === 'pages' ? 'pages' : 'journal'
+  const [selectedProjectId, setSelectedProjectIdState] = useState(() => getSelectedProjectId(wsId) || '')
+
+  const [pages, setPages] = useState([])
+  const [loaded, setLoaded] = useState(false)
+  const [jDate, setJDate] = useState(fmtLocalDate(new Date()))
+  const [openPage, setOpenPage] = useState(null)
+  const [showRecents, setShowRecents] = useState(false)
+  const [showNewPage, setShowNewPage] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(null)
+
+  useEffect(() => {
+    setSelectedProjectIdState(getSelectedProjectId(wsId) || '')
+    const onProjectChanged = (event) => {
+      const detail = event?.detail || {}
+      if (detail.workspaceId && String(detail.workspaceId) !== String(wsId || '')) return
+      setSelectedProjectIdState(detail.projectId || getSelectedProjectId(wsId) || '')
+    }
+    window.addEventListener('thoth:project-changed', onProjectChanged)
+    return () => window.removeEventListener('thoth:project-changed', onProjectChanged)
+  }, [wsId])
+
+  async function refresh() {
+    if (!wsId) {
+      setPages([])
+      setLoaded(true)
+      return
+    }
+    if (!selectedProjectId) {
+      setPages([])
+      setLoaded(true)
+      return
+    }
+    try {
+      const rows = await getPages(wsId, selectedProjectId)
+      setPages(Array.isArray(rows) ? rows : [])
+    } catch {
+      setPages([])
+    } finally {
+      setLoaded(true)
+    }
+  }
+
+  useEffect(() => { refresh() }, [wsId, selectedProjectId])
+
+  // author lookup for feed cards
+  const [authors, setAuthors] = useState({})
+  useEffect(() => {
+    let alive = true
+    if (!wsId) return undefined
+    getWorkspaceMembers(wsId)
+      .then((rows) => {
+        if (!alive) return
+        const map = {}
+        for (const m of Array.isArray(rows) ? rows : []) {
+          map[m.id] = m.full_name || m.username || 'Unknown'
+        }
+        setAuthors(map)
+      })
+      .catch(() => {})
+    return () => { alive = false }
+  }, [wsId])
+
+  const me = getMe()
+  const myId = me.id || null
+  const myName = me.full_name || me.username || 'Unknown'
+
+  function handlePagePatch(pageId, patch) {
+    setPages((prev) => prev.map((p) => (p.id === pageId ? { ...p, ...patch } : p)))
+    updatePage(pageId, patch)
+      .then((upd) => upd && setPages((prev) => prev.map((p) => (p.id === pageId ? { ...p, ...upd } : p))))
+      .catch(() => {})
+  }
+
+  const recents = useMemo(
+    () => [...pages].sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at)).slice(0, 8),
+    [pages]
+  )
+
+  // composer options
+  const [focusMode, setFocusMode] = useState(false)
+  const [focusPage, setFocusPage] = useState(null) // null | 'new' | page object
+  const [showToolbar, setShowToolbar] = useState(true)
+
+  // switching submodule resets the open editor
+  useEffect(() => { setOpenPage(null); setShowRecents(false) }, [view])
+
+  // leaving the module clears the open editor
+  useEffect(() => () => setOpenPage(null), [])
+
+  async function handleNewPage(title) {
+    if (!wsId) {
+      toast.error('No workspace selected — please pick a workspace first.')
+      setShowNewPage(false)
+      return
+    }
+    try {
+      const page = await createPage(wsId, { title: title || 'Untitled', page_type: 'page', content: '', project_id: selectedProjectId || null })
+      setPages((prev) => [page, ...prev])
+      setOpenPage(page)
+      setShowNewPage(false)
+    } catch (err) {
+      toast.error(err.message || 'Could not create page')
+    }
+  }
+
+  async function handleDelete() {
+    if (!confirmDelete) return
+    try {
+      await deletePage(confirmDelete.id)
+      setPages((prev) => prev.filter((p) => p.id !== confirmDelete.id))
+      if (openPage?.id === confirmDelete.id) setOpenPage(null)
+      setConfirmDelete(null)
+    } catch (err) {
+      toast.error(err.message || 'Could not delete page')
+    }
+  }
+
+  return (
+    <div>
+      {/* Module head */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '13px', gap: '8px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+          {openPage && (
+            <button className="icon-btn" title="Back" onClick={() => setOpenPage(null)}><ArrowLeft size={14} /></button>
+          )}
+          <h1 style={{ margin: 0, fontSize: '17px', fontWeight: 800 }}>
+            {view === 'pages' ? (openPage ? (openPage.title || 'Untitled') : 'All Pages') : 'Journal'}
+          </h1>
+          {view === 'journal' && (
+            <span style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.05em', color: '#8b7ff5', background: 'rgba(105,93,240,0.12)', border: '1px solid rgba(105,93,240,0.35)', padding: '3px 7px', borderRadius: '999px' }}>JOURNAL</span>
+          )}
+        </div>
+        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '7px' }}>
+          <div style={{ position: 'relative' }}>
+            <button className="btn" onClick={() => { setShowRecents((v) => !v); setShowNewPage(false) }} style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+              <Clock size={12} /> Recents <ChevronRight size={11} style={{ transform: showRecents ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }} />
+            </button>
+            {showRecents && (
+              <>
+                <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setShowRecents(false)} />
+                <div style={{
+                  position: 'absolute', right: 0, top: 'calc(100% + 5px)', width: '260px',
+                  background: 'var(--panel2)', border: '1px solid var(--border)', borderRadius: '6px',
+                  boxShadow: '0 14px 22px rgba(0,0,0,0.45)', zIndex: 50, overflow: 'hidden',
+                }}>
+                  <div style={{ fontSize: '9.5px', fontWeight: 700, color: 'var(--muted2)', letterSpacing: '0.07em', padding: '9px 12px 5px', borderBottom: '1px solid var(--border-soft)' }}>RECENTLY EDITED</div>
+                  {recents.length === 0 ? (
+                    <div style={{ padding: '14px 12px', fontSize: '11px', color: 'var(--muted2)' }}>No pages yet</div>
+                  ) : recents.map((p) => (
+                    <button key={p.id} onClick={() => { setOpenPage(p); setShowRecents(false) }}
+                      style={{
+                        display: 'flex', width: '100%', textAlign: 'left', gap: '8px', alignItems: 'center',
+                        background: 'transparent', border: 0, cursor: 'pointer', padding: '9px 12px',
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--border-soft)' }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+                    >
+                      {p.page_type === 'journal' ? <CalendarDays size={12} style={{ color: '#8b7ff5', flexShrink: 0 }} /> : <FileText size={12} style={{ color: 'var(--muted)', flexShrink: 0 }} />}
+                      <span style={{ flex: 1, minWidth: 0 }}>
+                        <span style={{ display: 'block', fontSize: '11.5px', color: 'var(--text-soft)', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.title || 'Untitled'}</span>
+                        <span style={{ display: 'block', fontSize: '9.5px', color: 'var(--muted2)' }}>{relTime(p.updated_at)}</span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Content */}
+      {view === 'pages' ? (
+        openPage ? (
+          <PageEditor
+            page={openPage}
+            onChange={(patch) => handlePagePatch(openPage.id, patch)}
+            onDelete={() => setConfirmDelete(openPage)}
+          />
+        ) : (
+          <AllPagesGrid pages={pages} loaded={loaded} onOpen={setOpenPage} onDelete={setConfirmDelete} />
+        )
+      ) : (
+        <>
+          {/* compact date pager + composer + feed */}
+          <DatePager jDate={jDate} onShift={setJDate} pages={pages} />
+          {!focusPage && (
+            <div className={focusMode ? 'j-focus-wrap' : undefined}>
+              <Composer
+                dateStr={jDate}
+                wsId={wsId}
+                projectId={selectedProjectId}
+                focusMode={focusMode}
+                showToolbar={showToolbar}
+                onToggleFocus={() => { setFocusPage('new'); setFocusMode(true) }}
+                onToggleToolbar={() => setShowToolbar((v) => !v)}
+                onCreated={(page) => setPages((prev) => [page, ...prev])}
+              />
+            </div>
+          )}
+          {!focusMode && (
+            <JournalFeed
+              entries={pages
+                .filter((p) => p.page_type === 'journal' && toLocalDate(p.page_date) === jDate && !p.archived)
+                .sort((a, b) => (b.pinned - a.pinned) || (new Date(b.created_at) - new Date(a.created_at)))}
+              loaded={loaded}
+              authors={authors}
+              myId={myId}
+              myName={myName}
+              patchPage={(page, patch) => handlePagePatch(page.id, patch)}
+              onDeleteConfirm={setConfirmDelete}
+              focusMode={focusMode}
+              showToolbar={showToolbar}
+              onToggleFocus={() => setFocusMode((v) => !v)}
+              onToggleToolbar={() => setShowToolbar((v) => !v)}
+              onFocusPage={(page) => { setFocusPage(page); setFocusMode(true) }}
+            />
+          )}
+        </>
+      )}
+
+      {showNewPage && <NewPageModal onSubmit={handleNewPage} onClose={() => setShowNewPage(false)} />}
+
+      {confirmDelete && (
+        <ConfirmModal
+          title={`Delete "${confirmDelete.title || 'Untitled'}"?`}
+          message={confirmDelete.page_type === 'journal' ? 'This journal entry will be permanently removed.' : 'This page will be permanently removed.'}
+          confirmLabel="Delete"
+          onConfirm={handleDelete}
+          onCancel={() => setConfirmDelete(null)}
+        />
+      )}
+
+      {/* focus mode overlay */}
+      {focusPage && (
+        <div className="j-focus-overlay">
+          <button className="j-focus-close" onClick={() => { setFocusPage(null); setFocusMode(false) }}>
+            <ArrowLeft size={13} /> Exit focus
+          </button>
+          <Composer
+            key={focusPage === 'new' ? 'focus-new' : `focus-${focusPage.id}`}
+            dateStr={jDate}
+            wsId={wsId}
+            projectId={selectedProjectId}
+            focusMode={true}
+            showToolbar={showToolbar}
+            onToggleFocus={() => {}}
+            onToggleToolbar={() => setShowToolbar((v) => !v)}
+            onCreated={(page) => { setPages((prev) => [page, ...prev]); setFocusPage(null); setFocusMode(false) }}
+            editPage={focusPage === 'new' ? null : focusPage}
+            onExitFocus={() => { setFocusPage(null); setFocusMode(false) }}
+            onPatchPage={(id, patch) => handlePagePatch(id, patch)}
+          />
+        </div>
+      )}
+    </div>
+  )
+}
+
+function DatePager({ jDate, onShift, pages }) {
+  const todayStr = fmtLocalDate(new Date())
+  const dt = new Date(`${jDate}T12:00:00`)
+  const label = dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+  const [calOpen, setCalOpen] = useState(false)
+  const [calMonth, setCalMonth] = useState(() => new Date(dt.getFullYear(), dt.getMonth(), 1))
+
+  const journalDates = new Set(
+    (pages || [])
+      .filter((p) => p.page_type === 'journal')
+      .map((p) => toLocalDate(p.page_date))
+  )
+
+  const calYear = calMonth.getFullYear()
+  const calMon = calMonth.getMonth()
+  const calLabel = calMonth.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
+  const firstDay = new Date(calYear, calMon, 1).getDay()
+  const daysInMonth = new Date(calYear, calMon + 1, 0).getDate()
+
+  const calDays = []
+  for (let i = 0; i < firstDay; i++) calDays.push(null)
+  for (let d = 1; d <= daysInMonth; d++) calDays.push(d)
+
+  function pickCalDay(day) {
+    if (!day) return
+    const picked = fmtLocalDate(new Date(calYear, calMon, day))
+    onShift(picked)
+    setCalOpen(false)
+  }
+
+  const weekDays = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(startOfWeek(jDate))
+    d.setDate(d.getDate() + i)
+    return fmtLocalDate(d)
+  })
+
+  return (
+    <div style={{ marginBottom: '10px' }}>
+      {/* compact date label row */}
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+        <button className="icon-btn" title="Previous day" onClick={() => onShift(shiftDate(jDate, -1))}><ChevronLeft size={14} /></button>
+        <div style={{ position: 'relative' }}>
+          <button className="md-date-pill" title="Pick a date" onClick={() => setCalOpen((v) => !v)} type="button">
+            <CalendarDays size={12} style={{ color: '#5b8dff', flexShrink: 0 }} />
+            <span>{label}</span>
+          </button>
+          {calOpen && (
+            <>
+              <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setCalOpen(false)} />
+              <div className="md-cal">
+                <div className="md-cal-head">
+                  <button className="icon-btn" onClick={() => setCalMonth(new Date(calYear, calMon - 1, 1))}><ChevronLeft size={12} /></button>
+                  <span className="md-cal-title">{calLabel}</span>
+                  <button className="icon-btn" onClick={() => setCalMonth(new Date(calYear, calMon + 1, 1))}><ChevronRight size={12} /></button>
+                </div>
+                <div className="md-cal-week">
+                  {['Su','Mo','Tu','We','Th','Fr','Sa'].map((d) => <span key={d}>{d}</span>)}
+                </div>
+                <div className="md-cal-grid">
+                  {calDays.map((day, i) => {
+                    if (day === null) return <span key={`e${i}`} />
+                    const ds = fmtLocalDate(new Date(calYear, calMon, day))
+                    const active = ds === jDate
+                    const isToday = ds === todayStr
+                    const hasEntry = journalDates.has(ds)
+                    return (
+                      <button
+                        key={ds}
+                        className={`md-cal-day${active ? ' active' : ''}${isToday && !active ? ' today' : ''}`}
+                        onClick={() => pickCalDay(day)}
+                        type="button"
+                      >
+                        {day}
+                        {hasEntry && <span className="md-cal-dot" />}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+        <button className="icon-btn" title="Next day" onClick={() => onShift(shiftDate(jDate, 1))}><ChevronRight size={14} /></button>
+        {jDate !== todayStr && (
+          <button className="btn" onClick={() => onShift(todayStr)} style={{ cursor: 'pointer', fontSize: '10px', padding: '3px 9px' }}>Today</button>
+        )}
+      </div>
+
+      {/* 7-day week row */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0,1fr))', gap: '5px' }}>
+        {weekDays.map((d, i) => {
+          const active = d === jDate
+          const isToday = d === todayStr
+          const hasEntry = journalDates.has(d)
+          const dayNum = new Date(`${d}T12:00:00`).getDate()
+          return (
+            <button
+              key={d}
+              onClick={() => onShift(d)}
+              title={prettyDate(d)}
+              className={`j-day${active ? ' active' : ''}${isToday && !active ? ' today' : ''}`}
+            >
+              <span className="j-day-letter">{DAY_LETTERS[i]}</span>
+              <span className="j-day-num">{dayNum}</span>
+              {hasEntry && !active && <span className="j-day-dot" />}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function shortDate(dateStr) {
+  try {
+    return new Date(`${dateStr}T12:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+  } catch {
+    return dateStr
+  }
+}
+
+function toLocalDate(d) {
+  if (!d) return ''
+  const dt = d instanceof Date ? d : new Date(d)
+  if (isNaN(dt.getTime())) return typeof d === 'string' ? d.slice(0, 10) : ''
+  const p = (n) => String(n).padStart(2, '0')
+  return `${dt.getFullYear()}-${p(dt.getMonth() + 1)}-${p(dt.getDate())}`
+}
+
+function startOfWeek(dateStr) {
+  const d = new Date(`${dateStr}T12:00:00`)
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7))
+  return d
+}
+
+const DAY_LETTERS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+
+function AllPagesGrid({ pages, loaded, onOpen, onDelete }) {
+  const [q, setQ] = useState('')
+  const [typeFilter, setTypeFilter] = useState('all')
+  const [filterOpen, setFilterOpen] = useState(false)
+
+  const filtered = pages
+    .filter((p) => (typeFilter === 'archived' ? p.archived : !p.archived && (typeFilter === 'all' || p.page_type === typeFilter)))
+    .filter((p) => {
+      if (!q.trim()) return true
+      const needle = q.toLowerCase()
+      return (p.title || '').toLowerCase().includes(needle) || (p.content || '').toLowerCase().includes(needle)
+    })
+
+  return (
+    <div>
+      {/* search + filter bar */}
+      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '12px' }}>
+        <input
+          className="search" style={{ width: '240px' }}
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Search notes…"
+        />
+        <div style={{ position: 'relative' }}>
+          <button className="btn" onClick={() => setFilterOpen((v) => !v)} style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+            <ListFilter size={12} /> Filter
+          </button>
+          {filterOpen && (
+            <>
+              <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setFilterOpen(false)} />
+              <div className="j-menu" style={{ left: 0, right: 'auto', top: 'calc(100% + 8px)', bottom: 'auto' }} role="menu">
+                {[
+                  ['all', 'All'],
+                  ['page', 'Pages only'],
+                  ['journal', 'Journal entries'],
+                  ['archived', 'Archived'],
+                ].map(([val, label]) => (
+                  <button key={val} className="j-menu-item" onClick={() => { setTypeFilter(val); setFilterOpen(false) }}>
+                    <span className="j-check">{typeFilter === val && <Check size={11} />}</span> {label}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+        <span style={{ fontSize: '10.5px', color: 'var(--muted2)' }}>{filtered.length} of {pages.length}</span>
+      </div>
+
+      {!loaded ? (
+        <div style={{ textAlign: 'center', padding: '48px', color: 'var(--muted2)', fontSize: '12px' }}>Loading pages…</div>
+      ) : filtered.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '48px 20px', color: 'var(--muted2)' }}>
+          <div style={{ fontSize: '13px', marginBottom: '8px' }}>No pages found</div>
+          <div style={{ fontSize: '11px', color: 'var(--muted2)' }}>{q ? `Nothing matches “${q}”` : 'Create your first page with "New Page"'}</div>
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))', gap: '10px' }}>
+          {filtered.map((p) => (
+            <div key={p.id}
+              onClick={() => onOpen(p)}
+              style={{ background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: '5px', padding: '12px', cursor: 'pointer', transition: 'border-color 0.15s' }}
+              onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#6e61ff' }}
+              onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border)' }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '7px', marginBottom: '6px' }}>
+                {p.page_type === 'journal'
+                  ? <CalendarDays size={12} style={{ color: '#8b7ff5', flexShrink: 0 }} />
+                  : <FileText size={12} style={{ color: 'var(--muted)', flexShrink: 0 }} />}
+                <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-strong)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{p.title || 'Untitled'}</span>
+                <button
+                  className="icon-btn" title="Delete"
+                  onClick={(e) => { e.stopPropagation(); onDelete(p) }}
+                  style={{ color: '#ff6b6b' }}
+                ><Trash2 size={11} /></button>
+              </div>
+              <div style={{ fontSize: '10.5px', color: 'var(--muted)', lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', minHeight: '31px' }}>
+                {(p.content || '').replace(/[#*`>\-[\]]/g, '').trim().slice(0, 120) || 'Empty page'}
+              </div>
+              <div style={{ fontSize: '9.5px', color: 'var(--muted2)', marginTop: '7px' }}>Edited {relTime(p.updated_at)}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function NewPageModal({ onSubmit, onClose }) {
+  const [title, setTitle] = useState('')
+  const [loading, setLoading] = useState(false)
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+      <form onClick={(e) => e.stopPropagation()} onSubmit={(e) => { e.preventDefault(); if (!loading) { setLoading(true); onSubmit(title.trim()) } }}
+        style={{ background: 'var(--panel2)', border: '1px solid var(--border)', borderRadius: '6px', padding: '24px', width: '100%', maxWidth: '380px', boxShadow: '0 20px 25px rgba(0,0,0,0.3)' }}>
+        <h2 style={{ margin: '0 0 6px', fontSize: '15px', fontWeight: 700 }}>New Page</h2>
+        <p style={{ margin: '0 0 14px', fontSize: '11.5px', color: 'var(--muted)' }}>Give your page a title</p>
+        <input
+          type="text" value={title} autoFocus
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="e.g., Meeting notes"
+          className="search" style={{ width: '100%', marginBottom: '18px' }}
+        />
+        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+          <button type="button" className="btn" onClick={onClose} style={{ cursor: 'pointer' }}>Cancel</button>
+          <button type="submit" className="btn primary" disabled={loading} style={{ cursor: 'pointer' }}>{loading ? 'Creating…' : 'Create'}</button>
+        </div>
+      </form>
+    </div>
+  )
+}
+
+// ---------- notepad editor ----------
+function PageEditor({ page, onChange, onDelete }) {
+  const [content, setContent] = useState(page.content || '')
+  const [title, setTitle] = useState(page.title || '')
+  const [mode, setMode] = useState('editor') // editor | preview | split
+  const taRef = useRef(null)
+
+  useEffect(() => {
+    setContent(page.content || '')
+    setTitle(page.title || '')
+  }, [page.id])
+
+  const stats = useMemo(() => ({
+    words: content.trim() ? content.trim().split(/\s+/).filter(Boolean).length : 0,
+    lines: content.split('\n').length,
+  }), [content])
+
+  // wrap or prefix insertion at the current selection
+  const applyTool = useCallback((tool) => {
+    const ta = taRef.current
+    if (!ta) return
+    const { selectionStart: s, selectionEnd: e, value } = ta
+    const sel = value.slice(s, e)
+    let next = value
+    let caret = e
+    const lineStart = value.lastIndexOf('\n', s - 1) + 1
+
+    switch (tool) {
+      case 'h1':
+      case 'h2': {
+        const prefix = tool === 'h1' ? '# ' : '## '
+        const already = value.slice(lineStart, s).startsWith(prefix)
+        if (already) {
+          next = value.slice(0, lineStart) + value.slice(lineStart + prefix.length)
+          caret = e - prefix.length
+        } else {
+          next = value.slice(0, lineStart) + prefix + value.slice(lineStart)
+          caret = e + prefix.length
+        }
+        break
+      }
+      case 'bold': next = `${value.slice(0, s)}**${sel || 'bold text'}**${value.slice(e)}`; caret = s + 2 + (sel || 'bold text').length + 2; break
+      case 'italic': next = `${value.slice(0, s)}*${sel || 'italic text'}*${value.slice(e)}`; caret = s + 1 + (sel || 'italic text').length + 1; break
+      case 'code': next = `${value.slice(0, s)}\`${sel || 'code'}\`${value.slice(e)}`; caret = s + 1 + (sel || 'code').length + 1; break
+      case 'fence': next = `${value.slice(0, s)}\`\`\`\n${sel}\n\`\`\`${value.slice(e)}`; caret = s + 4 + sel.length; break
+      case 'hr': next = `${value.slice(0, s)}\n\n---\n\n${value.slice(e)}`; caret = s + 6; break
+      case 'ul': next = `${value.slice(0, lineStart)}- ${value.slice(lineStart)}`; caret = e + 2; break
+      case 'todo': next = `${value.slice(0, lineStart)}- [ ] ${value.slice(lineStart)}`; caret = e + 6; break
+      default: break
+    }
+    setContent(next)
+    requestAnimationFrame(() => {
+      ta.focus()
+      ta.setSelectionRange(caret, caret)
+    })
+  }, [])
+
+  return (
+    <div className="card md-card">
+      {/* Title row */}
+      <input
+        className="md-title-input"
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        onBlur={() => { if (title.trim() && title !== page.title) onChange({ title: title.trim() }) }}
+        onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
+        placeholder="Untitled"
+      />
+
+      {/* Toolbar */}
+      <div className="md-toolbar">
+        <div className="md-tools-left">
+          <ToolBtn label="H1" title="Heading 1" Icon={Heading1} onClick={() => applyTool('h1')} />
+          <ToolBtn label="H2" title="Heading 2" Icon={Heading2} onClick={() => applyTool('h2')} />
+          <span className="md-tsep" />
+          <ToolBtn label="B" title="Bold" Icon={Bold} onClick={() => applyTool('bold')} b />
+          <ToolBtn label="I" title="Italic" Icon={Italic} onClick={() => applyTool('italic')} i />
+          <ToolBtn label="`" title="Inline code" Icon={Code} mono onClick={() => applyTool('code')} />
+          <ToolBtn label="```" title="Code block" Icon={FileCode2} mono onClick={() => applyTool('fence')} />
+          <span className="md-tsep" />
+          <ToolBtn label="—" title="Divider" Icon={Minus} onClick={() => applyTool('hr')} />
+          <ToolBtn label="-" title="Bullet list" Icon={List} onClick={() => applyTool('ul')} />
+          <ToolBtn label="[ ]" title="Checkbox" Icon={ListTodo} onClick={() => applyTool('todo')} />
+        </div>
+        <div className="md-tools-right">
+          <span className="md-stats">{stats.words}w · {stats.lines}L</span>
+          <div className="md-seg">
+            <SegBtn active={mode === 'editor'} onClick={() => setMode('editor')} Icon={PencilLine} title="Editor" />
+            <SegBtn active={mode === 'preview'} onClick={() => setMode('preview')} Icon={Eye} title="Preview" />
+            <SegBtn active={mode === 'split'} onClick={() => setMode('split')} Icon={Columns2} title="Split view" />
+          </div>
+          <button className="icon-btn" title="Delete this page" style={{ color: '#ff6b6b' }} onClick={onDelete}><Trash2 size={12} /></button>
+        </div>
+      </div>
+
+      {/* Body */}
+      {mode === 'preview' ? (
+        <div className="md-preview" dangerouslySetInnerHTML={{ __html: renderMarkdown(content) }} />
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: mode === 'split' ? '1fr 1fr' : '1fr', gap: 0, height: 'calc(100vh - 320px)', minHeight: '300px' }}>
+          <textarea
+            ref={taRef}
+            className="md-textarea"
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            onBlur={() => { if (content !== (page.content || '')) onChange({ content }) }}
+            placeholder="# Start writing…&#10;&#10;- ideas&#10;- [ ] todos&#10;- **markdown** supported"
+            spellCheck={false}
+          />
+          {mode === 'split' && (
+            <div className="md-preview md-split" dangerouslySetInnerHTML={{ __html: renderMarkdown(content) }} />
+          )}
+        </div>
+      )}
+
+      {(mode === 'editor' || mode === 'split') && (
+        <div className="md-footnote">{stats.words} words · autosaves when you click away</div>
+      )}
+    </div>
+  )
+}
+
+function ToolBtn({ label, title, Icon, onClick, b, i, mono }) {
+  return (
+    <button type="button" className="md-tool-btn" title={title} onClick={onClick}>
+      <Icon size={13} strokeWidth={2.2} />
+      <span style={{ fontWeight: b ? 800 : undefined, fontStyle: i ? 'italic' : undefined, fontFamily: mono ? 'monospace' : undefined }}>{label}</span>
+    </button>
+  )
+}
+
+function SegBtn({ active, onClick, Icon, title }) {
+  return (
+    <button type="button" title={title} onClick={onClick} className={`md-seg-btn${active ? ' active' : ''}`}>
+      <Icon size={12} />
+    </button>
+  )
+}
+
+// ---------- journal feed (social-style) ----------
+const LONG_CHARS = 420
+const LONG_LINES = 12
+const NEW_WINDOW_MS = 30 * 60 * 1000
+
+function JournalFeed({ entries, loaded, authors, myId, myName, patchPage, onDeleteConfirm, focusMode, showToolbar, onToggleFocus, onToggleToolbar, onFocusPage }) {
+  if (!loaded) return <div style={{ textAlign: 'center', padding: '40px', color: 'var(--muted2)', fontSize: '12px' }}>Loading notes…</div>
+  return (
+    <div className="j-feed" style={{ marginTop: '10px' }}>
+      {entries.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '26px 12px', color: 'var(--muted2)', fontSize: '11px', border: '1px dashed var(--border)', borderRadius: '8px' }}>
+          Nothing here yet — write the first note above.
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '9px' }}>
+          {entries.map((p) => (
+            <NoteCard
+              key={p.id}
+              page={p}
+              authorName={authors[p.created_by] || 'Unknown'}
+              myId={myId}
+              myName={myName}
+              patchPage={patchPage}
+              onDeleteConfirm={() => onDeleteConfirm(p)}
+              focusMode={focusMode}
+              showToolbar={showToolbar}
+              onToggleFocus={onToggleFocus}
+              onToggleToolbar={onToggleToolbar}
+              onFocusPage={onFocusPage}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function NoteCard({ page, authorName, myId, myName, patchPage, onDeleteConfirm, focusMode, showToolbar, onToggleFocus, onToggleToolbar, onFocusPage }) {
+  const [expanded, setExpanded] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [reactOpen, setReactOpen] = useState(false)
+  const [cText, setCText] = useState('')
+  const [replyTo, setReplyTo] = useState(null)
+  const [expandedReplies, setExpandedReplies] = useState(new Set())
+  const [showAllComments, setShowAllComments] = useState(false)
+  const [copied, setCopied] = useState(null)
+  const [editing, setEditing] = useState(false)
+  const [editTitle, setEditTitle] = useState(page.title || '')
+  const [editContent, setEditContent] = useState(page.content || '')
+  const [editMenuOpen, setEditMenuOpen] = useState(false)
+  const [editAtts, setEditAtts] = useState([])
+  const editAttRef = useRef(null)
+  const html = useMemo(() => renderMarkdown(page.content), [page.content])
+  const isLong = (page.content || '').length > LONG_CHARS || (page.content || '').split('\n').length > LONG_LINES
+  const reactions = page.reactions || {}
+  const comments = page.comments || []
+  const attachments = page.attachments || []
+  const isNew = page.created_at && (Date.now() - new Date(page.created_at).getTime()) < NEW_WINDOW_MS
+  const myTint = avatarTint(myName)
+  const myInitials = (myName || '?').split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase()
+
+  async function copyText(label, text) {
+    try { await navigator.clipboard.writeText(text) } catch { /* clipboard unavailable */ }
+    setMenuOpen(false)
+    setCopied(label)
+    setTimeout(() => setCopied(null), 1200)
+  }
+
+  function saveEdit() {
+    const mergedAtts = [...(page.attachments || []), ...editAtts]
+    patchPage(page, { title: editTitle.trim() || 'Untitled', content: editContent, ...(mergedAtts.length ? { attachments: mergedAtts } : { attachments: [] }) })
+    setEditing(false)
+    setEditAtts([])
+  }
+
+  async function pickEditAtt(e) {
+    const f = e.target.files?.[0]; e.target.value = ''
+    if (!f || f.size > MAX_FILE_BYTES) return
+    let dataUrl = null
+    if ((f.type || '').startsWith('image/')) dataUrl = await readFileAsDataUrl(f)
+    setEditAtts((prev) => [...prev, { id: crypto.randomUUID(), name: f.name, size: f.size, type: f.type, dataUrl }])
+  }
+
+  function postComment(e) {
+    e.preventDefault()
+    const text = cText.trim()
+    if (!text) return
+    const comment = { text, author: myName, at: new Date().toISOString() }
+    if (replyTo != null) {
+      const target = Number(replyTo)
+      comment.replyTo = target
+      setExpandedReplies((prev) => {
+        const next = new Set(prev)
+        let cur = target
+        // expand ancestors so the replied-to comment and new reply are visible
+        while (cur != null && comments[cur]) {
+          next.add(cur)
+          const parent = comments[cur].replyTo
+          cur = parent == null ? null : Number(parent)
+        }
+        return next
+      })
+    }
+    patchPage(page, { comments: [...comments, comment] })
+    setCText('')
+    setReplyTo(null)
+  }
+
+  return (
+    <article className="j-card">
+      {/* header: time · NEW · pin · menu */}
+      <header className="j-head">
+        <span className="j-time-strong">{feedTime(page.created_at)}</span>
+        {isNew && <span className="j-new-badge">NEW</span>}
+        {page.pinned && <Pin size={11} style={{ color: '#5b8dff' }} aria-label="Pinned" />}
+        <div style={{ flex: 1 }} />
+        <div style={{ position: 'relative' }}>
+          <button className="icon-btn" title="More" onClick={() => { setMenuOpen((v) => !v); setReactOpen(false) }}><MoreHorizontal size={14} /></button>
+          {menuOpen && (
+            <>
+              <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setMenuOpen(false)} />
+              <div className="j-menu" role="menu">
+                {copied && <div className="j-copied">✓ Copied</div>}
+                <button className="j-menu-item" onClick={() => { setMenuOpen(false); patchPage(page, { pinned: !page.pinned }) }}>
+                  <Pin size={11} /> {page.pinned ? 'Unpin' : 'Pin'}
+                </button>
+                <button className="j-menu-item" onClick={() => { setMenuOpen(false); setEditTitle(page.title || ''); setEditContent(page.content || ''); setEditing(true) }}><PencilLine size={11} /> Edit</button>
+                <button className="j-menu-item" onClick={() => { setMenuOpen(false); onFocusPage(page) }}><Columns2 size={11} /> Focus</button>
+                <button className="j-menu-item" onClick={() => copyText('link', `${window.location.href.split('#')[0]}#${page.id}`)}>🔗 Copy link</button>
+                <button className="j-menu-item" onClick={() => copyText('content', page.content || '')}><Copy size={11} /> Copy content</button>
+                <div className="j-menu-sep" />
+                <button className="j-menu-item" onClick={() => { setMenuOpen(false); patchPage(page, { archived: true }) }}>
+                  <Archive size={11} /> Archive
+                </button>
+                <button className="j-menu-item danger" onClick={() => { setMenuOpen(false); onDeleteConfirm() }}>
+                  <Trash2 size={11} /> Delete
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </header>
+
+      {/* body — edit mode or preview */}
+      {editing ? (
+        <div className="j-edit-wrap">
+          <div style={{ marginBottom: '6px' }}>
+            <input className="j-edit-title" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} placeholder="Title" autoFocus onKeyDown={(e) => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); saveEdit() } }} />
+          </div>
+          <textarea className="j-edit-body" value={editContent} onChange={(e) => setEditContent(e.target.value)} placeholder="Write something…" rows={Math.max(4, editContent.split('\n').length)} onKeyDown={(e) => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); saveEdit() } }} />
+
+          {/* existing + new attachments */}
+          {(page.attachments?.length > 0 || editAtts.length > 0) && (
+            <div className="j-att-row" style={{ marginTop: '6px', flexWrap: 'wrap', gap: '8px' }}>
+              {(page.attachments || []).map((a) => (
+                a.dataUrl && (a.type || '').startsWith('image/') ? (
+                  <div key={a.id || a.name} style={{ position: 'relative', display: 'inline-block' }}>
+                    <img
+                      src={a.dataUrl}
+                      alt={a.name || 'image'}
+                      style={{ width: '96px', height: '72px', objectFit: 'cover', borderRadius: '6px', border: '1px solid var(--border)', display: 'block' }}
+                    />
+                  </div>
+                ) : (
+                  <span key={a.id || a.name} className="j-att-chip">
+                    <Paperclip size={9} />
+                    {a.name}
+                  </span>
+                )
+              ))}
+              {editAtts.map((a) => (
+                a.dataUrl && (a.type || '').startsWith('image/') ? (
+                  <div key={a.id} style={{ position: 'relative', display: 'inline-block' }}>
+                    <img
+                      src={a.dataUrl}
+                      alt={a.name || 'image'}
+                      style={{ width: '96px', height: '72px', objectFit: 'cover', borderRadius: '6px', border: '1px dashed var(--border)', display: 'block' }}
+                    />
+                    <button
+                      type="button"
+                      title="Remove"
+                      onClick={() => setEditAtts((prev) => prev.filter((x) => x.id !== a.id))}
+                      style={{ position: 'absolute', top: '4px', right: '4px', background: 'rgba(0,0,0,0.55)', color: '#fff', borderRadius: '999px', width: '18px', height: '18px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', border: 0, cursor: 'pointer', padding: 0, lineHeight: 1 }}
+                    >✕</button>
+                  </div>
+                ) : (
+                  <span key={a.id} className="j-att-chip" style={{ borderStyle: 'dashed' }}>
+                    <Paperclip size={9} />
+                    {a.name}
+                    <button type="button" onClick={() => setEditAtts((prev) => prev.filter((x) => x.id !== a.id))} style={{ background: 'none', border: 0, color: 'var(--muted)', cursor: 'pointer', padding: 0, marginLeft: 2, lineHeight: 1 }}>✕</button>
+                  </span>
+                )
+              ))}
+            </div>
+          )}
+
+          <div className="j-edit-foot">
+            <div style={{ position: 'relative' }}>
+              <button className="icon-btn" title="Options" onClick={() => setEditMenuOpen((v) => !v)}><Plus size={14} /></button>
+              {editMenuOpen && (
+                <>
+                  <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setEditMenuOpen(false)} />
+                  <div className="j-menu" role="menu" style={{ top: 'auto', bottom: 'calc(100% + 4px)' }}>
+                    <button className="j-menu-item" onClick={() => { setEditMenuOpen(false); editAttRef.current?.click() }}><Paperclip size={11} /> Add attachment</button>
+                    <div className="j-menu-sep" />
+                    <button className="j-menu-item" onClick={() => { setEditMenuOpen(false); onFocusPage(page) }}>
+                      <Columns2 size={11} /> Focus mode
+                    </button>
+                    <button className="j-menu-item" onClick={() => { setEditMenuOpen(false); onToggleToolbar() }}>
+                      <Bold size={11} /> Formatting toolbar <span className="j-check">{showToolbar && <Check size={11} />}</span>
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: '6px' }}>
+              <button className="btn" onClick={() => { setEditing(false); setEditAtts([]) }} style={{ cursor: 'pointer', fontSize: '11px' }}>Cancel</button>
+              <button className="btn primary" onClick={saveEdit} style={{ cursor: 'pointer', fontSize: '11px' }}>Save</button>
+            </div>
+          </div>
+
+          <input ref={editAttRef} type="file" onChange={pickEditAtt} style={{ display: 'none' }} />
+        </div>
+      ) : (
+        <>
+          <div
+            className={`md-preview j-body${expanded ? '' : ' j-clamp'}`}
+            dangerouslySetInnerHTML={{ __html: html }}
+          />
+          {!page.content && attachments.length === 0 && (
+            <div className="md-blank" style={{ fontSize: '11px' }}>Empty note</div>
+          )}
+
+          {/* attachments */}
+          {attachments.length > 0 && (
+            <div className="j-att-row">
+              {attachments.map((a) => (
+                a.dataUrl && (a.type || '').startsWith('image/') ? (
+                  <a key={a.id || a.name} className="j-thumb" href={a.dataUrl} target="_blank" rel="noreferrer" title={`${a.name}${a.size ? ` · ${formatBytes(a.size)}` : ''}`}>
+                    <img src={a.dataUrl} alt={a.name} />
+                  </a>
+                ) : (
+                  <span key={a.id || a.name} className="j-att-chip" title={a.name}>
+                    <Paperclip size={10} /> {a.name}{a.size ? ` · ${formatBytes(a.size)}` : ''}
+                  </span>
+                )
+              ))}
+            </div>
+          )}
+
+          {/* expand toggle */}
+          {(isLong || attachments.length > 0) && (
+            <button type="button" className="j-more" onClick={() => setExpanded((v) => !v)}>
+              {expanded ? <>Show less <ChevronDown size={11} style={{ transform: 'rotate(180deg)' }} /></> : <>Show more <ChevronDown size={11} /></>}
+            </button>
+          )}
+        </>
+      )}
+
+      {/* existing comments */}
+      {(() => {
+        if (!comments.length) return null
+        const depthMap = []
+        const childrenMap = {}
+        const roots = []
+        comments.forEach((c, i) => {
+          const parentIdx = c.replyTo == null ? null : Number(c.replyTo)
+          if (parentIdx != null && comments[parentIdx]) {
+            depthMap[i] = (depthMap[parentIdx] ?? -1) + 1
+            if (!childrenMap[parentIdx]) childrenMap[parentIdx] = []
+            childrenMap[parentIdx].push(i)
+          } else {
+            depthMap[i] = 0
+            roots.push(i)
+          }
+        })
+
+        // Build display order in threaded (tree) order so replies appear under their parent.
+        const display = []
+        function walk(idx) {
+          display.push(idx)
+          const kids = childrenMap[idx] || []
+          if (kids.length > 0 && expandedReplies.has(idx)) {
+            kids.forEach(walk)
+          }
+        }
+        roots.forEach(walk)
+
+        const renderNode = (idx) => {
+          const c = comments[idx]
+          if (!c) return null
+          const depth = depthMap[idx] || 0
+          const childCount = (childrenMap[idx] || []).length
+          const isExpanded = expandedReplies.has(idx)
+          const parentIdx = c.replyTo == null ? null : Number(c.replyTo)
+          const replyAuthor = parentIdx != null && comments[parentIdx] ? comments[parentIdx].author : null
+          return (
+            <div key={idx} className={depth > 0 ? 'j-cmt-reply-thread' : undefined} style={depth > 0 ? { marginLeft: `${depth * 22}px` } : undefined}>
+              <div className="j-cmt">
+                <span className="avatar" style={{ ...avatarTint(c.author || '?'), width: '18px', height: '18px', fontSize: '8px' }}>
+                  {(c.author || '?').slice(0, 2).toUpperCase()}
+                </span>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <span style={{ fontWeight: 700, color: 'var(--text-soft)', marginRight: '6px', fontSize: '10.5px' }}>{c.author}</span>
+                  {replyAuthor && <span style={{ color: 'var(--muted2)', fontSize: '9.5px', marginRight: '4px' }}>replying to {replyAuthor}</span>}
+                  <span style={{ color: 'var(--muted)', fontSize: '11px', whiteSpace: 'pre-wrap' }}>{c.text}</span>
+                  <div className="j-cmt-actions">
+                    {c.emoji ? (
+                      <button type="button" className="j-cmt-action j-cmt-emoji-active" onClick={() => { setReactOpen(idx); setReplyTo(null) }}>
+                        {c.emoji}
+                      </button>
+                    ) : (
+                      <button type="button" className="j-cmt-action" onClick={() => { setReactOpen(idx); setReplyTo(null) }}>
+                        <Smile size={10} /> Emoji
+                      </button>
+                    )}
+                    <button type="button" className="j-cmt-action" onClick={() => { setReplyTo(idx); setCText(''); setReactOpen(false) }}>
+                      Reply
+                    </button>
+                    {childCount > 0 && (
+                      <button type="button" className="j-cmt-action j-cmt-thread-toggle" onClick={() => {
+                        setExpandedReplies((prev) => {
+                          const next = new Set(prev)
+                          if (next.has(idx)) next.delete(idx); else next.add(idx)
+                          return next
+                        })
+                      }}>
+                        {isExpanded ? '▾ Hide replies' : `▸ ${childCount} ${childCount === 1 ? 'reply' : 'replies'}`}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* inline emoji picker for this comment */}
+              {reactOpen === idx && (
+                <div className="j-cmt-emoji-row">
+                  <div className="j-emoji-pop up" role="menu" style={{ position: 'static', boxShadow: 'none', background: 'transparent', border: 0, padding: 0, display: 'inline-flex' }}>
+                    {EMOJIS.map((em) => (
+                      <button key={em} type="button" className="j-emoji" onClick={() => {
+                        const updated = [...comments]
+                        updated[idx] = { ...updated[idx], emoji: em }
+                        patchPage(page, { comments: updated })
+                        setReactOpen(false)
+                      }}>{em}</button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* inline reply form */}
+              {replyTo === idx && (
+                <div className="j-cmt-reply-form" style={{ flexWrap: 'wrap' }}>
+                  <div style={{ width: '100%', fontSize: '10px', color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                    Replying to <strong style={{ color: 'var(--text-soft)' }}>{c.author}</strong>
+                    <button type="button" onClick={() => setReplyTo(null)} style={{ background: 'transparent', border: 0, color: 'var(--muted2)', cursor: 'pointer', padding: 0, display: 'inline-flex', marginLeft: 'auto' }} aria-label="Cancel reply">✕</button>
+                  </div>
+                  <span className="avatar" style={{ background: myTint.bg, color: myTint.fg, width: '18px', height: '18px', fontSize: '8px', flexShrink: 0 }}>{myInitials}</span>
+                  <input
+                    className="j-cmt-input"
+                    value={cText}
+                    onChange={(e) => setCText(e.target.value)}
+                    placeholder={`Reply to ${c.author}…`}
+                    autoFocus
+                    onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); postComment(e) } }}
+                  />
+                  <button type="submit" className="j-send-btn" disabled={!cText.trim()} onClick={(e) => postComment(e)}>Send</button>
+                </div>
+              )}
+            </div>
+          )
+        }
+
+        return (
+          <div className="j-cmts">
+            {display.map(renderNode)}
+          </div>
+        )
+      })()}
+
+      {/* main comment bar — only when not replying */}
+      {replyTo == null && (
+        <form className="j-cmt-row" onSubmit={postComment}>
+          <span className="avatar" style={{ background: myTint.bg, color: myTint.fg, width: '22px', height: '22px', fontSize: '9px', flexShrink: 0 }}>{myInitials}</span>
+          <input
+            className="j-cmt-input"
+            value={cText}
+            onChange={(e) => setCText(e.target.value)}
+            placeholder="Add a comment…"
+          />
+          <button type="submit" className="j-send-btn" disabled={!cText.trim()}>Send</button>
+        </form>
+      )}
+
+      {/* reactions summary */}
+      {Object.keys(reactions).length > 0 && (
+        <footer className="j-react-row">
+          {Object.entries(reactions).map(([emoji, users]) => {
+            const count = Array.isArray(users) ? users.length : 0
+            if (!count) return null
+            const mine = Array.isArray(users) && myId && users.includes(myId)
+            return (
+              <button key={emoji} type="button" className={`j-chip${mine ? ' mine' : ''}`} title={`${count} reaction${count === 1 ? '' : 's'}`} onClick={() => patchPage(page, { reactions: toggleReaction(reactions, emoji, myId) })}>
+                <span>{emoji}</span><span>{count}</span>
+              </button>
+            )
+          })}
+        </footer>
+      )}
+    </article>
+  )
+}
+
+function formatBytes(bytes) {
+  if (bytes == null) return ''
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+// ---------- composer ----------
+function Composer({ dateStr, wsId, projectId, focusMode, showToolbar, onToggleFocus, onToggleToolbar, onCreated, editPage, onExitFocus, onPatchPage }) {
+  const [text, setText] = useState(editPage?.content || '')
+  const [atts, setAtts] = useState([])
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState(null)
+  const taRef = useRef(null)
+  const attFileRef = useRef(null)
+
+  useEffect(() => {
+    if (editPage) {
+      setText(editPage.content || '')
+      setAtts([])
+    }
+  }, [editPage?.id])
+
+  function autoGrow(el) {
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = el.scrollHeight + 'px'
+  }
+
+  function applyTool(tool) {
+    const res = mdInsert(taRef.current, tool)
+    if (!res) return
+    setText(res.next)
+    requestAnimationFrame(() => {
+      taRef.current?.focus()
+      taRef.current?.setSelectionRange(res.caret, res.caret)
+    })
+  }
+
+  async function pickAttachment(e) {
+    const f = e.target.files?.[0]
+    e.target.value = ''
+    if (!f) return
+    if (f.size > MAX_FILE_BYTES) return setError('File is too large (max 2 MB).')
+    setError(null)
+    let dataUrl = null
+    if ((f.type || '').startsWith('image/')) dataUrl = await readFileAsDataUrl(f)
+    setAtts((prev) => [...prev, { id: crypto.randomUUID(), name: f.name, size: f.size, type: f.type, dataUrl }])
+  }
+
+
+
+  async function save() {
+    if (!wsId && !editPage) return setError('No workspace selected.')
+    const body = text.trim() || (atts.length ? '' : null)
+    if (body === null) return setError('Write something first.')
+    setSaving(true)
+    setError(null)
+    try {
+      const firstLine = text.split('\n').find((l) => l.trim()) || ''
+      const title = firstLine.replace(/[#*`>\-[\]]/g, '').trim().slice(0, 60) || prettyDate(dateStr)
+      if (editPage) {
+        const mergedAtts = [...(editPage.attachments || []), ...atts]
+        await onPatchPage(editPage.id, { title, content: text, ...(mergedAtts.length ? { attachments: mergedAtts } : { attachments: [] }) })
+        setText('')
+        setAtts([])
+        onExitFocus()
+      } else {
+        const page = await createPage(wsId, {
+          title,
+          content: text,
+          page_type: 'journal',
+          page_date: dateStr,
+          project_id: projectId || null,
+          ...(atts.length ? { attachments: atts } : {}),
+        })
+        setAtts([])
+        setText('')
+        onCreated(page)
+      }
+    } catch (err) {
+      setError(err.message || 'Could not save note')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className={`j-card j-composer${focusMode ? ' focus' : ''}`}>
+      {/* toolbar at top */}
+      {showToolbar && (
+        <div className="j-composer-tools">
+          <ToolBtn label="H1" title="Heading 1" Icon={Heading1} onClick={() => applyTool('h1')} />
+          <ToolBtn label="H2" title="Heading 2" Icon={Heading2} onClick={() => applyTool('h2')} />
+          <span className="md-tsep" />
+          <ToolBtn label="B" title="Bold" Icon={Bold} onClick={() => applyTool('bold')} b />
+          <ToolBtn label="I" title="Italic" Icon={Italic} onClick={() => applyTool('italic')} i />
+          <ToolBtn label="`" title="Inline code" Icon={Code} mono onClick={() => applyTool('code')} />
+          <ToolBtn label="```" title="Code block" Icon={FileCode2} mono onClick={() => applyTool('fence')} />
+          <span className="md-tsep" />
+          <ToolBtn label="—" title="Divider" Icon={Minus} onClick={() => applyTool('hr')} />
+          <ToolBtn label="-" title="Bullet list" Icon={List} onClick={() => applyTool('ul')} />
+          <ToolBtn label="[ ]" title="Checkbox" Icon={ListTodo} onClick={() => applyTool('todo')} />
+        </div>
+      )}
+
+      {/* textarea */}
+      <textarea
+        ref={(el) => { taRef.current = el; if (el) autoGrow(el) }}
+        className="j-composer-input"
+        value={text}
+        onChange={(e) => { setText(e.target.value); autoGrow(e.target) }}
+        onKeyDown={(e) => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); save() } }}
+        placeholder="Any thoughts…"
+        rows={1}
+        spellCheck={false}
+      />
+
+      {/* bottom row: [+] left, [Save] right */}
+      <div className="j-composer-bottom">
+        <div style={{ position: 'relative' }}>
+          <button className="icon-btn" title="Options" onClick={() => setMenuOpen((v) => !v)}><Plus size={14} /></button>
+          {menuOpen && (
+            <>
+              <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setMenuOpen(false)} />
+              <div className="j-menu" role="menu" style={{ top: 'auto', bottom: 'calc(100% + 4px)' }}>
+                <button className="j-menu-item" onClick={() => { setMenuOpen(false); attFileRef.current?.click() }}><Paperclip size={11} /> Add attachment</button>
+                <div className="j-menu-sep" />
+                <button className="j-menu-item" onClick={() => { setMenuOpen(false); onToggleFocus() }}>
+                  <Columns2 size={11} /> Focus mode
+                </button>
+                <button className="j-menu-item" onClick={() => { setMenuOpen(false); onToggleToolbar() }}>
+                  <Bold size={11} /> Formatting toolbar <span className="j-check">{showToolbar && <Check size={11} />}</span>
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+        <button className="btn primary j-save-btn" onClick={save} disabled={saving || (!text.trim() && atts.length === 0)}>
+          {saving ? 'Saving…' : 'Save'}
+        </button>
+      </div>
+
+      {/* attachments */}
+      {atts.length > 0 && (
+        <div className="j-att-row" style={{ flexWrap: 'wrap', gap: '8px' }}>
+          {atts.map((a) => (
+            a.dataUrl && (a.type || '').startsWith('image/') ? (
+              <div key={a.id} style={{ position: 'relative', display: 'inline-block' }}>
+                <img
+                  src={a.dataUrl}
+                  alt={a.name || 'image'}
+                  style={{ width: '96px', height: '72px', objectFit: 'cover', borderRadius: '6px', border: '1px solid var(--border)', display: 'block' }}
+                />
+                <button
+                  type="button"
+                  className="j-att-x"
+                  title="Remove"
+                  onClick={() => setAtts((prev) => prev.filter((x) => x.id !== a.id))}
+                  style={{ position: 'absolute', top: '4px', right: '4px', background: 'rgba(0,0,0,0.55)', color: '#fff', borderRadius: '999px', width: '18px', height: '18px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', border: 0, cursor: 'pointer', padding: 0 }}
+                >✕</button>
+              </div>
+            ) : (
+              <span key={a.id} className="j-att-chip">
+                <Paperclip size={10} />
+                {a.name}
+                <button type="button" className="j-att-x" title="Remove" onClick={() => setAtts((prev) => prev.filter((x) => x.id !== a.id))}>✕</button>
+              </span>
+            )
+          ))}
+        </div>
+      )}
+
+      {error && <div className="j-composer-error">{error}</div>}
+
+      <input ref={attFileRef} type="file" onChange={pickAttachment} style={{ display: 'none' }} />
+    </div>
+  )
+}

@@ -1,0 +1,1376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Thoth Dev — Bugs</title>
+
+<style>
+    * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+    }
+
+    :root {
+        --bg: #090909;
+        --panel: #0d0d0d;
+        --panel-2: #111111;
+        --panel-3: #151515;
+        --border: #262626;
+        --border-light: #303030;
+        --text: #d6d6d6;
+        --muted: #777;
+        --muted-2: #4f4f4f;
+        --blue: #5865f2;
+        --purple: #665cff;
+        --red: #ff4545;
+        --orange: #ff9d42;
+        --green: #36d46c;
+        --yellow: #e6c84a;
+        --sidebar-width: 109px;
+        --detail-width: 210px;
+    }
+
+    html,
+    body {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: var(--bg);
+        color: var(--text);
+        font-family:
+            Inter,
+            ui-sans-serif,
+            system-ui,
+            -apple-system,
+            BlinkMacSystemFont,
+            "Segoe UI",
+            sans-serif;
+        font-size: 10px;
+    }
+
+    button,
+    input {
+        font: inherit;
+    }
+
+    /* --------------------------------------------------
+       APP
+    -------------------------------------------------- */
+
+    .app {
+        display: grid;
+        grid-template-columns: var(--sidebar-width) 1fr var(--detail-width);
+        grid-template-rows: 28px 1fr;
+        height: 100vh;
+        background: var(--bg);
+    }
+
+    /* --------------------------------------------------
+       TOP BAR
+    -------------------------------------------------- */
+
+    .topbar {
+        grid-column: 1 / -1;
+        height: 28px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 8px;
+        border-bottom: 1px solid var(--border);
+        background: #080808;
+    }
+
+    .top-left,
+    .top-right {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .brand {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        font-weight: 700;
+        font-size: 9px;
+        color: #fff;
+    }
+
+    .brand-mark {
+        width: 15px;
+        height: 15px;
+        border-radius: 3px;
+        display: grid;
+        place-items: center;
+        color: #fff;
+        background: var(--blue);
+        font-size: 8px;
+        font-weight: 800;
+    }
+
+    .top-link {
+        color: #666;
+        font-size: 8px;
+        padding: 0 7px;
+    }
+
+    .top-link:hover {
+        color: #aaa;
+    }
+
+    .search {
+        width: 85px;
+        height: 17px;
+        border: 1px solid #252525;
+        background: #0b0b0b;
+        color: #ddd;
+        outline: none;
+        padding: 0 6px;
+        font-size: 7px;
+    }
+
+    .search::placeholder {
+        color: #555;
+    }
+
+    .new-btn {
+        height: 17px;
+        padding: 0 7px;
+        border: 0;
+        border-radius: 2px;
+        color: #fff;
+        background: var(--blue);
+        font-size: 7px;
+        font-weight: 700;
+        cursor: pointer;
+    }
+
+    .icon-btn {
+        width: 18px;
+        height: 18px;
+        border: 1px solid #292929;
+        background: #0c0c0c;
+        color: #888;
+        border-radius: 2px;
+        cursor: pointer;
+        font-size: 8px;
+    }
+
+    .avatar {
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        color: #fff;
+        font-size: 7px;
+        font-weight: 700;
+        background: #3744b4;
+    }
+
+    /* --------------------------------------------------
+       SIDEBAR
+    -------------------------------------------------- */
+
+    .sidebar {
+        grid-column: 1;
+        grid-row: 2;
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        border-right: 1px solid var(--border);
+        background: #0a0a0a;
+    }
+
+    .sidebar-top {
+        padding: 7px 7px 5px;
+    }
+
+    .workspace {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        height: 18px;
+        color: #ddd;
+        font-size: 8px;
+        font-weight: 700;
+    }
+
+    .workspace-icon {
+        width: 13px;
+        height: 13px;
+        display: grid;
+        place-items: center;
+        background: #171717;
+        border: 1px solid #262626;
+        border-radius: 2px;
+        font-size: 7px;
+        color: #aaa;
+    }
+
+    .nav {
+        padding: 4px 4px;
+    }
+
+    .nav-item {
+        height: 22px;
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        padding: 0 7px;
+        color: #777;
+        border-radius: 2px;
+        cursor: pointer;
+        font-size: 8px;
+    }
+
+    .nav-item:hover {
+        color: #ccc;
+        background: #121212;
+    }
+
+    .nav-item.active {
+        color: #fff;
+        background: #191919;
+    }
+
+    .nav-icon {
+        width: 10px;
+        text-align: center;
+        color: #555;
+        font-size: 8px;
+    }
+
+    .nav-item.active .nav-icon {
+        color: #fff;
+    }
+
+    .section-label {
+        padding: 8px 8px 4px;
+        color: #5b5b5b;
+        font-size: 7px;
+        text-transform: uppercase;
+        letter-spacing: .06em;
+    }
+
+    .project-item {
+        height: 20px;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        padding: 0 8px;
+        color: #777;
+        font-size: 7px;
+    }
+
+    .dot {
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        flex: 0 0 auto;
+    }
+
+    .dot.purple { background: #8e69ff; }
+    .dot.green { background: #4fce7b; }
+    .dot.orange { background: #ef8f49; }
+    .dot.blue { background: #6487ff; }
+
+    .sidebar-bottom {
+        margin-top: auto;
+        border-top: 1px solid var(--border);
+        padding: 5px 4px;
+    }
+
+    .bottom-item {
+        height: 19px;
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        padding: 0 7px;
+        color: #666;
+        font-size: 7px;
+    }
+
+    .connected {
+        color: #5eb577;
+        font-size: 6px;
+        padding: 3px 7px 0;
+    }
+
+    /* --------------------------------------------------
+       MAIN
+    -------------------------------------------------- */
+
+    .main {
+        grid-column: 2;
+        grid-row: 2;
+        min-width: 0;
+        overflow: hidden;
+        background: #0a0a0a;
+    }
+
+    .main-header {
+        height: 38px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 8px;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .breadcrumb {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        color: #aaa;
+        font-size: 8px;
+    }
+
+    .breadcrumb strong {
+        color: #fff;
+    }
+
+    .count {
+        padding: 3px 5px;
+        border-radius: 2px;
+        background: #311313;
+        color: #ff5555;
+        font-size: 7px;
+        font-weight: 700;
+    }
+
+    .toolbar {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+
+    .toolbar input,
+    .toolbar select {
+        height: 19px;
+        border: 1px solid #292929;
+        background: #0d0d0d;
+        color: #8e8e8e;
+        outline: none;
+        font-size: 7px;
+        padding: 0 6px;
+    }
+
+    .toolbar input {
+        width: 110px;
+    }
+
+    .toolbar select {
+        width: 56px;
+    }
+
+    .report-btn {
+        height: 19px;
+        padding: 0 7px;
+        border: 0;
+        border-radius: 2px;
+        background: #6159ed;
+        color: white;
+        font-size: 7px;
+        font-weight: 700;
+        cursor: pointer;
+    }
+
+    /* --------------------------------------------------
+       TABLE
+    -------------------------------------------------- */
+
+    .table-wrap {
+        width: 100%;
+        overflow: hidden;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        table-layout: fixed;
+    }
+
+    thead tr {
+        height: 20px;
+        border-bottom: 1px solid var(--border);
+    }
+
+    th {
+        color: #555;
+        text-align: left;
+        font-size: 6px;
+        text-transform: uppercase;
+        letter-spacing: .06em;
+        font-weight: 700;
+        padding: 0 5px;
+    }
+
+    th:nth-child(1) { width: 67px; }
+    th:nth-child(2) { width: auto; }
+    th:nth-child(3) { width: 72px; }
+    th:nth-child(4) { width: 70px; }
+    th:nth-child(5) { width: 54px; }
+    th:nth-child(6) { width: 56px; }
+    th:nth-child(7) { width: 48px; }
+
+    tbody tr {
+        height: 26px;
+        border-bottom: 1px solid #1b1b1b;
+        cursor: pointer;
+    }
+
+    tbody tr:hover {
+        background: #111;
+    }
+
+    tbody tr.selected {
+        background: #141414;
+    }
+
+    td {
+        padding: 0 5px;
+        color: #bcbcbc;
+        font-size: 7px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    td:first-child {
+        color: #ff4f4f;
+        font-weight: 700;
+    }
+
+    .title {
+        color: #d1d1d1;
+    }
+
+    .status {
+        display: inline-flex;
+        align-items: center;
+        min-height: 14px;
+        padding: 0 5px;
+        border: 1px solid currentColor;
+        border-radius: 2px;
+        font-size: 6px;
+        font-weight: 700;
+    }
+
+    .status.resolved {
+        color: #39dd75;
+        background: rgba(57,221,117,.07);
+    }
+
+    .status.testing {
+        color: #be67ff;
+        background: rgba(190,103,255,.07);
+    }
+
+    .status.new {
+        color: #5898ff;
+        background: rgba(88,152,255,.07);
+    }
+
+    .status.urgent {
+        color: #ef4949;
+        background: rgba(239,73,73,.07);
+    }
+
+    .status.progress {
+        color: #4cda79;
+        background: rgba(76,218,121,.07);
+    }
+
+    .status.closed {
+        color: #777;
+        background: rgba(119,119,119,.07);
+    }
+
+    .priority {
+        font-weight: 700;
+        font-size: 6px;
+    }
+
+    .priority.critical { color: #ff4646; }
+    .priority.high { color: #ff943c; }
+    .priority.medium { color: #e2c549; }
+    .priority.low { color: #5fd87a; }
+
+    .project {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 6px;
+        color: #bbb;
+    }
+
+    .assignee {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        color: #888;
+        font-size: 6px;
+    }
+
+    .mini-avatar {
+        width: 11px;
+        height: 11px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        color: #fff;
+        font-size: 5px;
+        font-weight: 800;
+    }
+
+    .green-avatar { background: #21c36b; }
+    .purple-avatar { background: #7164ee; }
+    .yellow-avatar { background: #d8b320; }
+    .blue-avatar { background: #4177de; }
+
+    .date {
+        color: #555;
+        font-size: 6px;
+    }
+
+    .comments {
+        color: #555;
+        font-size: 6px;
+    }
+
+    /* --------------------------------------------------
+       DETAIL PANEL
+    -------------------------------------------------- */
+
+    .details {
+        grid-column: 3;
+        grid-row: 2;
+        min-width: 0;
+        border-left: 1px solid var(--border);
+        background: #111;
+        overflow-y: auto;
+    }
+
+    .details::-webkit-scrollbar {
+        width: 5px;
+    }
+
+    .details::-webkit-scrollbar-thumb {
+        background: #262626;
+    }
+
+    .detail-header {
+        height: 31px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 7px;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .detail-id {
+        color: #ef3e3e;
+        font-weight: 700;
+        font-size: 6px;
+    }
+
+    .detail-type {
+        color: #a53c3c;
+        text-transform: uppercase;
+        font-weight: 700;
+        font-size: 6px;
+    }
+
+    .close {
+        width: 15px;
+        height: 15px;
+        border: 1px solid #292929;
+        border-radius: 2px;
+        color: #aaa;
+        background: transparent;
+        cursor: pointer;
+        font-size: 9px;
+    }
+
+    .detail-body {
+        padding: 7px;
+    }
+
+    .detail-title {
+        color: #fff;
+        font-size: 9px;
+        line-height: 1.35;
+        font-weight: 800;
+        margin-bottom: 7px;
+    }
+
+    .tags {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        flex-wrap: wrap;
+        margin-bottom: 7px;
+    }
+
+    .tag {
+        height: 13px;
+        padding: 0 4px;
+        border: 1px solid #343434;
+        border-radius: 2px;
+        color: #bdbdbd;
+        background: #161616;
+        display: inline-flex;
+        align-items: center;
+        font-size: 5px;
+        font-weight: 700;
+    }
+
+    .tag.red {
+        color: #ff5454;
+        border-color: #4a2424;
+        background: #1b0e0e;
+    }
+
+    .meta {
+        display: grid;
+        gap: 5px;
+        margin-bottom: 9px;
+    }
+
+    .meta-row {
+        display: grid;
+        grid-template-columns: 65px 1fr;
+        gap: 5px;
+    }
+
+    .meta-label {
+        color: #555;
+        text-transform: uppercase;
+        font-size: 5px;
+    }
+
+    .meta-value {
+        color: #aaa;
+        font-size: 6px;
+    }
+
+    .meta-link {
+        color: #6988db;
+    }
+
+    .avatar-inline {
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        display: inline-grid;
+        place-items: center;
+        font-size: 4px;
+        color: #fff;
+        margin-right: 3px;
+    }
+
+    .heading {
+        color: #555;
+        text-transform: uppercase;
+        font-size: 6px;
+        margin: 8px 0 5px;
+        letter-spacing: .05em;
+        font-weight: 700;
+    }
+
+    .description {
+        color: #777;
+        line-height: 1.45;
+        font-size: 6px;
+    }
+
+    .steps {
+        background: #151515;
+        border: 1px solid #1f1f1f;
+        padding: 6px 8px;
+        margin-top: 5px;
+    }
+
+    .steps ol {
+        padding-left: 14px;
+    }
+
+    .steps li {
+        color: #acacac;
+        margin-bottom: 2px;
+        font-family: monospace;
+        font-size: 6px;
+    }
+
+    .result-box {
+        padding: 6px;
+        margin-top: 5px;
+        border: 1px solid;
+        font-size: 6px;
+        line-height: 1.45;
+    }
+
+    .result-box.expected {
+        color: #55de78;
+        border-color: #18542b;
+        background: #071509;
+    }
+
+    .result-box.actual {
+        color: #ff5454;
+        border-color: #5c2020;
+        background: #1c0a0a;
+    }
+
+    .attachment {
+        border: 1px solid #242424;
+        background: #151515;
+        padding: 6px;
+    }
+
+    .attachment-name {
+        color: #aaa;
+        font-family: monospace;
+        font-size: 6px;
+    }
+
+    .attachment-preview {
+        height: 28px;
+        border: 1px dashed #2d2d2d;
+        margin-top: 5px;
+        display: grid;
+        place-items: center;
+        color: #444;
+        font-size: 5px;
+    }
+
+    .comment {
+        display: grid;
+        grid-template-columns: 15px 1fr;
+        gap: 5px;
+        margin-bottom: 7px;
+    }
+
+    .comment-avatar {
+        width: 13px;
+        height: 13px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        color: white;
+        font-size: 5px;
+        font-weight: 800;
+    }
+
+    .comment-head {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        margin-bottom: 2px;
+    }
+
+    .comment-author {
+        color: #ccc;
+        font-weight: 700;
+        font-size: 6px;
+    }
+
+    .comment-time {
+        color: #555;
+        font-size: 5px;
+    }
+
+    .comment-text {
+        color: #777;
+        line-height: 1.4;
+        font-size: 6px;
+    }
+
+    .comment-box {
+        display: flex;
+        gap: 4px;
+        margin-top: 8px;
+    }
+
+    .comment-box input {
+        flex: 1;
+        min-width: 0;
+        height: 18px;
+        background: #0c0c0c;
+        border: 1px solid #252525;
+        outline: none;
+        color: #ddd;
+        padding: 0 5px;
+        font-size: 6px;
+    }
+
+    .comment-box button {
+        width: 28px;
+        height: 18px;
+        border: 0;
+        border-radius: 2px;
+        background: #6259ed;
+        color: white;
+        font-size: 6px;
+        cursor: pointer;
+    }
+
+    /* --------------------------------------------------
+       RESPONSIVE
+    -------------------------------------------------- */
+
+    @media (max-width: 900px) {
+        :root {
+            --sidebar-width: 85px;
+            --detail-width: 230px;
+        }
+
+        th:nth-child(5),
+        td:nth-child(5),
+        th:nth-child(6),
+        td:nth-child(6) {
+            display: none;
+        }
+    }
+
+    @media (max-width: 700px) {
+        .app {
+            grid-template-columns: 75px 1fr;
+        }
+
+        .details {
+            display: none;
+        }
+
+        .top-right .search {
+            display: none;
+        }
+
+        th:nth-child(4),
+        td:nth-child(4) {
+            display: none;
+        }
+    }
+</style>
+</head>
+
+<body>
+
+<div class="app">
+
+    <!-- TOP BAR -->
+    <header class="topbar">
+        <div class="top-left">
+            <div class="brand">
+                <span class="brand-mark">T</span>
+                <span>Thoth Dev</span>
+            </div>
+            <span class="top-link">•</span>
+            <span class="top-link">Bugs</span>
+        </div>
+
+        <div class="top-right">
+            <input class="search" type="text" placeholder="Search...">
+            <button class="new-btn">+ New</button>
+            <button class="icon-btn">○</button>
+            <button class="icon-btn">◔</button>
+            <div class="avatar">AC</div>
+            <span class="top-link" style="color:#aaa;">Aria</span>
+        </div>
+    </header>
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+
+        <div class="sidebar-top">
+            <div class="workspace">
+                <div class="workspace-icon">T</div>
+                <span>thoth</span>
+            </div>
+        </div>
+
+        <nav class="nav">
+            <div class="nav-item">
+                <span class="nav-icon">▣</span>
+                <span>Dashboard</span>
+            </div>
+
+            <div class="nav-item">
+                <span class="nav-icon">▤</span>
+                <span>Projects</span>
+            </div>
+
+            <div class="nav-item">
+                <span class="nav-icon">▥</span>
+                <span>Kanban</span>
+            </div>
+
+            <div class="nav-item">
+                <span class="nav-icon">✓</span>
+                <span>Tasks</span>
+            </div>
+
+            <div class="nav-item active">
+                <span class="nav-icon">⚑</span>
+                <span>Bugs</span>
+            </div>
+
+            <div class="nav-item">
+                <span class="nav-icon">◷</span>
+                <span>Calendar</span>
+            </div>
+
+            <div class="nav-item">
+                <span class="nav-icon">◇</span>
+                <span>Milestones</span>
+            </div>
+
+            <div class="nav-item">
+                <span class="nav-icon">▱</span>
+                <span>Reports</span>
+            </div>
+
+            <div class="nav-item">
+                <span class="nav-icon">⌁</span>
+                <span>Markdown</span>
+            </div>
+        </nav>
+
+        <div class="section-label">Projects</div>
+
+        <div class="project-item">
+            <span class="dot purple"></span>
+            <span>Thoth Core</span>
+        </div>
+
+        <div class="project-item">
+            <span class="dot green"></span>
+            <span>API Gateway</span>
+        </div>
+
+        <div class="project-item">
+            <span class="dot orange"></span>
+            <span>Data Pipeline</span>
+        </div>
+
+        <div class="project-item">
+            <span class="dot blue"></span>
+            <span>Mobile Client</span>
+        </div>
+
+        <div class="sidebar-bottom">
+            <div class="bottom-item">
+                <span>⚙</span>
+                <span>Workspace</span>
+            </div>
+
+            <div class="bottom-item">
+                <span>▣</span>
+                <span>Settings</span>
+            </div>
+
+            <div class="connected">
+                ● SQLite connected
+            </div>
+        </div>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main class="main">
+
+        <div class="main-header">
+            <div class="breadcrumb">
+                <strong>Bugs</strong>
+                <span>•</span>
+                <span class="count">6 Critical span</span>
+            </div>
+
+            <div class="toolbar">
+                <input type="text" placeholder="Search bugs...">
+                <select>
+                    <option>All status</option>
+                    <option>Resolved</option>
+                    <option>Testing</option>
+                    <option>New</option>
+                </select>
+
+                <select>
+                    <option>All project</option>
+                    <option>Thoth Core</option>
+                    <option>API Gateway</option>
+                </select>
+
+                <button class="report-btn">+ Report bug</button>
+            </div>
+        </div>
+
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>BUG ID</th>
+                        <th>TITLE</th>
+                        <th>STATUS</th>
+                        <th>PRIORITY</th>
+                        <th>PROJECT</th>
+                        <th>ASN</th>
+                        <th>REPORTED</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    <tr class="selected">
+                        <td>RESOLVED-91</td>
+                        <td class="title">
+                            Write lock not released on transaction timeout
+                        </td>
+                        <td>
+                            <span class="status resolved">Resolved</span>
+                        </td>
+                        <td>
+                            <span class="priority critical">critical</span>
+                        </td>
+                        <td>
+                            <span class="project">
+                                <span class="dot purple"></span>
+                                Thoth Core
+                            </span>
+                        </td>
+                        <td>
+                            <div class="assignee">
+                                <span class="mini-avatar green-avatar">MV</span>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="date">2026-08-02</span>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td>TESTING-2</td>
+                        <td class="title">
+                            Markdown preview de-synchronizes on rapid input
+                        </td>
+                        <td>
+                            <span class="status testing">Testing</span>
+                        </td>
+                        <td>
+                            <span class="priority medium">medium</span>
+                        </td>
+                        <td>
+                            <span class="project">
+                                <span class="dot purple"></span>
+                                Thoth Core
+                            </span>
+                        </td>
+                        <td>
+                            <div class="assignee">
+                                <span class="mini-avatar purple-avatar">AC</span>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="date">2026-08-02</span>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td>NEW-34</td>
+                        <td class="title">
+                            Calendar event click handler not firing on mobile
+                        </td>
+                        <td>
+                            <span class="status new">New</span>
+                        </td>
+                        <td>
+                            <span class="priority high">high</span>
+                        </td>
+                        <td>
+                            <span class="project">
+                                <span class="dot blue"></span>
+                                Mobile Client
+                            </span>
+                        </td>
+                        <td>
+                            <div class="assignee">
+                                <span class="mini-avatar yellow-avatar">DR</span>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="date">2026-08-02</span>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td>URGENT-5</td>
+                        <td class="title">
+                            Kafka consumer group rebalance causes duplicate processing
+                        </td>
+                        <td>
+                            <span class="status urgent">Urgent</span>
+                        </td>
+                        <td>
+                            <span class="priority critical">critical</span>
+                        </td>
+                        <td>
+                            <span class="project">
+                                <span class="dot orange"></span>
+                                Data Pipeline
+                            </span>
+                        </td>
+                        <td>
+                            <div class="assignee">
+                                <span class="mini-avatar purple-avatar">AC</span>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="date">2026-08-02</span>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td>INPROGRESS-8</td>
+                        <td class="title">
+                            GraphQL subscription memory leak on long connections
+                        </td>
+                        <td>
+                            <span class="status progress">In Progress</span>
+                        </td>
+                        <td>
+                            <span class="priority high">high</span>
+                        </td>
+                        <td>
+                            <span class="project">
+                                <span class="dot green"></span>
+                                API Gateway
+                            </span>
+                        </td>
+                        <td>
+                            <div class="assignee">
+                                <span class="mini-avatar blue-avatar">AD</span>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="date">2026-08-02</span>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td>CLOSED-47</td>
+                        <td class="title">
+                            User avatar fallback shows undefined initials
+                        </td>
+                        <td>
+                            <span class="status closed">Closed</span>
+                        </td>
+                        <td>
+                            <span class="priority low">low</span>
+                        </td>
+                        <td>
+                            <span class="project">
+                                <span class="dot purple"></span>
+                                Thoth Core
+                            </span>
+                        </td>
+                        <td>
+                            <div class="assignee">
+                                <span class="mini-avatar yellow-avatar">JR</span>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="date">2026-08-02</span>
+                        </td>
+                    </tr>
+
+                </tbody>
+            </table>
+        </div>
+
+    </main>
+
+    <!-- RIGHT DETAILS -->
+    <aside class="details">
+
+        <div class="detail-header">
+            <div>
+                <span class="detail-id">RESOLVED-91</span>
+                <span class="detail-type">BUG</span>
+            </div>
+
+            <button class="close">×</button>
+        </div>
+
+        <div class="detail-body">
+
+            <h1 class="detail-title">
+                Write lock not released on transaction timeout
+            </h1>
+
+            <div class="tags">
+                <span class="tag">Resolved</span>
+                <span class="tag red">Critical</span>
+            </div>
+
+            <div class="meta">
+
+                <div class="meta-row">
+                    <div class="meta-label">Reporter</div>
+                    <div class="meta-value">
+                        <span class="avatar-inline green-avatar">M</span>
+                        Marcus Webb
+                    </div>
+                </div>
+
+                <div class="meta-row">
+                    <div class="meta-label">Project</div>
+                    <div class="meta-value">Thoth Core</div>
+                </div>
+
+                <div class="meta-row">
+                    <div class="meta-label">Module</div>
+                    <div class="meta-value">Node.js, SQLite 3.45, Linux</div>
+                </div>
+
+                <div class="meta-row">
+                    <div class="meta-label">Created</div>
+                    <div class="meta-value">2026-08-19 01:45</div>
+                </div>
+
+            </div>
+
+            <div class="heading">Description</div>
+
+            <p class="description">
+                When a SQLite transaction exceeds the configured timeout,
+                the write lock is not properly released, causing subsequent
+                writes to hang indefinitely.
+            </p>
+
+            <div class="heading">Steps to Reproduce</div>
+
+            <div class="steps">
+                <ol>
+                    <li>Begin a write transaction</li>
+                    <li>Simulate timeout by delaying SQL</li>
+                    <li>Attempt subsequent write</li>
+                    <li>Observe indefinite hang</li>
+                </ol>
+            </div>
+
+            <div class="result-box expected">
+                <strong>EXPECTED</strong><br>
+                Lock is released after timeout and subsequent writes proceed
+                normally.
+            </div>
+
+            <div class="result-box actual">
+                <strong>ACTUAL</strong><br>
+                Subsequent write operations block forever until process restart.
+            </div>
+
+            <div class="heading">Attachments</div>
+
+            <div class="attachment">
+                <div class="attachment-name">trace-2026-08-19.log</div>
+                <div class="attachment-preview">
+                    Click to expand image
+                </div>
+            </div>
+
+            <div class="heading">Comments (3)</div>
+
+            <div class="comment">
+                <div class="comment-avatar green-avatar">MW</div>
+                <div>
+                    <div class="comment-head">
+                        <span class="comment-author">Marcus Webb</span>
+                        <span class="comment-time">2026-08-19 13:22</span>
+                    </div>
+                    <div class="comment-text">
+                        Looked into this — the fix condition happens when the
+                        write buffer flushes before the lock is acquired.
+                    </div>
+                </div>
+            </div>
+
+            <div class="comment">
+                <div class="comment-avatar purple-avatar">AC</div>
+                <div>
+                    <div class="comment-head">
+                        <span class="comment-author">Aria Chen</span>
+                        <span class="comment-time">2026-08-20 09:11</span>
+                    </div>
+                    <div class="comment-text">
+                        Confirmed on staging. Reproduced with 4 concurrent writes.
+                    </div>
+                </div>
+            </div>
+
+            <div class="comment">
+                <div class="comment-avatar yellow-avatar">DO</div>
+                <div>
+                    <div class="comment-head">
+                        <span class="comment-author">Devon O'Rourke</span>
+                        <span class="comment-time">2026-08-20 16:45</span>
+                    </div>
+                    <div class="comment-text">
+                        Added regression suite. Will verify after the fix lands.
+                    </div>
+                </div>
+            </div>
+
+            <div class="comment-box">
+                <input type="text" placeholder="Add a comment...">
+                <button>Send</button>
+            </div>
+
+        </div>
+    </aside>
+
+</div>
+
+<script>
+    // Select bug rows
+    const rows = document.querySelectorAll("tbody tr");
+
+    rows.forEach(row => {
+        row.addEventListener("click", () => {
+            rows.forEach(item => item.classList.remove("selected"));
+            row.classList.add("selected");
+        });
+    });
+
+    // Sidebar navigation
+    const navItems = document.querySelectorAll(".nav-item");
+
+    navItems.forEach(item => {
+        item.addEventListener("click", () => {
+            navItems.forEach(nav => nav.classList.remove("active"));
+            item.classList.add("active");
+        });
+    });
+
+    // Close detail panel
+    const closeBtn = document.querySelector(".close");
+    const details = document.querySelector(".details");
+
+    closeBtn.addEventListener("click", () => {
+        details.style.display = "none";
+    });
+
+    // Report button
+    document.querySelector(".report-btn").addEventListener("click", () => {
+        alert("Report bug dialog would open here.");
+    });
+
+    // New button
+    document.querySelector(".new-btn").addEventListener("click", () => {
+        alert("Create new item.");
+    });
+</script>
+
+</body>
+</html>

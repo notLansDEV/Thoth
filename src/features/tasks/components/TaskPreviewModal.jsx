@@ -1,0 +1,855 @@
+import { useEffect, useRef, useState } from 'react'
+import {
+  Check, X, Pencil, Paperclip, FileImage, FileText, FileArchive, FileType2, FileSpreadsheet, Reply,
+} from 'lucide-react'
+import { toast } from 'sonner'
+import {
+  TASK_STAGES,
+  TASK_PRIORITIES,
+  priorityStyle,
+  updateTask,
+  getWorkspaceMembers,
+  getMilestones,
+} from '../tasks.service.js'
+import { getProjectMembers } from '../../projects/projects.service.js'
+import CopyCode from '../../../components/CopyCode.jsx'
+import { renderMarkdown } from '../../../utils/renderMarkdown.js'
+
+const inputStyle = {
+  width: '100%',
+  padding: '6px 8px',
+  border: '1px solid var(--border)',
+  background: 'var(--panel3)',
+  color: 'var(--text-soft)',
+  borderRadius: '4px',
+  fontSize: '12px',
+  boxSizing: 'border-box',
+  outline: 'none',
+}
+
+const labelStyle = {
+  display: 'block',
+  marginBottom: '5px',
+  fontSize: '10px',
+  fontWeight: '700',
+  color: 'var(--muted)',
+  textTransform: 'uppercase',
+  letterSpacing: '0.06em',
+}
+
+function toDateInput(value) {
+  if (!value) return ''
+  const d = new Date(value)
+  return Number.isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10)
+}
+
+function currentUser() {
+  try {
+    const u = JSON.parse(localStorage.getItem('thoth_user') || 'null')
+    if (!u) return { id: null, name: 'Unknown' }
+    return { id: u.id || null, name: u.full_name || u.username || 'Unknown' }
+  } catch {
+    return { id: null, name: 'Unknown' }
+  }
+}
+
+function taskProgress(checklist, stage) {
+  const items = Array.isArray(checklist) ? checklist : []
+  if (items.length > 0) {
+    const done = items.filter((c) => c.done).length
+    return Math.round((done / items.length) * 100)
+  }
+  return stage === 'Done' ? 100 : 0
+}
+
+function pathKey(path) {
+  return Array.isArray(path) ? path.join('.') : ''
+}
+
+function TaskCommentNode({ node, path, depth, replyTarget, setReplyTarget, expanded, setExpanded }) {
+  const name = node.author_name || 'Unknown'
+  const replies = Array.isArray(node.replies) ? node.replies : []
+  const key = pathKey(path)
+  const isReplying = replyTarget && pathKey(replyTarget.path) === key
+  const isExpanded = !!expanded[key]
+  return (
+    <div style={{ display: 'flex', gap: '8px', marginBottom: depth === 0 ? '9px' : '6px' }}>
+      <span className="avatar" style={{ width: depth === 0 ? '24px' : '20px', height: depth === 0 ? '24px' : '20px', fontSize: depth === 0 ? '9px' : '8px', flexShrink: 0 }}>
+        {name.slice(0, 2).toUpperCase()}
+      </span>
+      <div style={{
+        flex: 1, background: depth === 0 ? 'var(--panel3)' : 'transparent',
+        border: depth === 0 ? '1px solid var(--border-soft)' : 'none',
+        borderRadius: '4px', padding: depth === 0 ? '7px 9px' : '0',
+        minWidth: 0,
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', marginBottom: '3px', alignItems: 'baseline', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: depth === 0 ? '10.5px' : '10px', fontWeight: 700, color: 'var(--text-soft)' }}>{name}</span>
+          <span style={{ fontSize: depth === 0 ? '9px' : '8.5px', color: 'var(--muted2)' }}>
+            {node.at ? new Date(node.at).toLocaleString() : ''}
+          </span>
+        </div>
+        <div style={{ fontSize: depth === 0 ? '11px' : '10.5px', color: 'var(--text-soft)', lineHeight: 1.5 }}>{node.text}</div>
+        <div style={{ marginTop: '5px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <button
+            type="button"
+            onClick={() => { setReplyTarget({ path, name }); }}
+            style={{
+              background: 'transparent', border: 0, padding: 0,
+              color: isReplying ? '#6e61ff' : 'var(--muted)', cursor: 'pointer',
+              fontSize: '9.5px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '3px',
+            }}
+          >
+            <Reply size={depth === 0 ? 10 : 9} /> Reply
+          </button>
+          {replies.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setExpanded((prev) => ({ ...prev, [key]: !prev[key] }))}
+              style={{
+                background: 'transparent', border: 0, padding: 0,
+                color: 'var(--muted)', cursor: 'pointer',
+                fontSize: '9.5px', fontWeight: 600,
+              }}
+            >
+              {isExpanded ? `▾ Hide replies` : `▸ ${replies.length} ${replies.length === 1 ? 'reply' : 'replies'}`}
+            </button>
+          )}
+        </div>
+
+        {replies.length > 0 && isExpanded && (
+          <div style={{ marginTop: '7px', marginLeft: '2px', paddingLeft: '10px', borderLeft: '2px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            {replies.map((r, ri) => (
+              <TaskCommentNode
+                key={ri}
+                node={r}
+                path={[...path, ri]}
+                depth={depth + 1}
+                replyTarget={replyTarget}
+                setReplyTarget={setReplyTarget}
+                expanded={expanded}
+                setExpanded={setExpanded}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function formatSize(bytes) {
+  const n = Number(bytes) || 0
+  if (n < 1024) return `${n} B`
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function fileIcon(name = '') {
+  const ext = name.split('.').pop().toLowerCase()
+  if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp'].includes(ext)) return <FileImage size={13} />
+  if (ext === 'pdf') return <FileText size={13} />
+  if (['txt', 'md', 'log'].includes(ext)) return <FileText size={13} />
+  if (['zip', 'rar', '7z'].includes(ext)) return <FileArchive size={13} />
+  if (['doc', 'docx'].includes(ext)) return <FileType2 size={13} />
+  if (['xls', 'xlsx', 'csv'].includes(ext)) return <FileSpreadsheet size={13} />
+  return <Paperclip size={13} />
+}
+
+export default function TaskPreviewModal({ task, workspaceId, stages, onUpdated, onClose }) {
+  const stageOptions = (stages && stages.length > 0)
+    ? stages.map((s) => ({ value: s.name, label: s.name }))
+    : TASK_STAGES
+  const [title, setTitle] = useState(task.title)
+  const [description, setDescription] = useState(task.description || '')
+  const [editingDesc, setEditingDesc] = useState(false)
+  const [stage, setStage] = useState(task.status || 'todo')
+  const [priority, setPriority] = useState(task.priority || 'medium')
+  const [assignee, setAssignee] = useState(task.assigned_to || '')
+  const [startDate, setStartDate] = useState(toDateInput(task.start_date))
+  const [dueDate, setDueDate] = useState(toDateInput(task.due_date))
+  const [milestoneId, setMilestoneId] = useState(task.milestone_id || '')
+
+  const [members, setMembers] = useState([])
+  const [projectMemberIds, setProjectMemberIds] = useState([])
+  const [milestones, setMilestones] = useState([])
+
+  const [comments, setComments] = useState(task.meta?.comments || [])
+  const [checklist, setChecklist] = useState(task.meta?.checklist || [])
+  const [files, setFiles] = useState(task.meta?.files || [])
+  const [tab, setTab] = useState('description')
+  const [newComment, setNewComment] = useState('')
+  const [replyTarget, setReplyTarget] = useState(null)
+  const [replyText, setReplyText] = useState('')
+  const [expandedReplies, setExpandedReplies] = useState({})
+  const [dragOver, setDragOver] = useState(false)
+  const [newCheckItem, setNewCheckItem] = useState('')
+  const [editCheckIndex, setEditCheckIndex] = useState(null)
+  const [editCheckText, setEditCheckText] = useState('')
+  const fileInputRef = useRef(null)
+
+  useEffect(() => {
+    let alive = true
+    getWorkspaceMembers(workspaceId)
+      .then((rows) => { if (alive) setMembers(rows) })
+      .catch(() => {})
+    getMilestones(task.project_id)
+      .then((rows) => { if (alive) setMilestones(rows) })
+      .catch(() => {})
+    getProjectMembers(task.project_id)
+      .then((rows) => { if (alive) setProjectMemberIds(Array.isArray(rows) ? rows.map((r) => r.id) : []) })
+      .catch(() => { if (alive) setProjectMemberIds([]) })
+    return () => { alive = false }
+  }, [workspaceId, task.project_id])
+
+  const assignableMembers = projectMemberIds.length
+    ? members.filter((m) => projectMemberIds.includes(m.id))
+    : members
+
+  async function patch(data) {
+    try {
+      const updated = await updateTask(task.id, data)
+      onUpdated({ ...task, ...updated })
+      return updated
+    } catch {
+      return null
+    }
+  }
+
+  function onTitleBlur() {
+    if (title.trim() && title.trim() !== task.title) patch({ title: title.trim() })
+    else setTitle(task.title)
+  }
+
+  function onDescriptionBlur() {
+    if ((description.trim() || null) !== (task.description || null)) {
+      patch({ description: description.trim() || null })
+    }
+  }
+
+  async function addComment(e) {
+    e.preventDefault()
+    if (!newComment.trim()) return
+    const user = currentUser()
+    const entry = {
+      text: newComment.trim(),
+      at: new Date().toISOString(),
+      author_id: user.id,
+      author_name: user.name,
+      replies: [],
+    }
+    const next = [...comments, entry]
+    setComments(next)
+    setNewComment('')
+    const updated = await patch({ meta: { comments: next } })
+    if (!updated) setComments(comments)
+  }
+
+  async function addReply(e) {
+    e.preventDefault()
+    if (!replyText.trim() || !replyTarget) return
+    const user = currentUser()
+    const entry = {
+      text: replyText.trim(),
+      at: new Date().toISOString(),
+      author_id: user.id,
+      author_name: user.name,
+      replies: [],
+    }
+    function addAtPath(nodes, pathArr, depth = 0) {
+      if (!pathArr || depth >= pathArr.length) return [...(nodes || []), entry]
+      const idx = pathArr[depth]
+      return (nodes || []).map((n, i) => {
+        if (i !== idx) return n
+        if (depth === pathArr.length - 1) return { ...n, replies: [...(n.replies || []), entry] }
+        return { ...n, replies: addAtPath(n.replies || [], pathArr, depth + 1) }
+      })
+    }
+    const next = addAtPath(comments, replyTarget.path)
+    // expand ancestors so the new reply is visible
+    setExpandedReplies((prev) => {
+      const nextExp = { ...prev }
+      const path = replyTarget.path || []
+      for (let i = 1; i <= path.length; i++) {
+        nextExp[path.slice(0, i).join('.')] = true
+      }
+      return nextExp
+    })
+    setComments(next)
+    setReplyText('')
+    setReplyTarget(null)
+    const updated = await patch({ meta: { comments: next } })
+    if (!updated) setComments(comments)
+  }
+
+  async function toggleCheck(index) {
+    const next = checklist.map((item, i) =>
+      i === index ? { ...item, done: !item.done } : item
+    )
+    setChecklist(next)
+    const updated = await patch({ meta: { checklist: next }, progress: taskProgress(next, stage) })
+    if (!updated) setChecklist(checklist)
+  }
+
+  async function removeCheckItem(index) {
+    const next = checklist.filter((_, i) => i !== index)
+    setChecklist(next)
+    const updated = await patch({ meta: { checklist: next }, progress: taskProgress(next, stage) })
+    if (!updated) setChecklist(checklist)
+  }
+
+  function startEditCheck(index) {
+    setEditCheckIndex(index)
+    setEditCheckText(checklist[index].text)
+  }
+
+  function cancelEditCheck() {
+    setEditCheckIndex(null)
+    setEditCheckText('')
+  }
+
+  async function saveEditCheck() {
+    const text = editCheckText.trim()
+    if (!text || editCheckIndex == null) { cancelEditCheck(); return }
+    const next = checklist.map((item, i) =>
+      i === editCheckIndex ? { ...item, text } : item
+    )
+    setEditCheckIndex(null)
+    setEditCheckText('')
+    setChecklist(next)
+    const updated = await patch({ meta: { checklist: next } })
+    if (!updated) setChecklist(checklist)
+  }
+
+  async function addCheckItem(e) {
+    e.preventDefault()
+    if (!newCheckItem.trim()) return
+    const next = [...checklist, { text: newCheckItem.trim(), done: false }]
+    setChecklist(next)
+    setNewCheckItem('')
+    const updated = await patch({ meta: { checklist: next }, progress: taskProgress(next, stage) })
+    if (!updated) setChecklist(checklist)
+  }
+
+  function readFileAsDataUrl(file) {
+    return new Promise((resolve) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(String(reader.result))
+      reader.onerror = () => resolve(null)
+      reader.readAsDataURL(file)
+    })
+  }
+
+  async function addFiles(picked) {
+    if (!picked || picked.length === 0) return
+    const MAX_FILE_BYTES = 2 * 1024 * 1024
+    const valid = []
+    let tooLarge = false
+    for (const f of picked) {
+      if (f.size > MAX_FILE_BYTES) { tooLarge = true; continue }
+      valid.push(f)
+    }
+    if (tooLarge) toast.error('File is too large (max 2 MB).')
+    if (valid.length === 0) return
+    // Images up to 2MB are inlined as data URLs so the Files tab can show thumbnails
+    const additions = await Promise.all(valid.map(async (f) => {
+      const entry = {
+        name: f.name,
+        size: f.size,
+        type: f.type || null,
+        added_at: new Date().toISOString(),
+        added_by: currentUser().name,
+      }
+      if ((f.type || '').startsWith('image/')) {
+        entry.dataUrl = await readFileAsDataUrl(f)
+      }
+      return entry
+    }))
+    const next = [...files, ...additions]
+    setFiles(next)
+    patch({ meta: { files: next } }).then((updated) => {
+      if (!updated) {
+        setFiles(files)
+        toast.error('Could not upload attachment')
+      } else {
+        toast.success(additions.length > 1 ? 'Attachments uploaded successfully' : 'Attachment uploaded successfully')
+      }
+    })
+  }
+
+  function onFilesPicked(e) {
+    const picked = Array.from(e.target.files || [])
+    e.target.value = ''
+    addFiles(picked)
+  }
+
+  function onFileDragOver(e) {
+    e.preventDefault()
+    e.stopPropagation()
+    setDragOver(true)
+  }
+
+  function onFileDragLeave(e) {
+    e.preventDefault()
+    e.stopPropagation()
+    setDragOver(false)
+  }
+
+  function onFileDrop(e) {
+    e.preventDefault()
+    e.stopPropagation()
+    setDragOver(false)
+    addFiles(Array.from(e.dataTransfer.files || []))
+  }
+
+  async function removeFile(index) {
+    const next = files.filter((_, i) => i !== index)
+    setFiles(next)
+    const updated = await patch({ meta: { files: next } })
+    if (!updated) setFiles(files)
+  }
+
+  const doneCount = checklist.filter((c) => c.done).length
+  const progress = taskProgress(checklist, stage)
+
+  return (
+    <div onClick={onClose} style={{
+      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+      background: 'rgba(0,0,0,0.65)', display: 'flex',
+      alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+    }}>
+      <div onClick={(e) => e.stopPropagation()} style={{
+        background: 'var(--panel2)', border: '1px solid var(--border)', borderRadius: '6px',
+        width: '100%', maxWidth: '760px', maxHeight: '88vh',
+        display: 'grid', gridTemplateColumns: '1fr 240px', gridTemplateRows: 'minmax(0, 1fr)',
+        boxShadow: '0 20px 25px rgba(0,0,0,0.4)', overflow: 'hidden',
+      }}>
+        {/* LEFT */}
+        <div className="modal-scroll" style={{ padding: '22px', minHeight: 0 }}>
+          <input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            onBlur={onTitleBlur}
+            style={{
+              width: '100%', background: 'transparent', border: '1px solid transparent',
+              borderRadius: '4px', color: 'var(--text-strong)', fontSize: '16px', fontWeight: '700',
+              padding: '4px 6px', margin: '-4px -6px 4px', outline: 'none',
+              fontFamily: 'inherit', boxSizing: 'border-box',
+            }}
+            onFocus={(e) => { e.target.style.borderColor = 'var(--border)'; e.target.style.background = 'var(--panel3)' }}
+            onBlur={(e) => { e.target.style.borderColor = 'transparent'; e.target.style.background = 'transparent'; onTitleBlur() }}
+          />
+
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '14px', paddingLeft: '2px' }}>
+            {task.task_code && (
+              <CopyCode
+                page="tasks"
+                id={task.id}
+                code={task.task_code}
+                style={{
+                  color: '#6e61ff',
+                  background: 'rgba(110,97,255,0.08)',
+                  borderColor: 'rgba(110,97,255,0.3)',
+                }}
+              />
+            )}
+            <span className="badge paused" style={{ fontSize: '9px' }}>
+              {(stageOptions.find((s) => s.value === stage) || {}).label || stage}
+            </span>
+            <span className="badge" style={{ ...priorityStyle(priority), background: 'transparent', fontSize: '9px' }}>
+              {priority}
+            </span>
+            {task.project_name && (
+              <span style={{ color: 'var(--muted2)', fontSize: '10px' }}>in {task.project_name}</span>
+            )}
+          </div>
+
+          {/* Section tabs in a row */}
+          <div style={{ display: 'flex', gap: '6px', borderBottom: '1px solid var(--border)', marginBottom: '14px' }}>
+            {[
+              { key: 'description', label: 'Description' },
+              { key: 'comments', label: `Comments${comments.length ? ` (${comments.length})` : ''}` },
+              { key: 'checklist', label: `Checklist${checklist.length ? ` (${doneCount}/${checklist.length})` : ''}` },
+              { key: 'files', label: `Files${files.length ? ` (${files.length})` : ''}` },
+            ].map((t) => (
+              <button
+                key={t.key}
+                type="button"
+                onClick={() => setTab(t.key)}
+                style={{
+                  padding: '7px 10px', fontSize: '11px', fontWeight: 600,
+                  background: 'transparent',
+                  color: tab === t.key ? 'var(--text-strong)' : 'var(--muted)',
+                  border: 0, borderTop: '2px solid transparent',
+                  borderBottom: tab === t.key ? '2px solid #695df0' : '2px solid transparent',
+                  cursor: 'pointer', fontFamily: 'inherit',
+                }}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+
+          {tab === 'description' && (
+            <div style={{ marginBottom: '18px' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
+                <button type="button" className="btn" onClick={() => setEditingDesc((v) => !v)} style={{ padding: '4px 10px', fontSize: 11 }}>
+                  {editingDesc ? 'Preview' : 'Edit'}
+                </button>
+              </div>
+              {editingDesc ? (
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  onBlur={onDescriptionBlur}
+                  placeholder="Add a more detailed description…"
+                  style={{ ...inputStyle, minHeight: '320px', resize: 'vertical' }}
+                />
+              ) : (
+                <div
+                  className="md-preview"
+                  style={{ minHeight: '320px', padding: '12px', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--panel3)', fontSize: 12, color: 'var(--text-soft)' }}
+                  dangerouslySetInnerHTML={{ __html: renderMarkdown(description, { emptyHtml: '<div style="color:var(--muted2)">No description.</div>' }) }}
+                />
+              )}
+            </div>
+          )}
+
+          {/* Checklist */}
+          {tab === 'checklist' && (
+            <>
+              <div style={{
+                background: 'var(--panel3)', border: '1px solid var(--border-soft)', borderRadius: '4px',
+                padding: '10px 12px', marginBottom: '10px',
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '7px' }}>
+                  <span style={{ fontSize: '10px', fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                    Checklist
+                  </span>
+                  <span style={{ fontSize: '10px', color: doneCount === checklist.length && checklist.length > 0 ? '#20d96b' : 'var(--muted)' }}>
+                    {doneCount}/{checklist.length} done
+                  </span>
+                </div>
+                <div className="progress" style={{ height: '4px' }}>
+                  <span style={{
+                    width: `${checklist.length ? Math.round((doneCount / checklist.length) * 100) : 0}%`,
+                    background: doneCount === checklist.length && checklist.length > 0 ? '#20d96b' : undefined,
+                  }} />
+                </div>
+              </div>
+
+              {checklist.length === 0 ? (
+                <div style={{ color: 'var(--muted2)', fontSize: '11px', marginBottom: '8px' }}>No checklist items yet</div>
+              ) : (
+                <div style={{ marginBottom: '10px' }}>
+                  {checklist.map((item, i) => (
+                    <div
+                      key={i}
+                      className="check-row"
+                      style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px', borderRadius: '4px' }}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => toggleCheck(i)}
+                        aria-label={item.done ? 'Mark as not done' : 'Mark as done'}
+                        style={{
+                          width: '15px', height: '15px', flexShrink: 0, borderRadius: '3px',
+                          border: item.done ? '0' : '1px solid var(--hover-border)',
+                          background: item.done ? '#695df0' : 'transparent',
+                          color: '#fff', fontSize: '9px', lineHeight: 1, cursor: 'pointer',
+                          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                        }}
+                      >
+                        {item.done && <Check size={9} strokeWidth={3} />}
+                      </button>
+                      {editCheckIndex === i ? (
+                        <input
+                          autoFocus
+                          value={editCheckText}
+                          onChange={(e) => setEditCheckText(e.target.value)}
+                          onBlur={saveEditCheck}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') { e.preventDefault(); saveEditCheck() }
+                            if (e.key === 'Escape') cancelEditCheck()
+                          }}
+                          style={{
+                            flex: 1, background: 'var(--hover)', border: '1px solid var(--hover-border)',
+                            borderRadius: '3px', color: 'var(--text-soft)', fontSize: '11.5px',
+                            fontFamily: 'inherit', padding: '2px 6px', outline: 'none',
+                          }}
+                        />
+                      ) : (
+                        <span style={{
+                          flex: 1, fontSize: '11.5px',
+                          color: item.done ? 'var(--muted2)' : 'var(--text-soft)',
+                          textDecoration: item.done ? 'line-through' : 'none',
+                        }}>{item.text}</span>
+                      )}
+                      <button
+                        type="button"
+                        className="row-delete"
+                        onClick={() => startEditCheck(i)}
+                        aria-label="Edit item"
+                        style={{
+                          background: 'transparent', border: 0, color: 'var(--muted2)', cursor: 'pointer',
+                          padding: '2px 4px', opacity: 0, display: 'inline-flex',
+                        }}
+                      ><Pencil size={11} /></button>
+                      <button
+                        type="button"
+                        className="row-delete"
+                        onClick={() => removeCheckItem(i)}
+                        aria-label="Delete item"
+                        style={{
+                          background: 'transparent', border: 0, color: 'var(--muted2)', cursor: 'pointer',
+                          padding: '2px 4px', opacity: 0, display: 'inline-flex',
+                        }}
+                      ><X size={11} /></button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <form onSubmit={addCheckItem} style={{ display: 'flex', gap: '6px', marginBottom: '18px' }}>
+                <input
+                  type="text" value={newCheckItem}
+                  onChange={(e) => setNewCheckItem(e.target.value)}
+                  placeholder="+ Add an item"
+                  style={{ ...inputStyle, padding: '5px 8px' }}
+                />
+                {newCheckItem.trim() && (
+                  <button type="submit" className="btn primary" style={{ cursor: 'pointer', flexShrink: 0 }}>Add</button>
+                )}
+              </form>
+            </>
+          )}
+
+          {/* Comments */}
+          {tab === 'comments' && (
+            <>
+              <div style={{ marginBottom: '8px' }}>
+                {comments.length === 0 && (
+                  <div style={{ color: 'var(--muted2)', fontSize: '11px' }}>No comments yet</div>
+                )}
+                {comments.map((c, i) => (
+                  <TaskCommentNode
+                    key={i}
+                    node={c}
+                    path={[i]}
+                    depth={0}
+                    replyTarget={replyTarget}
+                    setReplyTarget={setReplyTarget}
+                    expanded={expandedReplies}
+                    setExpanded={setExpandedReplies}
+                  />
+                ))}
+              </div>
+              <form onSubmit={replyTarget ? addReply : addComment} style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '18px' }}>
+                {replyTarget && (
+                  <div style={{ width: '100%', fontSize: '10px', color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '-2px' }}>
+                    Replying to <strong style={{ color: 'var(--text-soft)' }}>{replyTarget.name}</strong>
+                    <button type="button" onClick={() => { setReplyTarget(null); setReplyText('') }} style={{ background: 'transparent', border: 0, color: 'var(--muted2)', cursor: 'pointer', padding: 0, display: 'inline-flex' }} aria-label="Cancel reply"><X size={11} /></button>
+                  </div>
+                )}
+                <input
+                  type="text"
+                  value={replyTarget ? replyText : newComment}
+                  onChange={(e) => replyTarget ? setReplyText(e.target.value) : setNewComment(e.target.value)}
+                  placeholder={replyTarget ? `Reply to ${replyTarget.name}…` : `Comment as ${currentUser().name}…`}
+                  style={{ ...inputStyle, padding: '5px 8px', flex: 1 }}
+                />
+                <button type="submit" className="btn primary" disabled={replyTarget ? !replyText.trim() : !newComment.trim()} style={{ cursor: 'pointer', flexShrink: 0 }}>
+                  {replyTarget ? 'Reply' : 'Send'}
+                </button>
+              </form>
+            </>
+          )}
+
+          {/* Files */}
+          {tab === 'files' && (
+            <>
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept=".png,.jpg,.jpeg,.gif,.webp,.svg,.pdf,.txt,.md,.log,.doc,.docx,.xls,.xlsx,.csv,.zip"
+                style={{ display: 'none' }}
+                onChange={onFilesPicked}
+              />
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                onDragOver={onFileDragOver}
+                onDragEnter={onFileDragOver}
+                onDragLeave={onFileDragLeave}
+                onDrop={onFileDrop}
+                style={{
+                  border: `1px dashed ${dragOver ? '#6e61ff' : 'var(--border)'}`,
+                  background: dragOver ? 'rgba(95,116,255,0.1)' : 'transparent',
+                  borderRadius: '4px', padding: '22px', textAlign: 'center',
+                  color: dragOver ? '#8f9bff' : 'var(--muted2)', fontSize: '11px', cursor: 'pointer',
+                  marginBottom: '10px', transition: 'border-color .15s, background .15s, color .15s',
+                }}
+              >
+                <Paperclip size={12} style={{ verticalAlign: '-2px', marginRight: '4px' }} />
+                {dragOver ? 'Drop files to attach' : 'Drag & drop files here, or click to browse'}<br />
+                <span style={{ fontSize: '9px', color: 'var(--muted2)' }}>PNG, JPG, PDF, TXT, DOC, XLS, ZIP…</span>
+              </div>
+
+              {files.length > 0 && (
+                <div style={{ marginBottom: '10px' }}>
+                  {files.map((f, i) => (
+                    <div
+                      key={i}
+                      className="check-row"
+                      style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px', borderRadius: '4px' }}
+                    >
+                      {f.dataUrl ? (
+                        <img
+                          src={f.dataUrl}
+                          alt={f.name}
+                          style={{
+                            width: '34px', height: '34px', objectFit: 'cover',
+                            borderRadius: '3px', border: '1px solid var(--border)', flexShrink: 0,
+                          }}
+                        />
+                      ) : (
+                        <span style={{ display: 'inline-flex', color: 'var(--muted)' }}>{fileIcon(f.name)}</span>
+                      )}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: '11px', color: 'var(--text-soft)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {f.name}
+                        </div>
+                        <div style={{ fontSize: '9px', color: 'var(--muted2)' }}>
+                          {[f.size != null ? formatSize(f.size) : null, f.added_by].filter(Boolean).join(' · ')}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        className="row-delete"
+                        onClick={() => removeFile(i)}
+                        aria-label="Remove file"
+                        style={{
+                          background: 'transparent', border: 0, color: 'var(--muted2)', cursor: 'pointer',
+                          padding: '2px 4px', opacity: 0, display: 'inline-flex',
+                        }}
+                      ><X size={11} /></button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="btn"
+                style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+              >
+                <Paperclip size={12} /> Attach files
+              </button>
+              <div style={{ fontSize: '9.5px', color: 'var(--muted2)', marginTop: '6px' }}>Max 2 MB per file</div>
+            </>
+          )}
+        </div>
+
+        {/* RIGHT */}
+        <div className="modal-scroll" style={{
+          borderLeft: '1px solid var(--border)', background: 'var(--panel2)',
+          padding: '18px 16px', minHeight: 0,
+        }}>
+          <button
+            onClick={onClose}
+            style={{
+              float: 'right', background: 'transparent', border: 0, color: 'var(--muted2)',
+              cursor: 'pointer', fontSize: '14px', lineHeight: 1, padding: 0,
+            }}
+            aria-label="Close"
+          ><X size={14} /></button>
+
+          <div style={{ marginBottom: '13px' }}>
+            <label style={labelStyle}>Stage</label>
+            <select
+              value={stage}
+              onChange={(e) => { setStage(e.target.value); patch({ status: e.target.value, progress: taskProgress(checklist, e.target.value) }) }}
+              style={inputStyle}
+            >
+              {stageOptions.map((s) => (
+                <option key={s.value} value={s.value}>{s.label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div style={{ marginBottom: '13px' }}>
+            <label style={labelStyle}>Priority</label>
+            <select
+              value={priority}
+              onChange={(e) => { setPriority(e.target.value); patch({ priority: e.target.value }) }}
+              style={inputStyle}
+            >
+              {TASK_PRIORITIES.map((p) => (
+                <option key={p.value} value={p.value}>{p.label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div style={{ marginBottom: '13px' }}>
+            <label style={labelStyle}>Assignee</label>
+            <select
+              value={assignee}
+              onChange={(e) => { setAssignee(e.target.value); patch({ assigned_to: e.target.value || null }) }}
+              style={inputStyle}
+            >
+              <option value="">Unassigned</option>
+              {assignableMembers.map((m) => (
+                <option key={m.id} value={m.id}>{m.full_name || m.username}</option>
+              ))}
+            </select>
+          </div>
+
+          <div style={{ marginBottom: '13px' }}>
+            <label style={labelStyle}>Start date</label>
+            <input
+              type="date" value={startDate}
+              onChange={(e) => { setStartDate(e.target.value); patch({ start_date: e.target.value || null }) }}
+              style={inputStyle}
+            />
+          </div>
+
+          <div style={{ marginBottom: '13px' }}>
+            <label style={labelStyle}>Due date</label>
+            <input
+              type="date" value={dueDate}
+              onChange={(e) => { setDueDate(e.target.value); patch({ due_date: e.target.value || null }) }}
+              style={inputStyle}
+            />
+          </div>
+
+          <div style={{ marginBottom: '13px' }}>
+            <label style={labelStyle}>Progress — {progress}%</label>
+            <div className="progress" style={{ height: '4px', marginTop: '6px' }}>
+              <span style={{ width: `${progress}%`, background: progress === 100 ? 'var(--green)' : undefined }} />
+            </div>
+          </div>
+
+          <div style={{ marginBottom: '13px' }}>
+            <label style={labelStyle}>Project</label>
+            <div style={{ fontSize: '12px', color: 'var(--text-soft)', padding: '6px 8px', background: 'var(--panel3)', border: '1px solid var(--border)', borderRadius: '4px' }}>
+              {task.project_name || '—'}
+            </div>
+          </div>
+
+          <div style={{ marginBottom: '4px' }}>
+            <label style={labelStyle}>Milestone</label>
+            <select
+              value={milestoneId}
+              onChange={(e) => { setMilestoneId(e.target.value); patch({ milestone_id: e.target.value || null }) }}
+              style={inputStyle}
+            >
+              <option value="">None</option>
+              {milestones.map((m) => (
+                <option key={m.id} value={m.id}>{m.name}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}

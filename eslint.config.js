@@ -18,4 +18,11 @@ export default defineConfig([
       parserOptions: { ecmaFeatures: { jsx: true } },
     },
   },
+  {
+    files: ['server/**/*.js', 'src/db/**/*.js'],
+    languageOptions: {
+      globals: { ...globals.node },
+      parserOptions: { sourceType: 'module' },
+    },
+  },
 ])
