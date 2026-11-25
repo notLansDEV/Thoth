@@ -78,20 +78,19 @@ The app applies idempotent schema/bootstrap updates on startup.
 
 ### Quick start (all-in-one)
 
-The easiest way to run Thoth is the all-in-one image (app + PostgreSQL in one container):
+With Docker installed, run:
 
 ```bash
-docker build -f Dockerfile.allinone -t thoth .
 docker run -d \
   --name thoth \
   -p 5232:5232 \
   -v ~/.thoth:/var/opt/thoth \
-  thoth
+  ghcr.io/notlansdev/thoth:latest
 ```
 
 Open **http://localhost:5232** and create your first account.
 
-Everything Thoth stores is in `~/.thoth`, so backing up that one folder backs up your data.
+Everything Thoth stores is in `~/.thoth`, so backing up that one folder backs up your data. On first boot, Thoth automatically initializes PostgreSQL, creates the database, and generates/persists secrets in `/var/opt/thoth`.
 
 **Useful commands:**
 
@@ -100,6 +99,13 @@ docker logs -f thoth
 docker stop thoth
 docker start thoth
 docker rm -f thoth   # data stays in ~/.thoth
+```
+
+**Build locally instead (optional):**
+
+```bash
+docker build -f Dockerfile.allinone -t thoth .
+docker run -d --name thoth -p 5232:5232 -v ~/.thoth:/var/opt/thoth thoth
 ```
 
 ### Advanced: Docker Compose (separate app + DB)

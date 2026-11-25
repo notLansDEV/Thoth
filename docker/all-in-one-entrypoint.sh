@@ -56,4 +56,15 @@ su - postgres -c "psql -v ON_ERROR_STOP=1 --username=postgres -tc \"SELECT 1 FRO
 su - postgres -c "psql -v ON_ERROR_STOP=1 --username=postgres -c \"ALTER ROLE \\\"$DB_USER\\\" WITH PASSWORD '$DB_PASSWORD'; GRANT ALL PRIVILEGES ON DATABASE \\\"$DB_NAME\\\" TO \\\"$DB_USER\\\";\""
 
 echo "[thoth] Starting Thoth on port $PORT..."
-exec node /app/server/index.js
+node /app/server/index.js &
+APP_PID=$!
+
+shutdown() {
+  echo "[thoth] Shutting down..."
+  kill -TERM "$APP_PID" 2>/dev/null || true
+  wait "$APP_PID" 2>/dev/null || true
+  su - postgres -c "/usr/lib/postgresql/16/bin/pg_ctl -D '$PGDATA' -m fast stop" || true
+}
+trap shutdown SIGTERM SIGINT
+
+wait "$APP_PID"
