@@ -151,9 +151,9 @@ export default function ProjectDetail({ projectId, onBack }) {
       <div className="card" style={{ padding: '12px', marginBottom: '10px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'var(--muted)', marginBottom: '6px' }}>
           <span>Overall progress</span>
-          <span>{progress}%</span>
+          <span style={{ color: progress === 100 ? '#20d96b' : progress > 0 ? 'var(--purple, #6e61ff)' : 'var(--muted)', fontWeight: 700 }}>{progress}%</span>
         </div>
-        <div className="progress"><span style={{ width: `${progress}%` }} /></div>
+        <div className="progress"><span style={{ width: `${progress}%`, background: progress === 100 ? '#20d96b' : 'var(--purple, #6e61ff)' }} /></div>
       </div>
 
       {/* Tabs */}

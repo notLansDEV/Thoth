@@ -66,7 +66,7 @@ export class ReportRepository extends BaseRepository {
     // Get stats for the day
     const stats = await getOne(
       `SELECT
-         COUNT(DISTINCT CASE WHEN t.created_at::date = $2 AND t.status = 'completed' THEN t.id END) as tasks_done,
+         COUNT(DISTINCT CASE WHEN t.created_at::date = $2 AND LOWER(t.status) IN ('done', 'completed') THEN t.id END) as tasks_done,
          COUNT(DISTINCT CASE WHEN t.status = 'todo' THEN t.id END) as tasks_backlog,
          COUNT(DISTINCT CASE WHEN b.created_at::date = $2 AND b.status = 'resolved' THEN b.id END) as bugs_fixed,
          COUNT(DISTINCT CASE WHEN b.created_at::date = $2 THEN b.id END) as bugs_added

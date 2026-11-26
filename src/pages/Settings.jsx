@@ -1509,6 +1509,7 @@ export default function Settings() {
                 })
                 toast.success(`Reset ${String(selectedRole).toUpperCase()} permissions to default template.`)
               }
+              const canDeleteSelectedRole = isOwnerUser && !['admin', 'member', 'owner'].includes(selectedRole) && !String(selectedRole).startsWith('_')
               const _ROLE_PRESETS = [
                 { key: 'project_lead', title: 'Project Lead', description: 'Scope: Full operational authority across the assigned project. Permissions: Edit project details, manage milestones, assign team members, upload attachments/notes, full Task/Bug Kanban CRUD & stage management, reports, and markdown access.', base: 'admin' },
                 { key: 'editor', title: 'Editor (Contributor)', description: 'Scope: Day-to-day building and execution without structural configuration. Permissions: View project overview/milestones, create/edit tasks and bugs, drag-and-drop Kanban cards, manage markdown notes, and view reports. Cannot modify workflow stages.', base: 'member' },
@@ -1996,7 +1997,14 @@ export default function Settings() {
                     </table>
                   </div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 12, borderTop: '1px solid var(--border)', paddingTop: 14 }}>
-                    <div style={{ fontSize: 11, color: 'var(--muted)', maxWidth: 620, lineHeight: 1.5 }}>* <strong style={{ color: 'var(--text-soft)' }}>Granular Enforcement:</strong> Checking Edit or Delete automatically enables View. Unchecking View clears Edit and Delete actions. Saved to the active workspace configuration.</div>
+                    <div>
+                      {canDeleteSelectedRole && (
+                        <button type="button" className="btn" onClick={() => setConfirmDeleteRole(selectedRole)} style={{ color: '#f87171', borderColor: 'rgba(248,113,113,.35)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                          <Trash2 size={13} />
+                          <span>Delete role</span>
+                        </button>
+                      )}
+                    </div>
                     <button type="button" className="btn primary" onClick={handleSavePermissions} disabled={savingPerms || !editable}>{savingPerms ? 'Saving…' : 'Save permissions'}</button>
                   </div>
                   </div>
@@ -2034,13 +2042,13 @@ export default function Settings() {
               const initials = (m) => (m.full_name || m.username || m.email || '?').split(/[\s._-]+/).filter(Boolean).slice(0,2).map(s=>s[0]).join('').toUpperCase() || '?'
               const wsRoleBadge = (role) => {
                 if (role === 'owner') return { label: 'Workspace Owner', bg: 'rgba(32,217,107,0.12)', color: '#20d96b', border: 'rgba(32,217,107,0.3)' }
-                if (role === 'admin') return { label: 'Admin', bg: 'rgba(110,97,255,0.14)', color: '#a89cff', border: 'rgba(110,97,255,0.35)' }
+                if (role === 'admin') return { label: 'Admin', bg: 'rgba(110,97,255,0.14)', color: '#7c6cf0', border: 'rgba(110,97,255,0.35)' }
                 return { label: 'Member', bg: 'var(--panel2)', color: 'var(--text-soft)', border: 'var(--border)' }
               }
               const scopeStyle = (type) => {
                 if (type === 'all') return { color: '#20d96b', dot: '#20d96b' }
                 if (type === 'pending') return { color: 'var(--muted)', dot: 'var(--muted2)' }
-                return { color: '#a89cff', dot: '#6e61ff' }
+                return { color: '#7c6cf0', dot: '#6e61ff' }
               }
 
               return (
@@ -2054,8 +2062,8 @@ export default function Settings() {
                     .wpt-select{padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--panel3);color:var(--text-soft);outline:none}
                     .wpt-chip{display:inline-flex;align-items:center;gap:6px;background:var(--panel2);border:1px solid var(--border);padding:3px 8px;border-radius:6px;font-size:11px;font-weight:600;color:var(--text-soft)}
                     .wpt-role-tag{font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;background:var(--panel3);color:var(--text-soft);border:1px solid var(--border)}
-                    .wpt-role-tag.lead{background:rgba(110,97,255,.22);color:#c3bcff;border-color:rgba(110,97,255,.35)}
-                    .wpt-role-tag.editor{background:rgba(110,97,255,.12);color:#a89cff;border-color:rgba(110,97,255,.25)}
+                    .wpt-role-tag.lead{background:rgba(110,97,255,.22);color:#7c6cf0;border-color:rgba(110,97,255,.35)}
+                    .wpt-role-tag.editor{background:rgba(110,97,255,.12);color:#7c6cf0;border-color:rgba(110,97,255,.25)}
                     .wpt-manage{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:6px;font-size:11.5px;font-weight:600;cursor:pointer;border:1px solid var(--border);background:var(--panel2);color:var(--text-soft)}
                     .wpt-manage:hover{background:var(--hover);border-color:var(--hover-border);color:var(--text-strong)}
                     .wpt-drawer-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.45);backdrop-filter:blur(1px);z-index:120}

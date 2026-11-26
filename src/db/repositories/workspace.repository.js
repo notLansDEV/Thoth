@@ -131,7 +131,7 @@ export class WorkspaceRepository extends BaseRepository {
       `SELECT
          COUNT(DISTINCT p.id) as total_projects,
          COUNT(DISTINCT t.id) as total_tasks,
-         COUNT(DISTINCT CASE WHEN t.status = 'completed' THEN t.id END) as completed_tasks,
+         COUNT(DISTINCT CASE WHEN LOWER(t.status) IN ('done', 'completed') THEN t.id END) as completed_tasks,
          COUNT(DISTINCT b.id) as total_bugs,
          COUNT(DISTINCT CASE WHEN b.status = 'resolved' THEN b.id END) as resolved_bugs,
          COUNT(DISTINCT wm.user_id) as total_members
