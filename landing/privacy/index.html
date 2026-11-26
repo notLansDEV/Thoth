@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#000000" />
+  <title>Thoth — Privacy Policy</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; background: #000; }
+    body { min-height: 100vh; background: #000; color: #f6f8f8; font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    a { color: inherit; text-decoration: none; }
+    :root { --border:#202829; --border-light:#2c3638; --text:#f6f8f8; --text-soft:#c7ced0; --muted:#7e898b; --teal:#22979b; --teal-bright:#37b4b8; --teal-soft:rgba(34,151,155,.14); --max:900px; }
+    body { background-image: radial-gradient(circle, rgba(34,151,155,.45) 1px, transparent 1.3px); background-size:68px 68px; background-position:22px 22px; }
+    .vignette { position:fixed; inset:0; pointer-events:none; z-index:0; background: radial-gradient(ellipse at center, rgba(0,0,0,0) 0%, rgba(0,0,0,.12) 45%, rgba(0,0,0,.48) 80%, rgba(0,0,0,.78) 100%); }
+    .container { width:min(calc(100% - 40px), var(--max)); margin:0 auto; position:relative; z-index:2; }
+    header { position:sticky; top:0; z-index:30; border-bottom:1px solid rgba(255,255,255,.05); background:rgba(0,0,0,.78); backdrop-filter:blur(16px); }
+    .nav { height:72px; display:flex; align-items:center; justify-content:space-between; gap:20px; }
+    .brand { display:inline-flex; align-items:center; gap:10px; font-weight:700; letter-spacing:.02em; }
+    .brand-logo { width:28px; height:28px; display:block; }
+    .nav-links { display:flex; align-items:center; gap:14px; color:var(--text-soft); font-size:13px; }
+    .icon-link { display:inline-flex; align-items:center; justify-content:center; width:34px; height:34px; border-radius:8px; color:var(--text-soft); border:1px solid transparent; }
+    .icon-link:hover { color:var(--text); background:rgba(255,255,255,.04); border-color:var(--border); }
+    .nav-cta { padding:9px 14px; border-radius:8px; background:var(--teal-soft); color:var(--teal-bright); border:1px solid rgba(34,151,155,.28); font-weight:600; }
+    main { padding:48px 0 64px; }
+    .eyebrow { display:inline-flex; align-items:center; gap:8px; color:var(--teal-bright); font-size:10px; font-weight:700; letter-spacing:1.7px; text-transform:uppercase; margin-bottom:14px; }
+    .eyebrow-line { width:22px; height:1px; background:var(--teal); }
+    h1 { font-size:clamp(32px,5vw,48px); line-height:1.08; letter-spacing:-.03em; margin-bottom:12px; }
+    .lead { color:var(--text-soft); font-size:15px; line-height:1.8; margin-bottom:28px; max-width:720px; }
+    .card { border:1px solid var(--border); background:rgba(11,15,16,.62); border-radius:14px; padding:24px; margin-bottom:14px; }
+    h2 { font-size:16px; margin-bottom:8px; color:var(--text); }
+    p, li { color:var(--text-soft); font-size:14px; line-height:1.8; }
+    ul { padding-left:20px; }
+    .footer { padding:28px 0 40px; color:var(--muted); font-size:12px; border-top:1px solid rgba(255,255,255,.06); }
+    .footer-inner { display:flex; justify-content:space-between; gap:16px; flex-wrap:wrap; align-items:center; }
+    .theme-toggle { display:inline-flex; align-items:center; gap:8px; padding:8px 12px; border-radius:8px; border:1px solid var(--border); background:rgba(255,255,255,.03); color:var(--text-soft); font-size:12px; font-weight:600; cursor:pointer; }
+    .theme-toggle:hover { color:var(--text); border-color:var(--border-light); }
+    [data-theme="light"] { --border:#d7e2e3; --border-light:#c2d1d2; --text:#132022; --text-soft:#3f5255; --muted:#607274; --teal-soft:rgba(34,151,155,.12); }
+    [data-theme="light"] body { background-color:#f4f7f7; color:var(--text); background-image: radial-gradient(circle, rgba(34,151,155,.38) 1px, transparent 1.3px); }
+    [data-theme="light"] .vignette { background: radial-gradient(ellipse at center, rgba(255,255,255,0) 0%, rgba(244,247,247,.04) 45%, rgba(244,247,247,.18) 80%, rgba(244,247,247,.35) 100%); }
+    [data-theme="light"] header { background:rgba(244,247,247,.84); border-bottom-color:rgba(0,0,0,.06); }
+    [data-theme="light"] .card { background:rgba(255,255,255,.72); }
+    [data-theme="light"] .icon-link:hover, [data-theme="light"] .theme-toggle { background:rgba(255,255,255,.6); }
+    [data-theme="light"] .footer { color:#425759; border-top-color:rgba(0,0,0,.08); }
+  </style>
+</head>
+<body>
+  <div class="vignette"></div>
+  <header>
+    <div class="container nav">
+      <a href="../" class="brand" aria-label="Thoth home">
+        <img src="../assets/Thoth_logo.svg" alt="" class="brand-logo" width="28" height="28">
+        <span>Thoth</span>
+      </a>
+      <nav class="nav-links">
+        <a href="https://github.com/notLansDEV/Thoth" class="icon-link" target="_blank" rel="noopener noreferrer" aria-label="GitHub repository">
+          <svg viewBox="0 0 16 16" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+        </a>
+        <a href="../doc/" class="nav-cta">Docs</a>
+      </nav>
+    </div>
+  </header>
+  <main class="container">
+    <div class="eyebrow"><span class="eyebrow-line"></span>Legal</div>
+    <h1>Privacy Policy</h1>
+    <p class="lead">Thoth is a self-hosted application. Your data stays on your own server and infrastructure.</p>
+
+    <div class="card">
+      <h2>Data ownership</h2>
+      <p>When you self-host Thoth, all project data, accounts, tasks, bugs, files, and content are stored in your own database and storage volumes. The Thoth project does not collect or host your instance data.</p>
+    </div>
+    <div class="card">
+      <h2>Data stored by your instance</h2>
+      <ul>
+        <li>Account information you create (username, email, password hash, profile data).</li>
+        <li>Workspace/project content you add (projects, tasks, bugs, milestones, reports, Markdown, attachments).</li>
+        <li>Operational data needed for authentication, permissions, and audit/security logs.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h2>Cookies and local storage</h2>
+      <p>Thoth may use browser cookies/local storage for authentication, CSRF protection, and UI preferences (such as theme). These are used to operate your self-hosted instance.</p>
+    </div>
+    <div class="card">
+      <h2>Third-party services</h2>
+      <p>Thoth does not require third-party analytics by default. If you configure external services (reverse proxy, email, integrations, etc.), their privacy policies apply.</p>
+    </div>
+    <div class="card">
+      <h2>Contact</h2>
+      <p>For privacy questions or issues, open a report on <a href="https://github.com/notLansDEV/Thoth/issues/new" target="_blank" rel="noopener noreferrer" style="color:var(--teal-bright);">GitHub Issues</a>.</p>
+    </div>
+  </main>
+  <footer class="container footer">
+    <div class="footer-inner">
+      <span>© 2026 Thoth</span>
+      <button id="themeToggle" class="theme-toggle" type="button" aria-label="Toggle color theme"><span class="theme-toggle-icon" aria-hidden="true">☾</span><span class="theme-toggle-label">Dark</span></button>
+    </div>
+  </footer>
+  <script>
+    (function(){const root=document.documentElement;const toggle=document.getElementById("themeToggle");const stored=localStorage.getItem("thoth-landing-theme");const initial=stored==="light"||stored==="dark"?stored:"dark";function applyTheme(theme){root.setAttribute("data-theme",theme);if(toggle){toggle.querySelector(".theme-toggle-icon").textContent=theme==="light"?"☀":"☾";toggle.querySelector(".theme-toggle-label").textContent=theme==="light"?"Light":"Dark";}}applyTheme(initial);toggle?.addEventListener("click",()=>{const next=root.getAttribute("data-theme")==="light"?"dark":"light";localStorage.setItem("thoth-landing-theme",next);applyTheme(next);});})();
+  </script>
+</body>
+</html>
