@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import DescriptionPreview from '../../../components/DescriptionPreview.jsx'
+import { getCurrentWorkspace } from '../../workspaces/workspaces.service.js'
 
 const PREVIEW_LIMIT = 16
 
@@ -52,7 +53,7 @@ export default function ProjectOverview({ projects = [], tasks = [], bugs = [], 
                   const sm = statusMeta(p.status)
                   const allDone = pt.length > 0 && done === pt.length
                   return (
-                    <div key={p.id} className="dash-project-row" onClick={() => navigate(`/projects/${p.id}`)} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') navigate(`/projects/${p.id}`) }}>
+                    <div key={p.id} className="dash-project-row" onClick={() => { const slug = getCurrentWorkspace()?.slug || 'default'; navigate(`/Thoth/${slug}/projects/${p.id}`) }} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') { const slug = getCurrentWorkspace()?.slug || 'default'; navigate(`/Thoth/${slug}/projects/${p.id}`) } }}>
                       <div className="dash-project-info">
                         <div className="dash-project-title-line">
                           <span className="dash-project-name">{p.name}</span>
@@ -73,7 +74,7 @@ export default function ProjectOverview({ projects = [], tasks = [], bugs = [], 
                       <div className="dash-project-progress">
                         <span className="dash-progress-pct">{percent}%</span>
                         <div className="dash-progress-track">
-                          <div className={`dash-progress-fill ${percent === 100 ? 'is-done' : ''}`} style={{ width: `${percent}%` }} />
+                          <div className={`dash-progress-fill ${percent === 100 ? 'is-done' : ''}`} style={{ width: `${percent}%`, background: percent === 100 ? '#20d96b' : 'linear-gradient(90deg, #6e61ff, #8b5cf6)' }} />
                         </div>
                       </div>
                     </div>

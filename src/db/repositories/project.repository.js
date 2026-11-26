@@ -56,7 +56,7 @@ export class ProjectRepository extends BaseRepository {
     const sql = `
       SELECT
         COUNT(DISTINCT t.id) as total_tasks,
-        COUNT(DISTINCT CASE WHEN t.status = 'completed' THEN t.id END) as completed_tasks,
+        COUNT(DISTINCT CASE WHEN LOWER(t.status) IN ('done', 'completed') THEN t.id END) as completed_tasks,
         COUNT(DISTINCT b.id) as total_bugs,
         COUNT(DISTINCT CASE WHEN b.status = 'resolved' THEN b.id END) as resolved_bugs
       FROM projects p
